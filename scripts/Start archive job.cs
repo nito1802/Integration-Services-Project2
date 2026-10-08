@@ -2,7 +2,7 @@
         {
             Set("JobActive", false);
             Set("JobFailed", false);
-            Set("JobFilePublished", false);
+            Set("JobError", "");
             Set("OutputFile", "");
             SqlConnection status = AcquireStatus();
             try
@@ -27,7 +27,6 @@
                 try
                 {
                     source.ChangeDatabase(S("DatabaseName"));
-                    using (var command = new SqlCommand("SET XACT_ABORT ON; SET LOCK_TIMEOUT 30000; SET TRANSACTION ISOLATION LEVEL SERIALIZABLE; BEGIN TRANSACTION;", source)) command.ExecuteNonQuery();
                 }
                 finally { Release(source); }
             });

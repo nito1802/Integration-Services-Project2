@@ -14,7 +14,6 @@
                             Set("DaysCounter", reader.GetInt32(0));
                             Set("DateFrom", reader.GetDateTime(1));
                             Set("DateTo", reader.GetDateTime(2));
-                            Set("TableExpectedRows", reader.GetInt64(3));
                         }
                     }
                 }

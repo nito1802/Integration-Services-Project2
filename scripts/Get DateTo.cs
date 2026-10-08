@@ -6,8 +6,6 @@
                 Set("CurrentDateFrom", from);
                 Set("CurrentDateTo", to);
                 Set("BatchNumber", (long)0);
-                Set("DayExportedRows", (long)0);
-                // The table-wide transaction was started by Start archive job.
                 Set("CountSQL", "SELECT COUNT_BIG(*) FROM " + S("QuotedTable") + " WHERE " + S("QuotedColumn") +
                     " >= @DateFrom AND " + S("QuotedColumn") + " < @DateTo;");
             });

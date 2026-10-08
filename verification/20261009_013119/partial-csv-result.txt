@@ -1,0 +1,1 @@
+﻿PASS: production ScriptMain sources with a test exception after batch one; partial CSV has 1000 rows; no tmp; SetTableStatus recorded Error and retained the last successful date.

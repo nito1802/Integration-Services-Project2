@@ -37,4 +37,4 @@ dotnet ef database update --context ArchiveJobsDbContext
 dotnet ef migrations has-pending-model-changes --context ArchiveJobsDbContext
 ```
 
-Obie migracje zastosowano do uzgodnionej bazy. Sprawdzenie modelu nie wykazało oczekujących zmian. Skrypt `tools/Verify-ArchiveJobsDatabase.ps1` weryfikuje aktualną strukturę tabeli. Test SSIS obejmuje sukces, błąd, ponowienie i błąd podczas finalizacji eksportu.
+Obie migracje zastosowano do uzgodnionej bazy. Sprawdzenie modelu nie wykazało oczekujących zmian. Skrypt `tools/Verify-ArchiveJobsDatabase.ps1` weryfikuje aktualną strukturę tabeli. SSIS zapisuje wynik w końcowym bloczku SetTableStatus. Aktualne testy obejmują pełny eksport oraz błąd po pierwszej paczce, z pozostawieniem częściowego CSV i zachowaniem daty ostatniego sukcesu.

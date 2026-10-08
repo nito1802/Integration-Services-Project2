@@ -1,4 +1,4 @@
-# Archiwizacja CSV w SSIS
+﻿# Archiwizacja CSV w SSIS
 
 Projekt `Integration Services Project2.Console` pozwala dodawać zadania do `Archive.ArchiveJobs`. Ustaw go jako startowy w Visual Studio i uruchom przez F5 / Ctrl+F5. Kontekst jest wstrzykiwany przez DI, a połączenie pochodzi z tego samego `appsettings.json` co biblioteka `.Database`. Instrukcja znajduje się w README konsolówki.
 
@@ -22,13 +22,15 @@ Konfiguracja `Archive.ArchiveJobs`:
 
 `DatabaseName` nie jest nazwą schematu. Migracja poprawia dwa wcześniejsze przykładowe wpisy: `MyData.Snapshots` i `SmartHome.Events` należą do schematów w obecnej bazie `nito_superDb`. Pozostałe wcześniejsze wpisy demonstracyjne pozostają w tabeli; gdy wskazują nieistniejące bazy, otrzymują `Error`.
 
-Przepływ: Get Archive Jobs → Foreach Loop Container → Start archive job → BeginScript → Count days diff → GetGuid → pętla dni → pętla partii po 1000 → Finalize table. Na końcu Archive summary podsumowuje wszystkie zadania.
+Przepływ: Get Archive Jobs → Foreach Loop Container → Start archive job → BeginScript → Count days diff → GetGuid → pętla dni → pętla partii po 1000 → SetTableStatus. Na końcu Archive summary podsumowuje wszystkie zadania. Complete day i Finalize table zostały usunięte.
 
-Na początku zadania zapisujemy czas próby, czyścimy błąd i status. Cały eksport jednej tabeli działa w jednej transakcji SQL `SERIALIZABLE`, na zachowanym połączeniu. Dane są czytane bezpośrednio ze źródła; nie tworzymy `#ArchiveDay`. Zakres to pełne dni sprzed północy serwera SQL pomniejszonej o retencję. Tabela musi mieć kolumnę daty i niefiltrowany unikalny klucz, również złożony. Partia używa `ORDER BY` po tym kluczu oraz `OFFSET/FETCH`.
+Na początku zadania zapisujemy czas próby, czyścimy błąd i status. Nie używamy jawnych transakcji SQL ani transakcji SSIS. Dane są czytane bezpośrednio ze źródła; nie tworzymy `#ArchiveDay`. Zakres to pełne dni sprzed północy serwera SQL pomniejszonej o retencję. Tabela musi mieć kolumnę daty i niefiltrowany unikalny klucz, również złożony. Partia używa `ORDER BY` po tym kluczu oraz `OFFSET/FETCH`. Zakładamy, że historyczne rekordy w eksportowanym zakresie nie są zmieniane ani usuwane, a nowe dane przychodzą poza tym zakresem.
 
-Dane dopisują się do `.csv.tmp`, a nagłówek jest zapisywany raz. Po sprawdzeniu liczby rekordów następuje przemianowanie na `.csv`, zatwierdzenie transakcji odczytu źródła i zapis `Success` przez `ArchiveJobsDb`. Obie daty otrzymują dokładnie tę samą wartość `SYSDATETIME()`. Na błędzie wycofujemy jeszcze otwartą transakcję tabeli, zapisujemy `Error` i szczegóły połączeniem `ArchiveJobsDb`, zachowując ostatnią datę sukcesu. Zapis statusu i transakcja źródła są osobnymi operacjami. Kolejne zadania są przetwarzane dalej. Błąd pojedynczej tabeli pojawia się jako ostrzeżenie; końcowe podsumowanie oznacza pakiet jako nieudany, jeżeli były błędy. Brak dostępu do konfiguracji lub niemożność zapisania stanu zatrzymuje pakiet.
+Plik od początku ma rozszerzenie `.csv`. GetGuid tworzy plik i zapisuje jeden nagłówek; kolejne paczki dopisują dane. Nie ma pliku `.tmp`, przemianowania ani końcowego sprawdzania liczby rekordów dnia/tabeli. Count records pozostaje, ponieważ steruje liczbą paczek danego dnia. Liczba wierszy zapisanych w paczce służy tylko do logowania.
 
-Transakcja SQL nie obejmuje systemu plików. Przy obsłużonym błędzie finalizacji opublikowany CSV wraca do `.tmp`. Nagłe zakończenie procesu lub awaria komputera może zostawić nieukończony stan wymagający sprawdzenia. Nowa próba zawsze ma nowy GUID. Blokady źródła trwają przez cały eksport tabeli i mogą blokować równoległe zapisy; limit oczekiwania na blokadę wynosi 30 sekund. Dalsze partie `OFFSET` mogą być wolniejsze. Dane źródłowe nie są usuwane ani modyfikowane.
+Błąd odczytu lub serializacji ustawia `JobFailed` i zapisuje wyjątek do `JobError`. Dalszy eksport tej tabeli jest pomijany. Końcowy krótki bloczek `SetTableStatus`, wykonywany także po błędzie, aktualizuje `ArchiveJobs` przez osobne połączenie: przy sukcesie obie daty dostają identyczne `SYSDATETIME()`, status Success i pusty ErrorMessage; przy błędzie zapisuje datę próby, Error oraz komunikat, zachowując datę poprzedniego sukcesu. Błąd konfiguracji tabeli również daje Error. Jeżeli nie można odczytać konfiguracji lub zapisać stanu, pakiet zatrzymuje się.
+
+Po błędzie plik `.csv` pozostaje na dysku i może zawierać tylko część danych. Samo rozszerzenie nie oznacza sukcesu — wynik zadania wskazuje LastProcessedStatus. Kolejne zadania są przetwarzane dalej, a Archive summary zgłasza końcowy błąd pakietu, jeśli którekolwiek zadanie miało Error. Nowa próba zawsze ma nowy GUID. Dane źródłowe nie są usuwane ani modyfikowane. Dalsze partie OFFSET mogą być wolniejsze.
 
 Format CSV: separator `;`, wszystkie pola w cudzysłowach, podwajanie cudzysłowów, UTF-8 z BOM, nagłówki `Nazwa (typ SQL)`, NULL jako puste pole, formatowanie invariant culture. Zmiana struktury podczas eksportu powoduje błąd.
 
@@ -44,6 +46,4 @@ Weryfikacja:
 - `tools/Verify-JobProcessing.ps1`: kontynuacja po błędzie, wyczyszczenie poprzedniego błędu, zachowanie daty sukcesu; `-RetrySucceeded` sprawdza ponowienie po naprawie konfiguracji.
 - `tools/Verify-Export.ps1`: dokładne klucze, retencja, wiele partii, Unicode, cudzysłowy, średniki, wielowierszowy tekst i BOM.
 
-Osobne połączenia sprawdzono w Visual Studio na dwóch bazach LocalDB: źródłowej (bez tabeli ArchiveJobs) i konfiguracyjnej. Wynik: 3508 rekordów w CSV, trzy zadania Success, jeden kontrolowany Error, poprawne daty i kontynuacja po błędzie. Wyniki: `verification/20261008_180132`.
-
-Test LocalDB potwierdził 2506 rekordów Orders, 1002 Events oraz pustą tabelę. Pierwszy przebieg: trzy sukcesy i jeden kontrolowany błąd; po poprawieniu kolumny daty: cztery sukcesy, równe daty i puste ErrorMessage. Osobny test błędu finalizacji potwierdził zachowanie daty sukcesu, wycofanie transakcji i pozostawienie `.tmp`. Wyniki: `verification/20261008_152034`. Ten ostatni kontrolowany błąd pozostaje w izolowanej bazie testowej. Wynik porównania właściwej bazy: `verification/main-export-result.txt`.
+Aktualny test uproszczonego flow: `verification/20261009_013119`. Pełny pakiet uruchomiony w Visual Studio wyeksportował 3508 rekordów i CSV z nagłówkiem dla pustej tabeli; kontrolowany błąd konfiguracji dał Error i nie zatrzymał kolejnych zadań. Dodatkowy test rzeczywistych źródeł ScriptMain, z zastąpionym interfejsem hosta SSIS, wymusił błąd po pierwszej paczce: pozostał CSV z 1000 rekordami, bez tmp, a SetTableStatus zapisał Error i zachował poprzednią datę sukcesu. Wyniki: `verification-result.txt`, `job-state-False.txt`, `partial-csv-result.txt`.

@@ -38,46 +38,10 @@ namespace __NAMESPACE__
                     return;
                 }
                 Set("JobFailed", true);
-                try
-                {
-                    SqlConnection source = Acquire();
-                    try
-                    {
-                        using (var rollback = new SqlCommand("IF @@TRANCOUNT>0 ROLLBACK TRANSACTION; SET TRANSACTION ISOLATION LEVEL READ COMMITTED;", source)) rollback.ExecuteNonQuery();
-                    }
-                    catch (Exception cleanupError) { Info("Rollback: " + cleanupError.Message); }
-                    finally { Release(source); }
-                }
-                catch (Exception cleanupError) { Info("Source connection cleanup: " + cleanupError.Message); }
-                string error = ex.ToString();
-                if (Convert.ToBoolean(V("JobFilePublished")))
-                {
-                    try { File.Move(S("OutputFile"), S("OutputFile") + ".tmp"); Set("JobFilePublished", false); }
-                    catch (Exception cleanupError) { error += "\nCSV cleanup: " + cleanupError; }
-                }
-                try
-                {
-                    SqlConnection status = AcquireStatus();
-                    try
-                    {
-                        using (var command = new SqlCommand("UPDATE [Archive].[ArchiveJobs] SET LastProcessedAt=SYSDATETIME(), LastProcessedStatus=N'Error', ErrorMessage=@Error WHERE Id=@Id; IF @@ROWCOUNT<>1 THROW 50001,'Archive job no longer exists.',1;", status))
-                        {
-                            command.Parameters.Add("@Id", SqlDbType.Int).Value = V("ArchiveJobId");
-                            command.Parameters.Add("@Error", SqlDbType.NVarChar, -1).Value = error;
-                            command.ExecuteNonQuery();
-                        }
-                    }
-                    finally { ReleaseStatus(status); }
-                    Set("FailedJobs", Convert.ToInt32(V("FailedJobs")) + 1);
-                    Dts.Events.FireWarning(0, "CSV Archive", "Job=" + V("ArchiveJobId") + "; table=" + S("TableName") + "; " + error, "", 0);
-                    // Status is persisted; skip remaining work for this job and try the next one.
-                    Dts.TaskResult = (int)DTSExecResult.Success;
-                }
-                catch (Exception statusError)
-                {
-                    Dts.Events.FireError(0, "CSV Archive", "Cannot persist job failure: " + statusError + "\nOriginal: " + error, "", 0);
-                    Dts.TaskResult = (int)DTSExecResult.Failure;
-                }
+                Set("JobError", ex.ToString());
+                Dts.Events.FireWarning(0, "CSV Archive", "Job=" + V("ArchiveJobId") + "; table=" + S("TableName") + "; " + ex, "", 0);
+                // Skip the remaining export; SetTableStatus persists this result afterwards.
+                Dts.TaskResult = (int)DTSExecResult.Success;
             }
         }
         private static string Quote(string identifier)
@@ -98,15 +62,6 @@ namespace __NAMESPACE__
         {
             command.Parameters.Add("@DateFrom", SqlDbType.DateTime2).Value = from;
             command.Parameters.Add("@DateTo", SqlDbType.DateTime2).Value = to;
-        }
-        private static string FolderName(string name)
-        {
-            // Reversible encoding prevents path traversal and collisions between SQL names.
-            var encoded = new StringBuilder();
-            foreach (char c in name)
-                if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') encoded.Append(c);
-                else encoded.Append("~" + ((int)c).ToString("X4", CultureInfo.InvariantCulture));
-            return "table_" + encoded;
         }
         private static string EscapeCsv(string value)
         {

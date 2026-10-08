@@ -14,7 +14,6 @@
                 Set("FolderFullPath", folder);
                 Set("AddNumber", guid);
                 Set("OutputFile", output);
-                Set("TableExportedRows", 0L);
                 SqlConnection connection = Acquire();
                 try
                 {
@@ -23,7 +22,7 @@
                     {
                         string header = CsvHeader(reader);
                         Set("CsvHeader", header);
-                        using (var stream = new FileStream(output + ".tmp", FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                        using (var stream = new FileStream(output, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                         using (var writer = new StreamWriter(stream, new UTF8Encoding(true)))
                         {
                             writer.WriteLine(header);

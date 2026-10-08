@@ -24,16 +24,17 @@ while($package.PrecedenceConstraints.Count -gt 0) { $package.PrecedenceConstrain
 while($package.Executables.Count -gt 0) { $package.Executables.Remove(0) }
 $package.VersionBuild=$package.VersionBuild+1
 $package.MaxConcurrentExecutables=1
+$package.TransactionOption=[Microsoft.SqlServer.Dts.Runtime.DTSTransactionOption]::NotSupported
 $package.DelayValidation=$true
-$package.Description='CSV archive: configuration -> tables -> full days -> stable batches of 1000. One CSV per table and execution, in execution-date folder. Source tables are read only.'
+$package.Description='CSV archive: ArchiveJobs -> tables -> days -> batches of 1000 -> SetTableStatus. Direct CSV output, no explicit transactions. Source tables are read only.'
 $package.Variables.Remove('User::SQLStatement')
 function Add-Variable($name,$value) { [void]$package.Variables.Add($name,$false,'User',$value) }
 foreach($name in @('Tables')) { Add-Variable $name (New-Object object) }
-foreach($name in @('TableName','ColumnDate','ArchiwumPath','BeginScript','CountSQL','SQLStatement','FolderFullPath','OutputFile','AddNumber','QuotedTable','QuotedColumn','OrderBy','DatabaseName','JobsTable','CsvHeader')) { Add-Variable $name '' }
+foreach($name in @('TableName','ColumnDate','ArchiwumPath','BeginScript','CountSQL','SQLStatement','FolderFullPath','OutputFile','AddNumber','QuotedTable','QuotedColumn','OrderBy','DatabaseName','JobError','CsvHeader')) { Add-Variable $name '' }
 foreach($name in @('Days','DaysCounter','LoopCounter','ArchiveJobId','FailedJobs')) { Add-Variable $name ([int]0) }
-foreach($name in @('FileRecordCounter','BatchNumber','DayExportedRows','TableExportedRows','TableExpectedRows')) { Add-Variable $name ([long]0) }
+foreach($name in @('FileRecordCounter','BatchNumber')) { Add-Variable $name ([long]0) }
 foreach($name in @('DateFrom','DateTo','CurrentDateFrom','CurrentDateTo')) { Add-Variable $name ([datetime]'2000-01-01') }
-foreach($name in @('JobActive','JobFailed','JobFilePublished')) { Add-Variable $name $false }
+foreach($name in @('JobActive','JobFailed')) { Add-Variable $name $false }
 $archiveRoot=[IO.Path]::GetDirectoryName([string]$package.Parameters['OutputFile'].Value)
 foreach($obsolete in @('TableName','DateColumn','OlderThanDays','OutputFile')) { [void]$package.Parameters.Remove($obsolete) }
 $p=$package.Parameters.Add('ArchiveRoot',[TypeCode]::String); $p.Value=$archiveRoot
@@ -60,7 +61,7 @@ function Link($container,$from,$to,$expression='') {
 $scriptDefinitions=New-Object System.Collections.Generic.List[object]
 function Add-Script($container,$name,$read,$write) {
     $hostTask=$container.Executables.Add('STOCK:ScriptTask'); $hostTask.Name=$name; $hostTask.DelayValidation=$true; $hostTask.FailPackageOnFailure=$true
-    $sharedWrite=@('User::JobActive','User::JobFailed','User::JobFilePublished','User::FailedJobs','User::ArchiveJobId','User::JobsTable','User::OutputFile')
+    $sharedWrite=@('User::JobActive','User::JobFailed','User::JobError','User::FailedJobs','User::ArchiveJobId','User::OutputFile')
     $writes=@((@($write -split ',') + $sharedWrite) | Where-Object { $_ } | Select-Object -Unique)
     $reads=@((@($read -split ',') + @('User::TableName')) | Where-Object { $_ -and $_ -notin $writes } | Select-Object -Unique)
     $scriptDefinitions.Add(@{Name=$name; Read=($reads -join ','); Write=($writes -join ',')})
@@ -74,15 +75,15 @@ foreach($entry in @(@('ArchiveJobId',0),@('DatabaseName',1),@('TableName',2),@('
 Link $package $getSettings $tables
 $startJob=Add-Script $tables 'Start archive job' '$Package::ArchiveRoot,User::DatabaseName' 'User::ArchiwumPath'
 $begin=Add-Script $tables 'BeginScript' 'User::TableName,User::ColumnDate,User::Days' 'User::BeginScript,User::LoopCounter,User::QuotedTable,User::QuotedColumn,User::OrderBy'
-$days=Add-Script $tables 'Count days diff' 'User::BeginScript,User::Days' 'User::DaysCounter,User::DateFrom,User::DateTo,User::TableExpectedRows'
+$days=Add-Script $tables 'Count days diff' 'User::BeginScript,User::Days' 'User::DaysCounter,User::DateFrom,User::DateTo'
 $dayLoop=$tables.Executables.Add('STOCK:FORLOOP'); $dayLoop.Name='For Loop Container'; $dayLoop.DelayValidation=$true; $dayLoop.FailPackageOnFailure=$true
 $dayLoop.InitExpression='@[User::LoopCounter] = 0'; $dayLoop.EvalExpression='!@[User::JobFailed] && @[User::LoopCounter] < @[User::DaysCounter]'; $dayLoop.AssignExpression='@[User::LoopCounter] = @[User::LoopCounter] + 1'
 Link $tables $startJob $begin
 Link $tables $begin $days
-$guid=Add-Script $tables 'GetGuid' 'System::StartTime,User::ArchiwumPath,User::TableName,User::QuotedTable' 'User::FolderFullPath,User::AddNumber,User::OutputFile,User::CsvHeader,User::TableExportedRows,User::TableExpectedRows'
+$guid=Add-Script $tables 'GetGuid' 'System::StartTime,User::ArchiwumPath,User::TableName,User::QuotedTable' 'User::FolderFullPath,User::AddNumber,User::OutputFile,User::CsvHeader'
 Link $tables $days $guid
 Link $tables $guid $dayLoop
-$getDate=Add-Script $dayLoop 'Get DateTo' 'User::DateFrom,User::LoopCounter,User::ArchiwumPath,User::TableName,User::QuotedTable,User::QuotedColumn' 'User::CurrentDateFrom,User::CurrentDateTo,User::BatchNumber,User::DayExportedRows,User::CountSQL'
+$getDate=Add-Script $dayLoop 'Get DateTo' 'User::DateFrom,User::LoopCounter,User::ArchiwumPath,User::TableName,User::QuotedTable,User::QuotedColumn' 'User::CurrentDateFrom,User::CurrentDateTo,User::BatchNumber,User::CountSQL'
 $count=Add-Script $dayLoop 'Count records' 'User::CountSQL,User::CurrentDateFrom,User::CurrentDateTo' 'User::FileRecordCounter'
 $batches=$dayLoop.Executables.Add('STOCK:FORLOOP'); $batches.Name='Loop through 1000'; $batches.DelayValidation=$true; $batches.FailPackageOnFailure=$true
 $batches.InitExpression='@[User::BatchNumber] = 0'; $batches.EvalExpression='!@[User::JobFailed] && @[User::FileRecordCounter] > 0'; $batches.AssignExpression='@[User::FileRecordCounter] = @[User::FileRecordCounter] - 1000'
@@ -91,13 +92,11 @@ Link $dayLoop $count $batches
 
 
 $construct=Add-Script $batches 'Construct SQL' 'User::QuotedTable,User::QuotedColumn,User::OrderBy' 'User::SQLStatement'
-$export=Add-Script $batches 'Export data to CSV' 'User::SQLStatement,User::OutputFile,User::CurrentDateFrom,User::CurrentDateTo,User::FileRecordCounter,User::TableName,User::CsvHeader' 'User::DayExportedRows,User::BatchNumber,User::TableExportedRows'
+$export=Add-Script $batches 'Export data to CSV' 'User::SQLStatement,User::OutputFile,User::CurrentDateFrom,User::CurrentDateTo,User::TableName,User::CsvHeader' 'User::BatchNumber'
 
 Link $batches $construct $export
-$complete=Add-Script $dayLoop 'Complete day' 'User::DayExportedRows,User::QuotedTable,User::QuotedColumn,User::CurrentDateFrom,User::CurrentDateTo' 'User::TableExpectedRows'
-Link $dayLoop $batches $complete
-$finalize=Add-Script $tables 'Finalize table' 'User::OutputFile,User::TableName,User::TableExportedRows,User::TableExpectedRows' ''
-Link $tables $dayLoop $finalize
+$setStatus=Add-Script $tables 'SetTableStatus' '' ''
+Link $tables $dayLoop $setStatus
 $summary=Add-Script $package 'Archive summary' '' ''
 Link $package $tables $summary
 $skeleton=Join-Path $PSScriptRoot 'package-skeleton.dtsx'

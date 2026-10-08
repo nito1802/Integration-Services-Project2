@@ -1,4 +1,4 @@
-param([switch]$RetrySucceeded)
+param([switch]$RetrySucceeded,[string]$ExpectedError='*MissingDateColumn*',[int]$ExpectedStarts=0)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $config=Get-Content -LiteralPath (Get-Content -LiteralPath (Join-Path $root 'verification\latest-config.txt')) -Raw | ConvertFrom-Json
@@ -15,7 +15,7 @@ try {
     if($data.Tables[0].Rows.Count -ne 4) { throw 'Expected all four jobs, including failing job' }
     foreach($job in $data.Tables[0].Rows) {
         if($job.Id -eq 2 -and !$RetrySucceeded) {
-            if($job.LastProcessedStatus -ne 'Error' -or $job.ErrorMessage -notlike '*MissingDateColumn*') { throw 'Missing persisted error' }
+            if($job.LastProcessedStatus -ne 'Error' -or $job.ErrorMessage -notlike $ExpectedError) { throw 'Missing persisted error' }
             if($job.LastSuccesProcessedAt -ne [datetime]'2025-01-01') { throw 'Failure changed last success timestamp' }
             if($job.LastProcessedAt -le $job.LastSuccesProcessedAt) { throw 'Failure attempt timestamp not updated' }
         } else {
@@ -23,8 +23,8 @@ try {
             if($job.LastProcessedAt -ne $job.LastSuccesProcessedAt) { throw 'Success timestamps must be identical' }
         }
         $starts=@($data.Tables[1].Rows | Where-Object { $_.JobId -eq $job.Id -and $_.Status -is [DBNull] -and $_.ErrorMessage -is [DBNull] })
-        $expectedStarts=if($RetrySucceeded){2}else{1}
-        if($starts.Count -ne $expectedStarts) { throw ('Start did not clear error/status for job '+$job.Id) }
+        $startCount=if($ExpectedStarts -gt 0){$ExpectedStarts}elseif($RetrySucceeded){2}else{1}
+        if($starts.Count -ne $startCount) { throw ('Start did not clear error/status for job '+$job.Id) }
     }
     $data.Tables[0] | Select-Object Id,TableName,LastProcessedStatus,LastProcessedAt,LastSuccesProcessedAt | Format-Table -AutoSize
     $command.CommandText='SELECT COUNT(*) FROM sys.dm_tran_session_transactions st JOIN sys.dm_tran_database_transactions dt ON st.transaction_id=dt.transaction_id WHERE dt.database_id=DB_ID(@SourceDatabase);'
