@@ -1,6 +1,17 @@
+﻿param([switch]$MainConfiguration)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
-$config=Get-Content -LiteralPath (Get-Content -LiteralPath (Join-Path $root 'verification\latest-config.txt')) -Raw | ConvertFrom-Json
+if($MainConfiguration) {
+    $sourcePackage=[xml](Get-Content -LiteralPath (Join-Path $root 'Integration Services Project2\Package.dtsx') -Raw)
+    $sourceNs=New-Object Xml.XmlNamespaceManager($sourcePackage.NameTable); $sourceNs.AddNamespace('DTS','www.microsoft.com/SqlServer/Dts')
+    $config=[pscustomobject]@{
+        RunDirectory=(Join-Path $root 'verification\main-run')
+        ConnectionString=$sourcePackage.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="ConnectionString"]/DTS:Property[@DTS:Name="ParameterValue"]',$sourceNs).InnerText
+        ArchiveRoot=$sourcePackage.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="ArchiveRoot"]/DTS:Property[@DTS:Name="ParameterValue"]',$sourceNs).InnerText
+    }
+} else {
+    $config=Get-Content -LiteralPath (Get-Content -LiteralPath (Join-Path $root 'verification\latest-config.txt')) -Raw | ConvertFrom-Json
+}
 $testProject=Join-Path $config.RunDirectory 'designer-test'
 [void](New-Item -ItemType Directory -Path $testProject -Force)
 $package=[xml](Get-Content -LiteralPath (Join-Path $root 'Integration Services Project2\Package.dtsx') -Raw)

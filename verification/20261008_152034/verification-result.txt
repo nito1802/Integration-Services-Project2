@@ -1,0 +1,1 @@
+﻿PASS: 3 table CSV; Orders=2506; Events=1002; total=3508; file rows=2506,1002,0; exact keys; cutoff; Unicode; quotes; semicolons; multiline; NULL; decimal; BOM; single header per table; no TXT; one execution-date folder.

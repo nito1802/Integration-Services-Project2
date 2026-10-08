@@ -1,9 +1,10 @@
-﻿param([int]$ExpectedRuns=1)
+﻿param([int]$ExpectedRuns=1,[int]$ExpectedFiles=0)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $config=Get-Content -LiteralPath (Get-Content -LiteralPath (Join-Path $root 'verification\latest-config.txt')) -Raw | ConvertFrom-Json
 $files=@(Get-ChildItem -LiteralPath $config.ArchiveRoot -Recurse -Filter '*.csv')
-if($files.Count -ne 3*$ExpectedRuns) { throw "Unexpected number of table CSV files: $($files.Count)" }
+if($ExpectedFiles -eq 0) { $ExpectedFiles=3*$ExpectedRuns }
+if($files.Count -ne $ExpectedFiles) { throw "Unexpected number of table CSV files: $($files.Count)" }
 $files=@(foreach($pattern in @('dbo.Orders_*','audit.Events_*','dbo.EmptyTable_*')) {
  $files | Where-Object Name -like $pattern | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 })

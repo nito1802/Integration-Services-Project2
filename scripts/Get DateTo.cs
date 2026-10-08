@@ -7,13 +7,8 @@
                 Set("CurrentDateTo", to);
                 Set("BatchNumber", (long)0);
                 Set("DayExportedRows", (long)0);
-                // Keep source rows and their order stable until Complete day commits.
-                Set("CountSQL", "SET NOCOUNT ON; SET XACT_ABORT ON; SET LOCK_TIMEOUT 30000; " +
-                    "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE; " +
-                    "BEGIN TRY BEGIN TRANSACTION; " +
-                    "SELECT COUNT_BIG(*) AS FileRecordCounter FROM " + S("QuotedTable") + " WHERE " + S("QuotedColumn") +
-                    " >= @DateFrom AND " + S("QuotedColumn") + " < @DateTo; " +
-                    "END TRY BEGIN CATCH IF @@TRANCOUNT>0 ROLLBACK TRANSACTION; " +
-                    "SET TRANSACTION ISOLATION LEVEL READ COMMITTED; THROW; END CATCH;");
+                // The table-wide transaction was started by Start archive job.
+                Set("CountSQL", "SELECT COUNT_BIG(*) FROM " + S("QuotedTable") + " WHERE " + S("QuotedColumn") +
+                    " >= @DateFrom AND " + S("QuotedColumn") + " < @DateTo;");
             });
         }

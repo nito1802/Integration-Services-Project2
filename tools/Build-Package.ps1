@@ -1,4 +1,4 @@
-param([switch]$CompatibilityTest)
+﻿param([switch]$CompatibilityTest)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $project=Join-Path $root 'Integration Services Project2'
@@ -21,73 +21,58 @@ $package.Description='CSV archive: configuration -> tables -> full days -> stabl
 $package.Variables.Remove('User::SQLStatement')
 function Add-Variable($name,$value) { [void]$package.Variables.Add($name,$false,'User',$value) }
 foreach($name in @('Tables')) { Add-Variable $name (New-Object object) }
-foreach($name in @('TableName','ColumnDate','ArchiwumPath','BeginScript','CountSQL','SQLStatement','FolderFullPath','OutputFile','AddNumber','QuotedTable','QuotedColumn','OrderBy','SettingsSQL','CsvHeader')) { Add-Variable $name '' }
-foreach($name in @('Days','DaysCounter','LoopCounter')) { Add-Variable $name ([int]0) }
+foreach($name in @('TableName','ColumnDate','ArchiwumPath','BeginScript','CountSQL','SQLStatement','FolderFullPath','OutputFile','AddNumber','QuotedTable','QuotedColumn','OrderBy','DatabaseName','JobsTable','CsvHeader')) { Add-Variable $name '' }
+foreach($name in @('Days','DaysCounter','LoopCounter','ArchiveJobId','FailedJobs')) { Add-Variable $name ([int]0) }
 foreach($name in @('FileRecordCounter','BatchNumber','DayExportedRows','TableExportedRows','TableExpectedRows')) { Add-Variable $name ([long]0) }
 foreach($name in @('DateFrom','DateTo','CurrentDateFrom','CurrentDateTo')) { Add-Variable $name ([datetime]'2000-01-01') }
-$settings=@'
-SET NOCOUNT ON;
-IF OBJECT_ID(N'dbo.CasherSettings',N'U') IS NOT NULL
-    EXEC sys.sp_executesql N'SELECT Id,TableName,Days,ColumnDate,ArchiwumPath FROM dbo.CasherSettings WHERE DictionaryType=N''Archiwum'' ORDER BY Id;';
-ELSE
-BEGIN
-    RAISERROR('CasherSettings is absent. Using existing package parameters for one table.',10,1);
-    SELECT CAST(0 AS int) AS Id,@TableName AS TableName,@Days AS Days,@DateColumn AS ColumnDate,@ArchiveRoot AS ArchiwumPath;
-END;
-'@
-foreach($entry in @(@('SettingsQuery',$settings),@('ArchiveRoot',[IO.Path]::GetDirectoryName([string]$package.Parameters['OutputFile'].Value)))) {
-    $p=$package.Parameters.Add($entry[0],[TypeCode]::String); $p.Value=$entry[1]
-}
-$package.Variables['SettingsSQL'].EvaluateAsExpression=$true
-$package.Variables['SettingsSQL'].Expression='@[$Package::SettingsQuery]'
+foreach($name in @('JobActive','JobFailed','JobFilePublished')) { Add-Variable $name $false }
+$archiveRoot=[IO.Path]::GetDirectoryName([string]$package.Parameters['OutputFile'].Value)
+foreach($obsolete in @('TableName','DateColumn','OlderThanDays','OutputFile')) { [void]$package.Parameters.Remove($obsolete) }
+$p=$package.Parameters.Add('ArchiveRoot',[TypeCode]::String); $p.Value=$archiveRoot
 $connection=$package.Connections.Add('ADO.NET:System.Data.SqlClient.SqlConnection, System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089')
 $connection.Name='ArchiveDb'
 $connection.SetExpression('ConnectionString','@[$Package::ConnectionString]')
 $connection.Properties['RetainSameConnection'].SetValue($connection,$true)
 $connection.DelayValidation=$true
+$statusConnection=$package.Connections.Add('ADO.NET:System.Data.SqlClient.SqlConnection, System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089')
+$statusConnection.Name='ArchiveJobsDb'
+$statusConnection.SetExpression('ConnectionString','@[$Package::ConnectionString]')
+$statusConnection.Properties['RetainSameConnection'].SetValue($statusConnection,$true)
+$statusConnection.DelayValidation=$true
 function Link($container,$from,$to,$expression='') {
     $constraint=$container.PrecedenceConstraints.Add($from,$to)
     $constraint.Value=[Microsoft.SqlServer.Dts.Runtime.DTSExecResult]::Success
     if($expression) { $constraint.EvalOp=[Microsoft.SqlServer.Dts.Runtime.DTSPrecedenceEvalOp]::ExpressionAndConstraint; $constraint.Expression=$expression }
 }
-function Add-Sql($container,$name,$source,$resultType,$results,$parameters) {
-    $hostTask=$container.Executables.Add('Microsoft.ExecuteSQLTask'); $hostTask.Name=$name; $hostTask.DelayValidation=$true; $hostTask.FailPackageOnFailure=$true
-    $task=$hostTask.InnerObject; $task.Connection=$connection.ID; $task.TimeOut=300
-    $task.SqlStatementSourceType=[Microsoft.SqlServer.Dts.Tasks.ExecuteSQLTask.SqlStatementSourceType]::Variable
-    $task.SqlStatementSource='User::'+$source
-    $task.ResultSetType=[Microsoft.SqlServer.Dts.Tasks.ExecuteSQLTask.ResultSetType]$resultType
-    foreach($entry in $results) { $binding=$task.ResultSetBindings.Add(); $binding.ResultName=$entry[0]; $binding.DtsVariableName='User::'+$entry[1] }
-    foreach($entry in $parameters) {
-        $binding=$task.ParameterBindings.Add(); $binding.ParameterName=$entry[0]; $binding.DtsVariableName=$entry[1]
-        $binding.ParameterDirection=[Microsoft.SqlServer.Dts.Tasks.ExecuteSQLTask.ParameterDirections]::Input
-        $binding.DataType=[int]$entry[2]; $binding.ParameterSize=-1
-    }
-    return $hostTask
-}
 $scriptDefinitions=New-Object System.Collections.Generic.List[object]
 function Add-Script($container,$name,$read,$write) {
     $hostTask=$container.Executables.Add('STOCK:ScriptTask'); $hostTask.Name=$name; $hostTask.DelayValidation=$true; $hostTask.FailPackageOnFailure=$true
-    $scriptDefinitions.Add(@{Name=$name; Read=$read; Write=$write})
+    $sharedWrite=@('User::JobActive','User::JobFailed','User::JobFilePublished','User::FailedJobs','User::ArchiveJobId','User::JobsTable','User::OutputFile')
+    $writes=@((@($write -split ',') + $sharedWrite) | Where-Object { $_ } | Select-Object -Unique)
+    $reads=@((@($read -split ',') + @('User::TableName')) | Where-Object { $_ -and $_ -notin $writes } | Select-Object -Unique)
+    $scriptDefinitions.Add(@{Name=$name; Read=($reads -join ','); Write=($writes -join ',')})
     return $hostTask
 }
-$getSettings=Add-Sql $package 'Get Casher Settings' 'SettingsSQL' 'ResultSetType_Rowset' (,@('0','Tables')) @(@('@TableName','$Package::TableName',[Data.DbType]::String),@('@Days','$Package::OlderThanDays',[Data.DbType]::Int32),@('@DateColumn','$Package::DateColumn',[Data.DbType]::String),@('@ArchiveRoot','$Package::ArchiveRoot',[Data.DbType]::String))
+$getSettings=Add-Script $package 'Get Archive Jobs' '' 'User::Tables'
 $tables=$package.Executables.Add('STOCK:FOREACHLOOP'); $tables.Name='Foreach Loop Container'; $tables.DelayValidation=$true; $tables.FailPackageOnFailure=$true
 $tables.ForEachEnumerator=$app.ForEachEnumeratorInfos['Foreach ADO Enumerator'].CreateNew()
 $tables.ForEachEnumerator.InnerObject.DataObjectVariable='User::Tables'
-foreach($entry in @(@('TableName',1),@('Days',2),@('ColumnDate',3),@('ArchiwumPath',4))) { $mapping=$tables.VariableMappings.Add(); $mapping.VariableName='User::'+$entry[0]; $mapping.ValueIndex=$entry[1] }
+foreach($entry in @(@('ArchiveJobId',0),@('DatabaseName',1),@('TableName',2),@('Days',3),@('ColumnDate',4))) { $mapping=$tables.VariableMappings.Add(); $mapping.VariableName='User::'+$entry[0]; $mapping.ValueIndex=$entry[1] }
 Link $package $getSettings $tables
+$startJob=Add-Script $tables 'Start archive job' '$Package::ArchiveRoot,User::DatabaseName' 'User::ArchiwumPath'
 $begin=Add-Script $tables 'BeginScript' 'User::TableName,User::ColumnDate,User::Days' 'User::BeginScript,User::LoopCounter,User::QuotedTable,User::QuotedColumn,User::OrderBy'
-$days=Add-Sql $tables 'Count days diff' 'BeginScript' 'ResultSetType_SingleRow' @(@('0','DaysCounter'),@('1','DateFrom'),@('2','DateTo')) (,@('@Days','User::Days',[Data.DbType]::Int32))
+$days=Add-Script $tables 'Count days diff' 'User::BeginScript,User::Days' 'User::DaysCounter,User::DateFrom,User::DateTo,User::TableExpectedRows'
 $dayLoop=$tables.Executables.Add('STOCK:FORLOOP'); $dayLoop.Name='For Loop Container'; $dayLoop.DelayValidation=$true; $dayLoop.FailPackageOnFailure=$true
-$dayLoop.InitExpression='@[User::LoopCounter] = 0'; $dayLoop.EvalExpression='@[User::LoopCounter] < @[User::DaysCounter]'; $dayLoop.AssignExpression='@[User::LoopCounter] = @[User::LoopCounter] + 1'
+$dayLoop.InitExpression='@[User::LoopCounter] = 0'; $dayLoop.EvalExpression='!@[User::JobFailed] && @[User::LoopCounter] < @[User::DaysCounter]'; $dayLoop.AssignExpression='@[User::LoopCounter] = @[User::LoopCounter] + 1'
+Link $tables $startJob $begin
 Link $tables $begin $days
 $guid=Add-Script $tables 'GetGuid' 'System::StartTime,User::ArchiwumPath,User::TableName,User::QuotedTable' 'User::FolderFullPath,User::AddNumber,User::OutputFile,User::CsvHeader,User::TableExportedRows,User::TableExpectedRows'
 Link $tables $days $guid
 Link $tables $guid $dayLoop
 $getDate=Add-Script $dayLoop 'Get DateTo' 'User::DateFrom,User::LoopCounter,User::ArchiwumPath,User::TableName,User::QuotedTable,User::QuotedColumn' 'User::CurrentDateFrom,User::CurrentDateTo,User::BatchNumber,User::DayExportedRows,User::CountSQL'
-$count=Add-Sql $dayLoop 'Count records' 'CountSQL' 'ResultSetType_SingleRow' (,@('0','FileRecordCounter')) @(@('@DateFrom','User::CurrentDateFrom',[Data.DbType]::DateTime2),@('@DateTo','User::CurrentDateTo',[Data.DbType]::DateTime2))
+$count=Add-Script $dayLoop 'Count records' 'User::CountSQL,User::CurrentDateFrom,User::CurrentDateTo' 'User::FileRecordCounter'
 $batches=$dayLoop.Executables.Add('STOCK:FORLOOP'); $batches.Name='Loop through 1000'; $batches.DelayValidation=$true; $batches.FailPackageOnFailure=$true
-$batches.InitExpression='@[User::BatchNumber] = 0'; $batches.EvalExpression='@[User::FileRecordCounter] > 0'; $batches.AssignExpression='@[User::FileRecordCounter] = @[User::FileRecordCounter] - 1000'
+$batches.InitExpression='@[User::BatchNumber] = 0'; $batches.EvalExpression='!@[User::JobFailed] && @[User::FileRecordCounter] > 0'; $batches.AssignExpression='@[User::FileRecordCounter] = @[User::FileRecordCounter] - 1000'
 Link $dayLoop $getDate $count
 Link $dayLoop $count $batches
 
@@ -100,6 +85,8 @@ $complete=Add-Script $dayLoop 'Complete day' 'User::DayExportedRows,User::Quoted
 Link $dayLoop $batches $complete
 $finalize=Add-Script $tables 'Finalize table' 'User::OutputFile,User::TableName,User::TableExportedRows,User::TableExpectedRows' ''
 Link $tables $dayLoop $finalize
+$summary=Add-Script $package 'Archive summary' '' ''
+Link $package $tables $summary
 $skeleton=Join-Path $PSScriptRoot 'package-skeleton.dtsx'
 $app.SaveToXml($skeleton,$package,$null)
 $xml=[xml](Get-Content -LiteralPath $skeleton -Raw)
@@ -141,4 +128,16 @@ foreach($definition in $scriptDefinitions) {
 $xml.DocumentElement.SetAttribute('LastModifiedProductVersion','www.microsoft.com/SqlServer/Dts','17.0.1016.0')
 if($CompatibilityTest) { $destination=Join-Path $PSScriptRoot 'compatibility-test.dtsx' } else { $destination=$packagePath }
 $xml.Save($destination)
+if (!$CompatibilityTest) {
+    $projectFile=Join-Path $project 'Integration Services Project2.dtproj'
+    $projectXml=[xml](Get-Content -LiteralPath $projectFile -Raw)
+    $projectNs=New-Object Xml.XmlNamespaceManager($projectXml.NameTable)
+    $projectNs.AddNamespace('SSIS','www.microsoft.com/SqlServer/SSIS')
+    foreach($parameterNode in @($projectXml.SelectNodes('//SSIS:PackageMetaData/SSIS:Parameters/SSIS:Parameter',$projectNs))) {
+        if($parameterNode.GetAttribute('Name','www.microsoft.com/SqlServer/SSIS') -notin @('ConnectionString','ArchiveRoot')) {
+            [void]$parameterNode.ParentNode.RemoveChild($parameterNode)
+        }
+    }
+    $projectXml.Save($projectFile)
+}
 Write-Output ('Built '+$destination)

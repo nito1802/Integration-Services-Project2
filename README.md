@@ -1,27 +1,45 @@
 # Archiwizacja CSV w SSIS
 
-Solucja zawiera też bibliotekę C# `Integration Services Project2.Database` z niezależną tabelą `Archive.ArchiveJobs`, ośmioma rekordami przykładowymi i migracjami EF Core. Instrukcja `Add-Migration` / `Update-Database` bez osobnej aplikacji: [README biblioteki](Integration%20Services%20Project2.Database/README.md).
+Otwórz `Integration Services Project2.slnx`, następnie `Package.dtsx` i użyj Execute Package lub F5. Konfigurację tabel pakiet pobiera z `Archive.ArchiveJobs`, według `Id`. Parametry pakietu to `ConnectionString` i `ArchiveRoot`. Dawne `SettingsQuery` i konfiguracja CasherSettings zostały usunięte.
 
-Otwórz `Integration Services Project2.slnx`, następnie `Package.dtsx` w SSIS Packages. Użyj **Execute Package** z menu kontekstowego pakietu (albo ustaw pakiet jako StartUp Object i użyj F5).
+Wynik to jeden CSV na tabelę na uruchomienie, np. `C:\Archive\2026-10-08\MyData.Snapshots_2026-10-08_GUID.csv`. Dzień w folderze pochodzi z daty rozpoczęcia pakietu. GUID zapobiega nadpisywaniu poprzednich eksportów. Nagłówek jest odczytywany na nowo dla każdej tabeli; pusta tabela daje sam nagłówek.
 
-Wynik: **jeden CSV na tabelę na uruchomienie**, np. `C:\Archive\2026-10-08\MyData.Snapshots_2026-10-08_GUID.csv`.
+Konfiguracja `Archive.ArchiveJobs`:
 
-Folder i data w nazwie pochodzą z daty rozpoczęcia pakietu. GUID jest generowany raz dla każdej tabeli. Kolejne uruchomienie tworzy nowy plik w tym samym folderze dnia, bez nadpisywania wcześniejszych wyników. Nie ma podfolderów dni danych ani plików TXT. Pusta tabela daje CSV z samym nagłówkiem.
+| Kolumna | Znaczenie |
+|---|---|
+| Id | Klucz zadania |
+| DatabaseName | Rzeczywista nazwa bazy na tym samym serwerze SQL |
+| TableName | Nazwa `schema.table`, np. `MyData.Snapshots` |
+| DateColumn | Kolumna daty, zwykle `CreatedAt` |
+| ArchiveOlderThanDays | Retencja w pełnych dniach |
+| LastSuccesProcessedAt | Data i czas ostatniego udanego eksportu |
+| LastProcessedAt | Data i czas ostatniej próby |
+| LastProcessedStatus | Tekst `Success` lub `Error`; NULL podczas przetwarzania / przed pierwszą próbą |
+| ErrorMessage | Szczegóły ostatniego błędu, czyszczone przy rozpoczęciu próby |
 
-Przepływ: Get Casher Settings → Foreach Loop Container (tabele) → BeginScript → Count days diff → GetGuid (inicjalizacja pliku) → For Loop Container (dni) → Get DateTo → Count records → Loop through 1000 → Construct SQL → Export data to CSV → Complete day. Po pętli dni Finalize table publikuje gotowy CSV.
+`DatabaseName` nie jest nazwą schematu. Migracja poprawia dwa wcześniejsze przykładowe wpisy: `MyData.Snapshots` i `SmartHome.Events` należą do schematów w obecnej bazie `nito_superDb`. Pozostałe wcześniejsze wpisy demonstracyjne pozostają w tabeli; gdy wskazują nieistniejące bazy, otrzymują `Error`.
 
-Wszystkie dni i partie dopisują dane do wspólnego `.csv.tmp`. Nagłówek i BOM zapisują się raz. Po sprawdzeniu liczby rekordów tabeli plik jest przemianowany na `.csv`. Błąd zatrzymuje przebieg i pozostawia `.tmp` jako wynik nieukończony. Nowe uruchomienie otrzymuje nowy GUID i nie dopisuje do przerwanego eksportu.
+Przepływ: Get Archive Jobs → Foreach Loop Container → Start archive job → BeginScript → Count days diff → GetGuid → pętla dni → pętla partii po 1000 → Finalize table. Na końcu Archive summary podsumowuje wszystkie zadania.
 
-Format CSV zachowuje eksport z projektu: separator `;`, wszystkie pola w cudzysłowach, podwajanie cudzysłowów, nagłówki `Nazwa (typ SQL)`, UTF-8 z BOM, NULL jako puste pole, formatowanie invariant culture. Kolumny są odczytywane na nowo przy każdym uruchomieniu. Zmiana nagłówka podczas jednego eksportu powoduje błąd, aby nie mieszać struktur w jednym pliku.
+Na początku zadania zapisujemy czas próby, czyścimy błąd i status. Cały eksport jednej tabeli działa w jednej transakcji SQL `SERIALIZABLE`, na zachowanym połączeniu. Dane są czytane bezpośrednio ze źródła; nie tworzymy `#ArchiveDay`. Zakres to pełne dni sprzed północy serwera SQL pomniejszonej o retencję. Tabela musi mieć kolumnę daty i niefiltrowany unikalny klucz, również złożony. Partia używa `ORDER BY` po tym kluczu oraz `OFFSET/FETCH`.
 
-Jeżeli istnieje `dbo.CasherSettings`, pakiet przetwarza rekordy `DictionaryType = 'Archiwum'`, według `Id`. Kolumny konfiguracji: `Id, TableName, Days, ColumnDate, ArchiwumPath`. `TableName` zapisuj jako `schema.table`, bez nawiasów. Przykład: `CasherSettings.example.sql`. Gdy tabela nie istnieje, pakiet używa parametrów `TableName`, `DateColumn`, `OlderThanDays`, `ArchiveRoot`. `SettingsQuery` pozwala dostosować zapytanie konfiguracji, zachowując kolejność pięciu kolumn. Parametr `OutputFile` pozostaje dla zgodności; wynikową ścieżkę wyznacza przepływ.
+Dane dopisują się do `.csv.tmp`, a nagłówek jest zapisywany raz. Po sprawdzeniu liczby rekordów następuje przemianowanie na `.csv`, zapis `Success` i zatwierdzenie transakcji. Obie daty otrzymują dokładnie tę samą wartość `SYSDATETIME()`. Na błędzie wycofujemy transakcję tabeli, zapisujemy `Error` i szczegóły osobnym połączeniem, zachowując ostatnią datę sukcesu. Kolejne zadania są przetwarzane dalej. Błąd pojedynczej tabeli pojawia się jako ostrzeżenie; końcowe podsumowanie oznacza pakiet jako nieudany, jeżeli były błędy. Brak dostępu do konfiguracji lub niemożność zapisania stanu zatrzymuje pakiet.
 
-Eksport obejmuje wszystkie rekordy kwalifikujące się według obecnej retencji: pełne dni przed północą serwera SQL minus `Days`, zakresy `[DateFrom, DateTo)`. Wymagana jest kolumna date/datetime/datetime2/smalldatetime i niefiltrowany unikalny klucz, także złożony. Każda paczka maksymalnie 1000 rekordów czyta bezpośrednio z tabeli źródłowej, z `ORDER BY` po wykrytym unikalnym kluczu i parametrami `OFFSET/FETCH`. Nie tworzymy kopii dziennej ani tabeli tymczasowej. Liczenie, wszystkie paczki i końcowe sprawdzenie jednego dnia działają w tej samej transakcji `SERIALIZABLE`, na zachowanym połączeniu. Zapobiega to przesuwaniu rekordów między paczkami wskutek równoległych zapisów. Blokady są utrzymywane do zakończenia dnia; przy dużym dniu lub braku odpowiednich indeksów mogą blokować zapisy również szerzej niż dany zakres. Limit oczekiwania na blokadę wynosi 30 sekund. Puste dni również zamykają transakcję. Błąd eksportu wycofuje transakcję i pozostawia nieukończony `.tmp`. Tabele źródłowe nie są zmieniane. `OFFSET` może spowalniać dalsze paczki; ta implementacja nie gwarantuje stałego czasu odczytu każdej paczki.
+Transakcja SQL nie obejmuje systemu plików. Przy obsłużonym błędzie finalizacji opublikowany CSV wraca do `.tmp`. Nagłe zakończenie procesu lub awaria komputera może zostawić nieukończony stan wymagający sprawdzenia. Nowa próba zawsze ma nowy GUID. Blokady źródła trwają przez cały eksport tabeli i mogą blokować równoległe zapisy; limit oczekiwania na blokadę wynosi 30 sekund. Dalsze partie `OFFSET` mogą być wolniejsze. Dane źródłowe nie są usuwane ani modyfikowane.
 
-Źródła Script Tasks: `scripts`. `tools/Build-Package.ps1` osadza kod i skompilowane biblioteki przy użyciu Visual Studio 18 Insiders / SSIS 2025. Oryginalny pakiet: `tools/original.Package.dtsx`.
+Format CSV: separator `;`, wszystkie pola w cudzysłowach, podwajanie cudzysłowów, UTF-8 z BOM, nagłówki `Nazwa (typ SQL)`, NULL jako puste pole, formatowanie invariant culture. Zmiana struktury podczas eksportu powoduje błąd.
 
-Weryfikacja: `tools/Verify-MainExport.ps1` porównuje najnowszy CSV bieżącej tabeli z bazą. `tools/Verify-Export.ps1` sprawdza test LocalDB: wiele tabel/dni/partii, IDENTITY, klucz złożony, pusta tabela, granica retencji, Unicode, średniki, cudzysłowy, tekst wielowierszowy, NULL i format liczb. `-ExpectedRuns 2` sprawdza ponowny eksport po dodaniu kolumny testowej. Konfiguracja: `verification/latest-config.txt`.
+Biblioteka `Integration Services Project2.Database` utrzymuje model i migracje. Instrukcja migracji bez osobnej aplikacji znajduje się w jej README. Konfiguracja biblioteki pochodzi z `appsettings.json`; połączenie SSIS jest osobnym parametrem pakietu.
 
-Potwierdzone wykonania w Visual Studio: główny eksport 95 rekordów w jednym CSV; test LocalDB 3508 rekordów w dwóch plikach danych i jeden CSV z nagłówkiem dla pustej tabeli; ponowne uruchomienie po dodaniu kolumny tworzy nowe CSV i pozostawia poprzednie pliki bez zmian. Wyniki sprawdzeń zapisano w katalogu ostatniego testu.
+Źródła Script Tasks są w `scripts`. Po ich zmianie `tools/Build-Package.ps1` osadza kod i kompiluje skrypty przy użyciu Visual Studio 18 Insiders / SSIS 2025. Samo edytowanie pliku w `scripts` nie aktualizuje osadzonego kodu pakietu.
 
-Po zmianie na bezpośredni odczyt źródła ponownie wykonano cały pakiet w Visual Studio: 2506 rekordów Orders, 1002 Events (klucz złożony), pusta tabela, pusty dzień między dniami danych oraz paczki 1000/1000/505. `Verify-Export.ps1` potwierdził dokładne klucze, granicę retencji, format CSV i brak nieukończonych plików. Wynik: `verification/20261008_112715/verification-result.txt`.
+Weryfikacja:
+
+- `tools/Verify-ArchiveJobsDatabase.ps1`: dziewięć kolumn, typy datetime2 i tekstowy status.
+- `tools/Verify-MainExport.ps1`: porównanie najnowszych CSV udanych zadań z każdym rekordem i polem źródła, sprawdzenie stanów błędów.
+- `tools/Create-TestDatabase.ps1 -IncludeFailure`: izolowany LocalDB z wieloma tabelami, kluczem złożonym, pustą tabelą i celowo błędnym zadaniem.
+- `tools/Verify-JobProcessing.ps1`: kontynuacja po błędzie, wyczyszczenie poprzedniego błędu, zachowanie daty sukcesu; `-RetrySucceeded` sprawdza ponowienie po naprawie konfiguracji.
+- `tools/Verify-Export.ps1`: dokładne klucze, retencja, wiele partii, Unicode, cudzysłowy, średniki, wielowierszowy tekst i BOM.
+
+Test LocalDB potwierdził 2506 rekordów Orders, 1002 Events oraz pustą tabelę. Pierwszy przebieg: trzy sukcesy i jeden kontrolowany błąd; po poprawieniu kolumny daty: cztery sukcesy, równe daty i puste ErrorMessage. Osobny test błędu finalizacji potwierdził zachowanie daty sukcesu, wycofanie transakcji i pozostawienie `.tmp`. Wyniki: `verification/20261008_152034`. Ten ostatni kontrolowany błąd pozostaje w izolowanej bazie testowej. Wynik porównania właściwej bazy: `verification/main-export-result.txt`.

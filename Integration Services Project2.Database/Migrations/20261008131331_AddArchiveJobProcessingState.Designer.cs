@@ -4,6 +4,7 @@ using IntegrationServicesProject2.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace IntegrationServicesProject2.Database.Migrations
 {
     [DbContext(typeof(ArchiveJobsDbContext))]
-    partial class ArchiveJobsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261008131331_AddArchiveJobProcessingState")]
+    partial class AddArchiveJobProcessingState
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

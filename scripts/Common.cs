@@ -18,11 +18,67 @@ namespace __NAMESPACE__
         private string S(string name) { return Convert.ToString(V(name), CultureInfo.InvariantCulture); }
         private SqlConnection Acquire() { return (SqlConnection)Dts.Connections["ArchiveDb"].AcquireConnection(Dts.Transaction); }
         private void Release(SqlConnection connection) { Dts.Connections["ArchiveDb"].ReleaseConnection(connection); }
+        private SqlConnection AcquireStatus() { return (SqlConnection)Dts.Connections["ArchiveJobsDb"].AcquireConnection(Dts.Transaction); }
+        private void ReleaseStatus(SqlConnection connection) { Dts.Connections["ArchiveJobsDb"].ReleaseConnection(connection); }
         private void Info(string message) { bool again = false; Dts.Events.FireInformation(0, "CSV Archive", message, "", 0, ref again); }
         private void Run(Action work)
         {
+            if (Convert.ToBoolean(V("JobActive")) && Convert.ToBoolean(V("JobFailed")))
+            {
+                Dts.TaskResult = (int)DTSExecResult.Success;
+                return;
+            }
             try { work(); Dts.TaskResult = (int)DTSExecResult.Success; }
-            catch (Exception ex) { Dts.Events.FireError(0, "CSV Archive", ex.ToString(), "", 0); Dts.TaskResult = (int)DTSExecResult.Failure; }
+            catch (Exception ex)
+            {
+                if (!Convert.ToBoolean(V("JobActive")))
+                {
+                    Dts.Events.FireError(0, "CSV Archive", ex.ToString(), "", 0);
+                    Dts.TaskResult = (int)DTSExecResult.Failure;
+                    return;
+                }
+                Set("JobFailed", true);
+                try
+                {
+                    SqlConnection source = Acquire();
+                    try
+                    {
+                        using (var rollback = new SqlCommand("IF @@TRANCOUNT>0 ROLLBACK TRANSACTION; SET TRANSACTION ISOLATION LEVEL READ COMMITTED;", source)) rollback.ExecuteNonQuery();
+                    }
+                    catch (Exception cleanupError) { Info("Rollback: " + cleanupError.Message); }
+                    finally { Release(source); }
+                }
+                catch (Exception cleanupError) { Info("Source connection cleanup: " + cleanupError.Message); }
+                string error = ex.ToString();
+                if (Convert.ToBoolean(V("JobFilePublished")))
+                {
+                    try { File.Move(S("OutputFile"), S("OutputFile") + ".tmp"); Set("JobFilePublished", false); }
+                    catch (Exception cleanupError) { error += "\nCSV cleanup: " + cleanupError; }
+                }
+                try
+                {
+                    SqlConnection status = AcquireStatus();
+                    try
+                    {
+                        using (var command = new SqlCommand("UPDATE [Archive].[ArchiveJobs] SET LastProcessedAt=SYSDATETIME(), LastProcessedStatus=N'Error', ErrorMessage=@Error WHERE Id=@Id; IF @@ROWCOUNT<>1 THROW 50001,'Archive job no longer exists.',1;", status))
+                        {
+                            command.Parameters.Add("@Id", SqlDbType.Int).Value = V("ArchiveJobId");
+                            command.Parameters.Add("@Error", SqlDbType.NVarChar, -1).Value = error;
+                            command.ExecuteNonQuery();
+                        }
+                    }
+                    finally { ReleaseStatus(status); }
+                    Set("FailedJobs", Convert.ToInt32(V("FailedJobs")) + 1);
+                    Dts.Events.FireWarning(0, "CSV Archive", "Job=" + V("ArchiveJobId") + "; table=" + S("TableName") + "; " + error, "", 0);
+                    // Status is persisted; skip remaining work for this job and try the next one.
+                    Dts.TaskResult = (int)DTSExecResult.Success;
+                }
+                catch (Exception statusError)
+                {
+                    Dts.Events.FireError(0, "CSV Archive", "Cannot persist job failure: " + statusError + "\nOriginal: " + error, "", 0);
+                    Dts.TaskResult = (int)DTSExecResult.Failure;
+                }
+            }
         }
         private static string Quote(string identifier)
         {

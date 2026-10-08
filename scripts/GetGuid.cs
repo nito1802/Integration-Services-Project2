@@ -15,7 +15,6 @@
                 Set("AddNumber", guid);
                 Set("OutputFile", output);
                 Set("TableExportedRows", 0L);
-                Set("TableExpectedRows", 0L);
                 SqlConnection connection = Acquire();
                 try
                 {

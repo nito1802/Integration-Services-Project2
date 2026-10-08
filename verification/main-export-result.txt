@@ -1,0 +1,8 @@
+PASS: job=1; table=MyData.Snapshots; rows=95; every field and row multiplicity match; timestamps equal; file=C:\Archive\2026-10-08\MyData.Snapshots_2026-10-08_ed2eb7b8-b930-442b-b448-59f2fa5c4459.csv
+PASS: job=2; table=SmartHome.Events; rows=1344; every field and row multiplicity match; timestamps equal; file=C:\Archive\2026-10-08\SmartHome.Events_2026-10-08_95a57839-90dc-4d1d-96e7-8058121cffac.csv
+Recorded Error: job=3; database=SalesDemo; table=dbo.Orders
+Recorded Error: job=4; database=WarehouseDemo; table=audit.StockMovements
+Recorded Error: job=5; database=TelemetryDemo; table=dbo.Readings
+Recorded Error: job=6; database=SupportDemo; table=dbo.Tickets
+Recorded Error: job=7; database=PaymentsDemo; table=audit.Transactions
+Recorded Error: job=8; database=LogsDemo; table=dbo.ApplicationLogs

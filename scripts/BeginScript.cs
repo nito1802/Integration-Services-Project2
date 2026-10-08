@@ -45,7 +45,8 @@ WHERE ic.object_id=OBJECT_ID(@TableName) AND ic.key_ordinal>0 AND ic.index_id=(
                 Set("BeginScript", "SET NOCOUNT ON; DECLARE @Cutoff date=DATEADD(day,-@Days,CONVERT(date,GETDATE())); " +
                     "DECLARE @First date=(SELECT CONVERT(date,MIN(" + quotedColumn + ")) FROM " + table + " WHERE " + quotedColumn + " < @Cutoff); " +
                     "SELECT CASE WHEN @First IS NULL THEN 0 ELSE DATEDIFF(day,@First,@Cutoff) END AS DaysCounter, " +
-                    "COALESCE(@First,@Cutoff) AS DateFrom, @Cutoff AS DateTo;");
+                    "COALESCE(@First,@Cutoff) AS DateFrom, @Cutoff AS DateTo, " +
+                    "(SELECT COUNT_BIG(*) FROM " + table + " WHERE " + quotedColumn + " < @Cutoff) AS TableExpectedRows;");
                 Set("LoopCounter", 0);
                 Info("Table=" + table + "; Days=" + days + "; unique order=" + S("OrderBy"));
             });

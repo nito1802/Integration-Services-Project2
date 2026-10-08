@@ -1,0 +1,1 @@
+PASS: injected failure during finalization rolled back success date; file returned to .tmp; remaining 3 jobs succeeded.
