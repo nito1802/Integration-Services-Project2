@@ -1,25 +1,20 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace IntegrationServicesProject2.Database.Entities;
 
-[Table("ArchiveJobs")]
 public class ArchiveJob
 {
-    [Key]
-    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public int Id { get; set; }
 
-    [Required]
-    [MaxLength(128)]
-    public string DatabaseName { get; set; } = string.Empty;
+    [Required, MaxLength(128)]
+    public string DatabaseName { get; set; }
+
+    [Required, MaxLength(128)]
+    public string TableName { get; set; }
 
     [Required]
-    [MaxLength(257)]
-    public string TableName { get; set; } = string.Empty;
+    public DateTime? LastSuccesProcessedAt { get; set; }
 
-    [Column(TypeName = "date")]
-    public DateOnly LastSuccesProcessedAt { get; set; }
-
+    [Required]
     public int ArchiveOlderThanDays { get; set; }
 }
