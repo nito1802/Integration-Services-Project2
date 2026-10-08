@@ -89,14 +89,14 @@ $count=Add-Sql $dayLoop 'Count records' 'CountSQL' 'ResultSetType_SingleRow' (,@
 $batches=$dayLoop.Executables.Add('STOCK:FORLOOP'); $batches.Name='Loop through 1000'; $batches.DelayValidation=$true; $batches.FailPackageOnFailure=$true
 $batches.InitExpression='@[User::BatchNumber] = 0'; $batches.EvalExpression='@[User::FileRecordCounter] > 0'; $batches.AssignExpression='@[User::FileRecordCounter] = @[User::FileRecordCounter] - 1000'
 Link $dayLoop $getDate $count
-Link $dayLoop $count $batches '@[User::FileRecordCounter] > 0'
+Link $dayLoop $count $batches
 
 
-$construct=Add-Script $batches 'Construct SQL' 'User::QuotedColumn,User::OrderBy' 'User::SQLStatement'
+$construct=Add-Script $batches 'Construct SQL' 'User::QuotedTable,User::QuotedColumn,User::OrderBy' 'User::SQLStatement'
 $export=Add-Script $batches 'Export data to CSV' 'User::SQLStatement,User::OutputFile,User::CurrentDateFrom,User::CurrentDateTo,User::FileRecordCounter,User::TableName,User::CsvHeader' 'User::DayExportedRows,User::BatchNumber,User::TableExportedRows'
 
 Link $batches $construct $export
-$complete=Add-Script $dayLoop 'Complete day' 'User::DayExportedRows' 'User::TableExpectedRows'
+$complete=Add-Script $dayLoop 'Complete day' 'User::DayExportedRows,User::QuotedTable,User::QuotedColumn,User::CurrentDateFrom,User::CurrentDateTo' 'User::TableExpectedRows'
 Link $dayLoop $batches $complete
 $finalize=Add-Script $tables 'Finalize table' 'User::OutputFile,User::TableName,User::TableExportedRows,User::TableExpectedRows' ''
 Link $tables $dayLoop $finalize
@@ -122,6 +122,7 @@ foreach($definition in $scriptDefinitions) {
         $item.SetAttribute('Name',$item.GetAttribute('Name').Replace($oldName,$newName))
         $content=$item.InnerText.Replace($oldName,$newName)
         if($item.GetAttribute('Name') -eq 'ScriptMain.cs') { $content=$source }
+        $content=$content -replace '(?m)[\t ]+$',''
         $item.InnerText=''; [void]$item.AppendChild($xml.CreateCDataSection($content))
     }
     $cs=Join-Path $buildDir ($newName+'.cs'); $dll=Join-Path $buildDir ($newName+'.dll')

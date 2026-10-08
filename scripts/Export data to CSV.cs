@@ -49,6 +49,11 @@
                 }
                 catch (Exception ex)
                 {
+                    try
+                    {
+                        using (var rollback = new SqlCommand("IF @@TRANCOUNT>0 ROLLBACK TRANSACTION; SET TRANSACTION ISOLATION LEVEL READ COMMITTED;", connection)) rollback.ExecuteNonQuery();
+                    }
+                    catch (Exception cleanupError) { Info("Transaction cleanup failed: " + cleanupError.Message); }
                     throw new IOException("Export failed. Table=" + S("TableName") + "; day=" + Convert.ToDateTime(V("CurrentDateFrom")).ToString("yyyy-MM-dd") +
                         "; batch=" + (Convert.ToInt64(V("BatchNumber")) + 1) + "; file=" + outputFile + "; rowsWritten=" + rows, ex);
                 }

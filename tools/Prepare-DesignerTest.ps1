@@ -15,6 +15,10 @@ $project.SelectSingleNode('//SSIS:Parameter[@SSIS:Name="ConnectionString"]/SSIS:
 $project.Save((Join-Path $testProject 'Integration Services Project2.dtproj'))
 Copy-Item -LiteralPath (Join-Path $root 'Integration Services Project2\Project.params'),(Join-Path $root 'Integration Services Project2\Integration Services Project2.database') -Destination $testProject
 $solution=[xml](Get-Content -LiteralPath (Join-Path $root 'Integration Services Project2.slnx') -Raw)
-$solution.Solution.Project.SetAttribute('Path','Integration Services Project2.dtproj')
+foreach ($solutionProject in @($solution.Solution.Project)) {
+    if ($solutionProject.GetAttribute('Path').EndsWith('.dtproj')) {
+        $solutionProject.SetAttribute('Path','Integration Services Project2.dtproj')
+    } else { [void]$solution.Solution.RemoveChild($solutionProject) }
+}
 $solution.Save((Join-Path $testProject 'Test.slnx'))
 Write-Output (Join-Path $testProject 'Test.slnx')
