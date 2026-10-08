@@ -1,16 +1,21 @@
+﻿param([int]$ExpectedRuns=1)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $config=Get-Content -LiteralPath (Get-Content -LiteralPath (Join-Path $root 'verification\latest-config.txt')) -Raw | ConvertFrom-Json
 $files=@(Get-ChildItem -LiteralPath $config.ArchiveRoot -Recurse -Filter '*.csv')
-if($files.Count -ne 7) { throw "Expected 7 CSV files; got $($files.Count)" }
+if($files.Count -ne 3*$ExpectedRuns) { throw "Unexpected number of table CSV files: $($files.Count)" }
+$files=@(foreach($pattern in @('dbo.Orders_*','audit.Events_*','dbo.EmptyTable_*')) {
+ $files | Where-Object Name -like $pattern | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+})
+if($files.Count -ne 3) { throw 'Missing table CSV' }
 $orders=@(); $events=@(); $sizes=@()
 foreach($file in $files) {
  $bytes=[IO.File]::ReadAllBytes($file.FullName)
  if($bytes[0] -ne 239 -or $bytes[1] -ne 187 -or $bytes[2] -ne 191) { throw "Missing UTF-8 BOM: $file" }
  $rows=@(Import-Csv -LiteralPath $file.FullName -Delimiter ';' -Encoding UTF8)
- if($rows.Count -gt 1000 -or $rows.Count -eq 0) { throw "Invalid batch size: $file" }
+
  $sizes+=$rows.Count
- if($file.Directory.Parent.Name -eq 'table_dbo~002EOrders') { $orders+=$rows } else { $events+=$rows }
+ if($file.Name -like 'dbo.Orders_*') { $orders+=$rows } elseif($file.Name -like 'audit.Events_*') { $events+=$rows } elseif($rows.Count -ne 0) { throw 'Empty table CSV contains rows' }
 }
 if($orders.Count -ne 2506 -or $events.Count -ne 1002) { throw 'Table row counts differ' }
 $ids=@($orders | ForEach-Object { [long]$_.'OrderNo (bigint)' } | Sort-Object)
@@ -26,10 +31,12 @@ foreach($row in $events) {
 $first=$orders | Where-Object { $_.'OrderNo (bigint)' -eq '1' }
 if($first.'Note (nvarchar)' -cne "semi; `"quote`"`r`nZażółć gęślą jaźń") { throw 'CSV escaping, multiline, or Unicode mismatch' }
 if($first.'Amount (decimal)' -ne '1.2345') { throw 'Invariant decimal format mismatch' }
+if($ExpectedRuns -eq 2 -and $first.'Extra (nvarchar)' -ne 'new column') { throw 'Changed schema was not exported' }
 $nullRow=$orders | Where-Object { $_.'OrderNo (bigint)' -eq '7' }
 if($nullRow.'Note (nvarchar)' -ne '') { throw 'NULL format mismatch' }
 if(@(Get-ChildItem -LiteralPath $config.ArchiveRoot -Recurse -Filter '*.tmp').Count) { throw 'Unfinished export files' }
-if(@(Get-ChildItem -LiteralPath $config.ArchiveRoot -Recurse -Filter '_SUCCESS.txt').Count -ne 4) { throw 'Missing day markers' }
-$result="PASS: 7 CSV; Orders=2506; Events=1002; total=3508; batches=$($sizes -join ','); exact keys; cutoff; Unicode; quotes; semicolons; multiline; NULL; decimal; BOM; 4 completed days."
+if(@(Get-ChildItem -LiteralPath $config.ArchiveRoot -Recurse -Filter '*.txt').Count) { throw 'Unexpected TXT files' }
+if(@(Get-ChildItem -LiteralPath $config.ArchiveRoot -Recurse -Directory).Count -ne 1) { throw 'Expected only the execution-date folder' }
+$result="PASS: 3 table CSV; Orders=2506; Events=1002; total=3508; file rows=$($sizes -join ','); exact keys; cutoff; Unicode; quotes; semicolons; multiline; NULL; decimal; BOM; single header per table; no TXT; one execution-date folder."
 $result | Set-Content -LiteralPath (Join-Path $config.RunDirectory 'verification-result.txt') -Encoding UTF8
 $result

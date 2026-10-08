@@ -7,11 +7,6 @@
                 Set("CurrentDateTo", to);
                 Set("BatchNumber", (long)0);
                 Set("DayExportedRows", (long)0);
-                string folder = Path.Combine(Path.GetFullPath(S("ArchiwumPath")), FolderName(S("TableName")), from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-                Set("FolderFullPath", folder);
-                // A day is immutable once published. A failed day must be inspected explicitly before retry.
-                if (Directory.Exists(folder) && Directory.GetFileSystemEntries(folder).Length != 0)
-                    throw new IOException("Archive day already exists or contains an unfinished attempt. Inspect it before retrying: " + folder);
                 // Create in the retained session, outside the parameterized command's scope.
                 // UNION prevents SQL Server from copying the source identity property.
                 SqlConnection connection = Acquire();

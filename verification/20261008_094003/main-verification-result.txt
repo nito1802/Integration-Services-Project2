@@ -1,0 +1,1 @@
+﻿PASS: MyData.Snapshots; one CSV; rows=95; all IDs and field values match the current database; no duplicates or unfinished files. File=C:\Archive\2026-10-08\MyData.Snapshots_2026-10-08_d69a1c42-7570-4aad-a551-26ca83c77734.csv

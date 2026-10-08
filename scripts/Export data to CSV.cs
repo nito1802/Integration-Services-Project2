@@ -17,16 +17,12 @@
                         command.Parameters.Add("@Offset", SqlDbType.BigInt).Value = checked(Convert.ToInt64(V("BatchNumber")) * 1000L);
                         command.Parameters.Add("@BatchSize", SqlDbType.Int).Value = 1000;
                         using (var reader = command.ExecuteReader())
-                        using (var stream = new FileStream(temporaryFile, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-                        using (var writer = new StreamWriter(stream, new UTF8Encoding(true)))
                         {
-                            // Existing project's CSV format: quoted fields, ;, SQL types, UTF-8 BOM.
-                            for (int i = 0; i < reader.FieldCount; i++)
+                            if (CsvHeader(reader) != S("CsvHeader")) throw new InvalidOperationException("Table columns changed during this export.");
+                            using (var stream = new FileStream(temporaryFile, FileMode.Open, FileAccess.Write, FileShare.None))
+                            using (var writer = new StreamWriter(stream, new UTF8Encoding(false)))
                             {
-                                if (i > 0) writer.Write(";");
-                                writer.Write(EscapeCsv(reader.GetName(i) + " (" + reader.GetDataTypeName(i) + ")"));
-                            }
-                            writer.WriteLine();
+                            stream.Seek(0, SeekOrigin.End);
                             while (reader.Read())
                             {
                                 for (int i = 0; i < reader.FieldCount; i++)
@@ -40,11 +36,12 @@
                             }
                             writer.Flush();
                             stream.Flush(true);
+                            }
                         }
                     }
                     if (rows != expected) throw new InvalidOperationException("Batch row count mismatch: expected " + expected + ", got " + rows);
-                    File.Move(temporaryFile, outputFile);
                     Set("DayExportedRows", Convert.ToInt64(V("DayExportedRows")) + rows);
+                    Set("TableExportedRows", checked(Convert.ToInt64(V("TableExportedRows")) + rows));
                     Info("Table=" + S("TableName") + "; from=" + Convert.ToDateTime(V("CurrentDateFrom")).ToString("o") +
                         "; to=" + Convert.ToDateTime(V("CurrentDateTo")).ToString("o") + "; batch=" + (Convert.ToInt64(V("BatchNumber")) + 1) +
                         "; path=" + outputFile + "; rows=" + rows + "; elapsedMs=" + timer.ElapsedMilliseconds);

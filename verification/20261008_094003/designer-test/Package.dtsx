@@ -5,7 +5,7 @@
     <DTS:ConnectionManager DTS:refId="Package.ConnectionManagers[ArchiveDb]" DTS:CreationName="ADO.NET:System.Data.SqlClient.SqlConnection, System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" DTS:DelayValidation="True" DTS:DTSID="{46FFE001-F7CF-4B63-86C9-59A644209743}" DTS:ObjectName="ArchiveDb">
       <DTS:PropertyExpression DTS:Name="ConnectionString">@[$Package::ConnectionString]</DTS:PropertyExpression>
       <DTS:ObjectData>
-        <DTS:ConnectionManager DTS:Retain="True" DTS:ConnectionString="Data Source=mssql3.webio.pl,2401;Uid=nito_user_db;Database=nito_superDb;TrustServerCertificate=True;">
+        <DTS:ConnectionManager DTS:Retain="True" DTS:ConnectionString="Data Source=(localdb)\MSSQLLocalDB;Integrated Security=True;Initial Catalog=CodexArchiveFlow_409eebf2f97c41ba965dbff94b7782eb;Connect Timeout=60">
           <DTS:Password DTS:Name="Password" Sensitive="1">
           </DTS:Password>
         </DTS:ConnectionManager>
@@ -14,10 +14,10 @@
   </DTS:ConnectionManagers>
   <DTS:PackageParameters>
     <DTS:PackageParameter DTS:CreationName="" DTS:DataType="8" DTS:DTSID="{B44E3A85-28BF-466C-AD24-F791BEEC31E5}" DTS:ObjectName="ArchiveRoot">
-      <DTS:Property DTS:DataType="8" DTS:Name="ParameterValue">C:\Archive</DTS:Property>
+      <DTS:Property DTS:DataType="8" DTS:Name="ParameterValue">C:\Users\Dante\Desktop\Istotne\source\Visual Studio\Test\Integration Services Project2\verification\20261008_094003\csv</DTS:Property>
     </DTS:PackageParameter>
     <DTS:PackageParameter DTS:CreationName="" DTS:DataType="8" DTS:DTSID="{732E2F61-9A39-4DBF-8E23-174B7F781447}" DTS:ObjectName="ConnectionString">
-      <DTS:Property DTS:DataType="8" DTS:Name="ParameterValue">Data Source=mssql3.webio.pl,2401;Database=nito_superDb;Uid=nito_user_db;Password=SEbu4b!scxEug38;TrustServerCertificate=True</DTS:Property>
+      <DTS:Property DTS:DataType="8" DTS:Name="ParameterValue">Data Source=(localdb)\MSSQLLocalDB;Integrated Security=True;Initial Catalog=CodexArchiveFlow_409eebf2f97c41ba965dbff94b7782eb;Connect Timeout=60</DTS:Property>
     </DTS:PackageParameter>
     <DTS:PackageParameter DTS:CreationName="" DTS:DataType="8" DTS:DTSID="{FF956620-9AB8-4DE6-ACBD-0F93989753CC}" DTS:ObjectName="DateColumn">
       <DTS:Property DTS:DataType="8" DTS:Name="ParameterValue">CreatedAt</DTS:Property>

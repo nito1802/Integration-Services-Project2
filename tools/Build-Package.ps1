@@ -17,13 +17,13 @@ while($package.Executables.Count -gt 0) { $package.Executables.Remove(0) }
 $package.VersionBuild=$package.VersionBuild+1
 $package.MaxConcurrentExecutables=1
 $package.DelayValidation=$true
-$package.Description='CSV archive: configuration -> tables -> full days -> stable batches of 1000. Source tables are read only.'
+$package.Description='CSV archive: configuration -> tables -> full days -> stable batches of 1000. One CSV per table and execution, in execution-date folder. Source tables are read only.'
 $package.Variables.Remove('User::SQLStatement')
 function Add-Variable($name,$value) { [void]$package.Variables.Add($name,$false,'User',$value) }
 foreach($name in @('Tables')) { Add-Variable $name (New-Object object) }
-foreach($name in @('TableName','ColumnDate','ArchiwumPath','BeginScript','CountSQL','SQLStatement','FolderFullPath','OutputFile','AddNumber','QuotedTable','QuotedColumn','OrderBy','SettingsSQL')) { Add-Variable $name '' }
+foreach($name in @('TableName','ColumnDate','ArchiwumPath','BeginScript','CountSQL','SQLStatement','FolderFullPath','OutputFile','AddNumber','QuotedTable','QuotedColumn','OrderBy','SettingsSQL','CsvHeader')) { Add-Variable $name '' }
 foreach($name in @('Days','DaysCounter','LoopCounter')) { Add-Variable $name ([int]0) }
-foreach($name in @('FileRecordCounter','BatchNumber','DayExportedRows')) { Add-Variable $name ([long]0) }
+foreach($name in @('FileRecordCounter','BatchNumber','DayExportedRows','TableExportedRows','TableExpectedRows')) { Add-Variable $name ([long]0) }
 foreach($name in @('DateFrom','DateTo','CurrentDateFrom','CurrentDateTo')) { Add-Variable $name ([datetime]'2000-01-01') }
 $settings=@'
 SET NOCOUNT ON;
@@ -81,24 +81,25 @@ $days=Add-Sql $tables 'Count days diff' 'BeginScript' 'ResultSetType_SingleRow' 
 $dayLoop=$tables.Executables.Add('STOCK:FORLOOP'); $dayLoop.Name='For Loop Container'; $dayLoop.DelayValidation=$true; $dayLoop.FailPackageOnFailure=$true
 $dayLoop.InitExpression='@[User::LoopCounter] = 0'; $dayLoop.EvalExpression='@[User::LoopCounter] < @[User::DaysCounter]'; $dayLoop.AssignExpression='@[User::LoopCounter] = @[User::LoopCounter] + 1'
 Link $tables $begin $days
-Link $tables $days $dayLoop
-$getDate=Add-Script $dayLoop 'Get DateTo' 'User::DateFrom,User::LoopCounter,User::ArchiwumPath,User::TableName,User::QuotedTable,User::QuotedColumn' 'User::CurrentDateFrom,User::CurrentDateTo,User::BatchNumber,User::DayExportedRows,User::FolderFullPath,User::CountSQL'
+$guid=Add-Script $tables 'GetGuid' 'System::StartTime,User::ArchiwumPath,User::TableName,User::QuotedTable' 'User::FolderFullPath,User::AddNumber,User::OutputFile,User::CsvHeader,User::TableExportedRows,User::TableExpectedRows'
+Link $tables $days $guid
+Link $tables $guid $dayLoop
+$getDate=Add-Script $dayLoop 'Get DateTo' 'User::DateFrom,User::LoopCounter,User::ArchiwumPath,User::TableName,User::QuotedTable,User::QuotedColumn' 'User::CurrentDateFrom,User::CurrentDateTo,User::BatchNumber,User::DayExportedRows,User::CountSQL'
 $count=Add-Sql $dayLoop 'Count records' 'CountSQL' 'ResultSetType_SingleRow' (,@('0','FileRecordCounter')) @(@('@DateFrom','User::CurrentDateFrom',[Data.DbType]::DateTime2),@('@DateTo','User::CurrentDateTo',[Data.DbType]::DateTime2))
-$directory=$dayLoop.Executables.Add('STOCK:FileSystemTask'); $directory.Name='File System Task'; $directory.DelayValidation=$true; $directory.FailPackageOnFailure=$true
-$directory.InnerObject.Operation=[Microsoft.SqlServer.Dts.Tasks.FileSystemTask.DTSFileSystemOperation]::CreateDirectory
-$directory.InnerObject.IsSourcePathVariable=$true; $directory.InnerObject.Source='User::FolderFullPath'; $directory.InnerObject.OverwriteDestinationFile=$true
 $batches=$dayLoop.Executables.Add('STOCK:FORLOOP'); $batches.Name='Loop through 1000'; $batches.DelayValidation=$true; $batches.FailPackageOnFailure=$true
 $batches.InitExpression='@[User::BatchNumber] = 0'; $batches.EvalExpression='@[User::FileRecordCounter] > 0'; $batches.AssignExpression='@[User::FileRecordCounter] = @[User::FileRecordCounter] - 1000'
 Link $dayLoop $getDate $count
-Link $dayLoop $count $directory '@[User::FileRecordCounter] > 0'
-Link $dayLoop $directory $batches
-$guid=Add-Script $batches 'GetGuid' 'User::FolderFullPath,User::BatchNumber' 'User::AddNumber,User::OutputFile'
+Link $dayLoop $count $batches '@[User::FileRecordCounter] > 0'
+
+
 $construct=Add-Script $batches 'Construct SQL' 'User::QuotedColumn,User::OrderBy' 'User::SQLStatement'
-$export=Add-Script $batches 'Export data to CSV' 'User::SQLStatement,User::OutputFile,User::CurrentDateFrom,User::CurrentDateTo,User::FileRecordCounter,User::TableName' 'User::DayExportedRows,User::BatchNumber'
-Link $batches $guid $construct
+$export=Add-Script $batches 'Export data to CSV' 'User::SQLStatement,User::OutputFile,User::CurrentDateFrom,User::CurrentDateTo,User::FileRecordCounter,User::TableName,User::CsvHeader' 'User::DayExportedRows,User::BatchNumber,User::TableExportedRows'
+
 Link $batches $construct $export
-$complete=Add-Script $dayLoop 'Complete day' 'User::FolderFullPath,User::TableName,User::CurrentDateFrom,User::CurrentDateTo,User::DayExportedRows,User::BatchNumber' ''
+$complete=Add-Script $dayLoop 'Complete day' 'User::DayExportedRows' 'User::TableExpectedRows'
 Link $dayLoop $batches $complete
+$finalize=Add-Script $tables 'Finalize table' 'User::OutputFile,User::TableName,User::TableExportedRows,User::TableExpectedRows' ''
+Link $tables $dayLoop $finalize
 $skeleton=Join-Path $PSScriptRoot 'package-skeleton.dtsx'
 $app.SaveToXml($skeleton,$package,$null)
 $xml=[xml](Get-Content -LiteralPath $skeleton -Raw)

@@ -58,6 +58,12 @@ namespace __NAMESPACE__
             value = value.Replace("\"", "\"\"");
             return "\"" + value + "\"";
         }
+        private static string CsvHeader(SqlDataReader reader)
+        {
+            var fields = new string[reader.FieldCount];
+            for (int i = 0; i < fields.Length; i++) fields[i] = EscapeCsv(reader.GetName(i) + " (" + reader.GetDataTypeName(i) + ")");
+            return string.Join(";", fields);
+        }
         // __MAIN__
     }
 }

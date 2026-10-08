@@ -7,9 +7,9 @@ function Parameter($name) { $package.SelectSingleNode('//DTS:PackageParameter[@D
 $table=Parameter 'TableName'
 $dateColumn=Parameter 'DateColumn'
 $days=[int](Parameter 'OlderThanDays')
-$encoded='table_'+[regex]::Replace($table,'[^a-zA-Z0-9_]',{param($m) '~'+([int][char]$m.Value).ToString('X4')})
-$folder=Join-Path (Parameter 'ArchiveRoot') $encoded
-$files=@(Get-ChildItem -LiteralPath $folder -Recurse -Filter '*.csv')
+$folder=Join-Path (Parameter 'ArchiveRoot') ([datetime]::Now.ToString('yyyy-MM-dd'))
+$files=@(Get-ChildItem -LiteralPath $folder -Filter ($table+'_*.csv') | Sort-Object LastWriteTime -Descending | Select-Object -First 1)
+if($files.Count -ne 1) { throw 'No completed table CSV found' }
 $rows=@($files | ForEach-Object { Import-Csv -LiteralPath $_.FullName -Delimiter ';' -Encoding UTF8 })
 $actual=@{}
 foreach($row in $rows) {
@@ -40,10 +40,8 @@ try {
  $reader.Close()
  if($expected -ne $rows.Count) { throw 'Exported row count differs from database' }
 } finally { $connection.Dispose() }
-$markers=@(Get-ChildItem -LiteralPath $folder -Recurse -Filter '_SUCCESS.txt')
-if($markers.Count -ne $files.Count) { throw 'Missing day completion markers' }
-if(@(Get-ChildItem -LiteralPath $folder -Recurse -Filter '*.tmp').Count) { throw 'Unfinished files' }
-$result="PASS: $table; CSV=$($files.Count); rows=$($rows.Count); completed days=$($markers.Count); all IDs and field values match the current database; no duplicates or unfinished files."
+if(@(Get-ChildItem -LiteralPath $folder -Filter '*.tmp').Count) { throw 'Unfinished files' }
+$result="PASS: $table; one CSV; rows=$($rows.Count); all IDs and field values match the current database; no duplicates or unfinished files. File=$($files[0].FullName)"
 $config=Get-Content -LiteralPath (Get-Content -LiteralPath (Join-Path $root 'verification\latest-config.txt')) -Raw | ConvertFrom-Json
 $result | Set-Content -LiteralPath (Join-Path $config.RunDirectory 'main-verification-result.txt') -Encoding UTF8
 $result
