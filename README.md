@@ -2,7 +2,7 @@
 
 Projekt `Integration Services Project2.Console` pozwala dodawać zadania do `Archive.ArchiveJobs`. Ustaw go jako startowy w Visual Studio i uruchom przez F5 / Ctrl+F5. Kontekst jest wstrzykiwany przez DI, a połączenie pochodzi z tego samego `appsettings.json` co biblioteka `.Database`. Instrukcja znajduje się w README konsolówki.
 
-Otwórz `Integration Services Project2.slnx`, następnie `Package.dtsx` i użyj Execute Package lub F5. Konfigurację tabel pakiet pobiera z `Archive.ArchiveJobs`, według `Id`. Parametry pakietu to `ConnectionString` i `ArchiveRoot`. Dawne `SettingsQuery` i konfiguracja CasherSettings zostały usunięte.
+Otwórz `Integration Services Project2.slnx`, następnie `Package.dtsx` i użyj Execute Package lub F5. Konfigurację tabel pakiet pobiera z `Archive.ArchiveJobs`, według `Id`. Parametr `ConnectionString` wskazuje serwer danych źródłowych, `ArchiveJobsConnectionString` wskazuje bazę z konfiguracją i statusami `ArchiveJobs`, a `ArchiveRoot` katalog wynikowy. Połączenia mogą wskazywać różne serwery; `DatabaseName` zadania odnosi się do bazy na serwerze źródłowym. Dawne `SettingsQuery` i konfiguracja CasherSettings zostały usunięte.
 
 Wynik to jeden CSV na tabelę na uruchomienie, np. `C:\Archive\2026-10-08\MyData.Snapshots_2026-10-08_GUID.csv`. Dzień w folderze pochodzi z daty rozpoczęcia pakietu. GUID zapobiega nadpisywaniu poprzednich eksportów. Nagłówek jest odczytywany na nowo dla każdej tabeli; pusta tabela daje sam nagłówek.
 
@@ -26,7 +26,7 @@ Przepływ: Get Archive Jobs → Foreach Loop Container → Start archive job →
 
 Na początku zadania zapisujemy czas próby, czyścimy błąd i status. Cały eksport jednej tabeli działa w jednej transakcji SQL `SERIALIZABLE`, na zachowanym połączeniu. Dane są czytane bezpośrednio ze źródła; nie tworzymy `#ArchiveDay`. Zakres to pełne dni sprzed północy serwera SQL pomniejszonej o retencję. Tabela musi mieć kolumnę daty i niefiltrowany unikalny klucz, również złożony. Partia używa `ORDER BY` po tym kluczu oraz `OFFSET/FETCH`.
 
-Dane dopisują się do `.csv.tmp`, a nagłówek jest zapisywany raz. Po sprawdzeniu liczby rekordów następuje przemianowanie na `.csv`, zapis `Success` i zatwierdzenie transakcji. Obie daty otrzymują dokładnie tę samą wartość `SYSDATETIME()`. Na błędzie wycofujemy transakcję tabeli, zapisujemy `Error` i szczegóły osobnym połączeniem, zachowując ostatnią datę sukcesu. Kolejne zadania są przetwarzane dalej. Błąd pojedynczej tabeli pojawia się jako ostrzeżenie; końcowe podsumowanie oznacza pakiet jako nieudany, jeżeli były błędy. Brak dostępu do konfiguracji lub niemożność zapisania stanu zatrzymuje pakiet.
+Dane dopisują się do `.csv.tmp`, a nagłówek jest zapisywany raz. Po sprawdzeniu liczby rekordów następuje przemianowanie na `.csv`, zatwierdzenie transakcji odczytu źródła i zapis `Success` przez `ArchiveJobsDb`. Obie daty otrzymują dokładnie tę samą wartość `SYSDATETIME()`. Na błędzie wycofujemy jeszcze otwartą transakcję tabeli, zapisujemy `Error` i szczegóły połączeniem `ArchiveJobsDb`, zachowując ostatnią datę sukcesu. Zapis statusu i transakcja źródła są osobnymi operacjami. Kolejne zadania są przetwarzane dalej. Błąd pojedynczej tabeli pojawia się jako ostrzeżenie; końcowe podsumowanie oznacza pakiet jako nieudany, jeżeli były błędy. Brak dostępu do konfiguracji lub niemożność zapisania stanu zatrzymuje pakiet.
 
 Transakcja SQL nie obejmuje systemu plików. Przy obsłużonym błędzie finalizacji opublikowany CSV wraca do `.tmp`. Nagłe zakończenie procesu lub awaria komputera może zostawić nieukończony stan wymagający sprawdzenia. Nowa próba zawsze ma nowy GUID. Blokady źródła trwają przez cały eksport tabeli i mogą blokować równoległe zapisy; limit oczekiwania na blokadę wynosi 30 sekund. Dalsze partie `OFFSET` mogą być wolniejsze. Dane źródłowe nie są usuwane ani modyfikowane.
 
@@ -43,5 +43,7 @@ Weryfikacja:
 - `tools/Create-TestDatabase.ps1 -IncludeFailure`: izolowany LocalDB z wieloma tabelami, kluczem złożonym, pustą tabelą i celowo błędnym zadaniem.
 - `tools/Verify-JobProcessing.ps1`: kontynuacja po błędzie, wyczyszczenie poprzedniego błędu, zachowanie daty sukcesu; `-RetrySucceeded` sprawdza ponowienie po naprawie konfiguracji.
 - `tools/Verify-Export.ps1`: dokładne klucze, retencja, wiele partii, Unicode, cudzysłowy, średniki, wielowierszowy tekst i BOM.
+
+Osobne połączenia sprawdzono w Visual Studio na dwóch bazach LocalDB: źródłowej (bez tabeli ArchiveJobs) i konfiguracyjnej. Wynik: 3508 rekordów w CSV, trzy zadania Success, jeden kontrolowany Error, poprawne daty i kontynuacja po błędzie. Wyniki: `verification/20261008_180132`.
 
 Test LocalDB potwierdził 2506 rekordów Orders, 1002 Events oraz pustą tabelę. Pierwszy przebieg: trzy sukcesy i jeden kontrolowany błąd; po poprawieniu kolumny daty: cztery sukcesy, równe daty i puste ErrorMessage. Osobny test błędu finalizacji potwierdził zachowanie daty sukcesu, wycofanie transakcji i pozostawienie `.tmp`. Wyniki: `verification/20261008_152034`. Ten ostatni kontrolowany błąd pozostaje w izolowanej bazie testowej. Wynik porównania właściwej bazy: `verification/main-export-result.txt`.

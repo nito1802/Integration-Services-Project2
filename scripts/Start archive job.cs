@@ -12,7 +12,6 @@
                     command.Parameters.Add("@Id", SqlDbType.Int).Value = V("ArchiveJobId");
                     command.ExecuteNonQuery();
                 }
-                Set("JobsTable", Quote(status.Database) + ".[Archive].[ArchiveJobs]");
             }
             catch (Exception ex)
             {

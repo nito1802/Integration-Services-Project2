@@ -7,22 +7,30 @@ if($MainConfiguration) {
     $config=[pscustomobject]@{
         RunDirectory=(Join-Path $root 'verification\main-run')
         ConnectionString=$sourcePackage.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="ConnectionString"]/DTS:Property[@DTS:Name="ParameterValue"]',$sourceNs).InnerText
+        ArchiveJobsConnectionString=$sourcePackage.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="ArchiveJobsConnectionString"]/DTS:Property[@DTS:Name="ParameterValue"]',$sourceNs).InnerText
         ArchiveRoot=$sourcePackage.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="ArchiveRoot"]/DTS:Property[@DTS:Name="ParameterValue"]',$sourceNs).InnerText
     }
 } else {
     $config=Get-Content -LiteralPath (Get-Content -LiteralPath (Join-Path $root 'verification\latest-config.txt')) -Raw | ConvertFrom-Json
 }
+$jobsConnectionString=if($config.ArchiveJobsConnectionString) { $config.ArchiveJobsConnectionString } else { $config.ConnectionString }
 $testProject=Join-Path $config.RunDirectory 'designer-test'
 [void](New-Item -ItemType Directory -Path $testProject -Force)
 $package=[xml](Get-Content -LiteralPath (Join-Path $root 'Integration Services Project2\Package.dtsx') -Raw)
 $ns=New-Object Xml.XmlNamespaceManager($package.NameTable); $ns.AddNamespace('DTS','www.microsoft.com/SqlServer/Dts')
 $package.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="ConnectionString"]/DTS:Property[@DTS:Name="ParameterValue"]',$ns).InnerText=$config.ConnectionString
+$package.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="ArchiveJobsConnectionString"]/DTS:Property[@DTS:Name="ParameterValue"]',$ns).InnerText=$jobsConnectionString
 $package.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="ArchiveRoot"]/DTS:Property[@DTS:Name="ParameterValue"]',$ns).InnerText=$config.ArchiveRoot
-foreach($conn in $package.SelectNodes('//DTS:ConnectionManager/DTS:ObjectData/DTS:ConnectionManager',$ns)) { $conn.SetAttribute('ConnectionString','www.microsoft.com/SqlServer/Dts',$config.ConnectionString) | Out-Null }
+foreach($manager in $package.SelectNodes('//DTS:ConnectionManagers/DTS:ConnectionManager',$ns)) {
+    $value=if($manager.GetAttribute('ObjectName','www.microsoft.com/SqlServer/Dts') -eq 'ArchiveJobsDb') { $jobsConnectionString } else { $config.ConnectionString }
+    $conn=$manager.SelectSingleNode('DTS:ObjectData/DTS:ConnectionManager',$ns)
+    if($conn) { $conn.SetAttribute('ConnectionString','www.microsoft.com/SqlServer/Dts',$value) | Out-Null }
+}
 $package.Save((Join-Path $testProject 'Package.dtsx'))
 $project=[xml](Get-Content -LiteralPath (Join-Path $root 'Integration Services Project2\Integration Services Project2.dtproj') -Raw)
 $pn=New-Object Xml.XmlNamespaceManager($project.NameTable); $pn.AddNamespace('SSIS','www.microsoft.com/SqlServer/SSIS')
 $project.SelectSingleNode('//SSIS:Parameter[@SSIS:Name="ConnectionString"]/SSIS:Properties/SSIS:Property[@SSIS:Name="Value"]',$pn).InnerText=$config.ConnectionString
+$project.SelectSingleNode('//SSIS:Parameter[@SSIS:Name="ArchiveJobsConnectionString"]/SSIS:Properties/SSIS:Property[@SSIS:Name="Value"]',$pn).InnerText=$jobsConnectionString
 $project.Save((Join-Path $testProject 'Integration Services Project2.dtproj'))
 Copy-Item -LiteralPath (Join-Path $root 'Integration Services Project2\Project.params'),(Join-Path $root 'Integration Services Project2\Integration Services Project2.database') -Destination $testProject
 $solution=[xml](Get-Content -LiteralPath (Join-Path $root 'Integration Services Project2.slnx') -Raw)

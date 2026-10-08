@@ -5,6 +5,14 @@ $project=Join-Path $root 'Integration Services Project2'
 $packagePath=Join-Path $project 'Package.dtsx'
 $backup=Join-Path $PSScriptRoot 'original.Package.dtsx'
 if(!(Test-Path -LiteralPath $backup)) { Copy-Item -LiteralPath $packagePath -Destination $backup }
+$current=[xml](Get-Content -LiteralPath $packagePath -Raw)
+$currentNs=New-Object Xml.XmlNamespaceManager($current.NameTable)
+$currentNs.AddNamespace('DTS','www.microsoft.com/SqlServer/Dts')
+$currentValues=@{}
+foreach($name in @('ConnectionString','ArchiveJobsConnectionString','ArchiveRoot')) {
+    $valueNode=$current.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="'+$name+'"]/DTS:Property[@DTS:Name="ParameterValue"]',$currentNs)
+    if($valueNode) { $currentValues[$name]=$valueNode.InnerText }
+}
 $original=[xml](Get-Content -LiteralPath $backup -Raw)
 $originalNs=New-Object Xml.XmlNamespaceManager($original.NameTable)
 $originalNs.AddNamespace('DTS','www.microsoft.com/SqlServer/Dts')
@@ -29,6 +37,11 @@ foreach($name in @('JobActive','JobFailed','JobFilePublished')) { Add-Variable $
 $archiveRoot=[IO.Path]::GetDirectoryName([string]$package.Parameters['OutputFile'].Value)
 foreach($obsolete in @('TableName','DateColumn','OlderThanDays','OutputFile')) { [void]$package.Parameters.Remove($obsolete) }
 $p=$package.Parameters.Add('ArchiveRoot',[TypeCode]::String); $p.Value=$archiveRoot
+if($currentValues.ContainsKey('ConnectionString')) { $package.Parameters['ConnectionString'].Value=$currentValues['ConnectionString'] }
+if($currentValues.ContainsKey('ArchiveRoot')) { $package.Parameters['ArchiveRoot'].Value=$currentValues['ArchiveRoot'] }
+$p=$package.Parameters.Add('ArchiveJobsConnectionString',[TypeCode]::String)
+$p.Value=if($currentValues.ContainsKey('ArchiveJobsConnectionString')) { $currentValues['ArchiveJobsConnectionString'] } else { $package.Parameters['ConnectionString'].Value }
+$p.Description='Connection to the database containing Archive.ArchiveJobs (job configuration and processing status).'
 $connection=$package.Connections.Add('ADO.NET:System.Data.SqlClient.SqlConnection, System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089')
 $connection.Name='ArchiveDb'
 $connection.SetExpression('ConnectionString','@[$Package::ConnectionString]')
@@ -36,7 +49,7 @@ $connection.Properties['RetainSameConnection'].SetValue($connection,$true)
 $connection.DelayValidation=$true
 $statusConnection=$package.Connections.Add('ADO.NET:System.Data.SqlClient.SqlConnection, System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089')
 $statusConnection.Name='ArchiveJobsDb'
-$statusConnection.SetExpression('ConnectionString','@[$Package::ConnectionString]')
+$statusConnection.SetExpression('ConnectionString','@[$Package::ArchiveJobsConnectionString]')
 $statusConnection.Properties['RetainSameConnection'].SetValue($statusConnection,$true)
 $statusConnection.DelayValidation=$true
 function Link($container,$from,$to,$expression='') {
@@ -134,9 +147,20 @@ if (!$CompatibilityTest) {
     $projectNs=New-Object Xml.XmlNamespaceManager($projectXml.NameTable)
     $projectNs.AddNamespace('SSIS','www.microsoft.com/SqlServer/SSIS')
     foreach($parameterNode in @($projectXml.SelectNodes('//SSIS:PackageMetaData/SSIS:Parameters/SSIS:Parameter',$projectNs))) {
-        if($parameterNode.GetAttribute('Name','www.microsoft.com/SqlServer/SSIS') -notin @('ConnectionString','ArchiveRoot')) {
+        if($parameterNode.GetAttribute('Name','www.microsoft.com/SqlServer/SSIS') -notin @('ConnectionString','ArchiveJobsConnectionString','ArchiveRoot')) {
             [void]$parameterNode.ParentNode.RemoveChild($parameterNode)
         }
+    }
+    $parameterList=$projectXml.SelectSingleNode('//SSIS:PackageMetaData/SSIS:Parameters',$projectNs)
+    $jobsParameter=$parameterList.SelectSingleNode('SSIS:Parameter[@SSIS:Name="ArchiveJobsConnectionString"]',$projectNs)
+    if(!$jobsParameter) {
+        $jobsParameter=$parameterList.SelectSingleNode('SSIS:Parameter[@SSIS:Name="ConnectionString"]',$projectNs).CloneNode($true)
+        $jobsParameter.SetAttribute('Name','www.microsoft.com/SqlServer/SSIS','ArchiveJobsConnectionString')
+        $jobsParameter.SelectSingleNode('SSIS:Properties/SSIS:Property[@SSIS:Name="ID"]',$projectNs).InnerText=[string]$package.Parameters['ArchiveJobsConnectionString'].ID
+        [void]$parameterList.AppendChild($jobsParameter)
+    }
+    foreach($parameterName in @('ConnectionString','ArchiveJobsConnectionString','ArchiveRoot')) {
+        $projectXml.SelectSingleNode('//SSIS:PackageMetaData/SSIS:Parameters/SSIS:Parameter[@SSIS:Name="'+$parameterName+'"]/SSIS:Properties/SSIS:Property[@SSIS:Name="Value"]',$projectNs).InnerText=[string]$package.Parameters[$parameterName].Value
     }
     $projectXml.Save($projectFile)
 }

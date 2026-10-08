@@ -8,10 +8,12 @@ function Quote($name) { '['+$name.Replace(']',']]')+']' }
 function RowKey($values) { ConvertTo-Json -InputObject @($values) -Compress }
 $folder=Join-Path (Parameter 'ArchiveRoot') ([datetime]::Now.ToString('yyyy-MM-dd'))
 $connection=New-Object Data.SqlClient.SqlConnection((Parameter 'ConnectionString'))
+$jobsConnection=New-Object Data.SqlClient.SqlConnection((Parameter 'ArchiveJobsConnectionString'))
 $results=New-Object 'System.Collections.Generic.List[string]'
 try {
     $connection.Open()
-    $command=$connection.CreateCommand()
+    $jobsConnection.Open()
+    $command=$jobsConnection.CreateCommand()
     $command.CommandText='SELECT * FROM Archive.ArchiveJobs ORDER BY Id;'
     $jobs=New-Object Data.DataTable
     $adapter=New-Object Data.SqlClient.SqlDataAdapter($command)
@@ -63,6 +65,6 @@ try {
         } finally { $reader.Dispose() }
         $results.Add("PASS: job=$($job.Id); table=$($job.TableName); rows=$expected; every field and row multiplicity match; timestamps equal; file=$($file.FullName)")
     }
-} finally { $connection.Dispose() }
+} finally { $connection.Dispose(); $jobsConnection.Dispose() }
 $results | Set-Content -LiteralPath (Join-Path $root 'verification\main-export-result.txt') -Encoding UTF8
 $results

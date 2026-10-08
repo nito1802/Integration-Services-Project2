@@ -3,7 +3,8 @@ $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $config=Get-Content -LiteralPath (Get-Content -LiteralPath (Join-Path $root 'verification\latest-config.txt')) -Raw | ConvertFrom-Json
 if($config.Database -notmatch '^CodexArchiveFlow_[a-f0-9]{32}$') { throw 'Expected isolated LocalDB test' }
-$connection=New-Object Data.SqlClient.SqlConnection($config.ConnectionString)
+$jobsConnectionString=if($config.ArchiveJobsConnectionString) { $config.ArchiveJobsConnectionString } else { $config.ConnectionString }
+$connection=New-Object Data.SqlClient.SqlConnection($jobsConnectionString)
 try {
     $connection.Open()
     $command=$connection.CreateCommand()
@@ -26,7 +27,9 @@ try {
         if($starts.Count -ne $expectedStarts) { throw ('Start did not clear error/status for job '+$job.Id) }
     }
     $data.Tables[0] | Select-Object Id,TableName,LastProcessedStatus,LastProcessedAt,LastSuccesProcessedAt | Format-Table -AutoSize
-    $command.CommandText='SELECT COUNT(*) FROM sys.dm_tran_session_transactions st JOIN sys.dm_tran_database_transactions dt ON st.transaction_id=dt.transaction_id WHERE dt.database_id=DB_ID();'
+    $command.CommandText='SELECT COUNT(*) FROM sys.dm_tran_session_transactions st JOIN sys.dm_tran_database_transactions dt ON st.transaction_id=dt.transaction_id WHERE dt.database_id=DB_ID(@SourceDatabase);'
+    [void]$command.Parameters.Add('@SourceDatabase',[Data.SqlDbType]::NVarChar,128)
+    $command.Parameters['@SourceDatabase'].Value=$config.Database
     if([int]$command.ExecuteScalar() -ne 0) { throw 'Transaction was left open after processing' }
     $message=if($RetrySucceeded){'PASS: retry cleared ErrorMessage; all 4 jobs Success; success dates identical; both starts cleared errors; no open source transactions.'}else{'PASS: 3 Success, 1 Error; failure retained prior success date; processing continued after error; start cleared old errors; no open source transactions.'}
     $message | Set-Content -LiteralPath (Join-Path $config.RunDirectory ('job-state-'+[bool]$RetrySucceeded+'.txt')) -Encoding UTF8
