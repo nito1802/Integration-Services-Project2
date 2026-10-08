@@ -6,4 +6,8 @@
   <Project Path="Integration Services Project2/Integration Services Project2.dtproj" Type="c9674dcb-5085-4a16-b785-4c70dd1589bd">
     <Platform Project="?" />
   </Project>
+  <Project Path="Integration Services Project2.Database/Integration Services Project2.Database.csproj">
+    <BuildType Project="Debug" />
+    <Platform Project="Any CPU" />
+  </Project>
 </Solution>

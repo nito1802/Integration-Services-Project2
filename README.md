@@ -1,5 +1,7 @@
 # Archiwizacja CSV w SSIS
 
+Solucja zawiera też bibliotekę C# `Integration Services Project2.Database` z niezależną tabelą `Archive.ArchiveJobs`, ośmioma rekordami przykładowymi i migracjami EF Core. Instrukcja `Add-Migration` / `Update-Database` bez osobnej aplikacji: [README biblioteki](Integration%20Services%20Project2.Database/README.md).
+
 Otwórz `Integration Services Project2.slnx`, następnie `Package.dtsx` w SSIS Packages. Użyj **Execute Package** z menu kontekstowego pakietu (albo ustaw pakiet jako StartUp Object i użyj F5).
 
 Wynik: **jeden CSV na tabelę na uruchomienie**, np. `C:\Archive\2026-10-08\MyData.Snapshots_2026-10-08_GUID.csv`.
