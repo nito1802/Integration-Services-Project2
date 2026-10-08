@@ -3,6 +3,7 @@
 tools/.script-build/
 tools/package-skeleton.dtsx
 verification/main-run/
+verification/console-run/
 verification/*/designer-test/
 verification/*/csv*/
 verification/*/test-process-id.txt
@@ -368,3 +369,4 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/Integration Services Project2.Database/appsettings.json

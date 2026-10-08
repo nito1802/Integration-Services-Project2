@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace IntegrationServicesProject2.Database;
 
-internal static class DatabaseConfiguration
+public static class DatabaseConfiguration
 {
     public static string GetConnectionString()
     {

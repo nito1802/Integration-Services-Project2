@@ -1,0 +1,1 @@
+PASS: console DI resolves DbContext; one job inserted; SQL identity returned; default CreatedAt; invalid table/retention reprompted; processing fields NULL; isolated test record removed.
