@@ -1,0 +1,1 @@
+﻿PASS: MyData.Snapshots; CSV=82; rows=95; completed days=82; all IDs and field values match the current database; no duplicates or unfinished files.

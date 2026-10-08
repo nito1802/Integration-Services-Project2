@@ -1,0 +1,2 @@
+﻿"Kind (nvarchar)";"SequenceNo (int)";"HappenedAt (datetime2)";"Details (nvarchar)"
+"A";"2000";"10/06/2026 00:00:00";""

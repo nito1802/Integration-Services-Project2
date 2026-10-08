@@ -1,0 +1,1 @@
+PASS: 7 CSV; Orders=2506; Events=1002; total=3508; batches=1000,1,1,1000,1000,505,1; exact keys; cutoff; Unicode; quotes; semicolons; multiline; NULL; decimal; BOM; 4 completed days.
