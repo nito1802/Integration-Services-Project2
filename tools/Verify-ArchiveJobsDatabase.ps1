@@ -1,7 +1,7 @@
 param([switch]$BeforeMigration)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
-$config=Get-Content -LiteralPath (Join-Path $root 'Integration Services Project2.Database\appsettings.Local.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$config=Get-Content -LiteralPath (Join-Path $root 'Integration Services Project2.Database\appsettings.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $connection=New-Object Data.SqlClient.SqlConnection($config.ConnectionStrings.ArchiveJobsDatabase)
 try {
     $connection.Open()

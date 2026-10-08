@@ -18,13 +18,7 @@ Historia migracji tej biblioteki: `Archive.__EFMigrationsHistory`. Biblioteka ni
 
 ## Połączenie
 
-Kolejność konfiguracji:
-
-1. Zmienna środowiskowa `ARCHIVEJOBS_CONNECTION_STRING`.
-2. `ConnectionStrings:ArchiveJobsDatabase` z `appsettings.Local.json`.
-3. Ten sam klucz z `appsettings.json` (domyślne lokalne LocalDB).
-
-Uzgodnione połączenie z serwerem zapisano w `appsettings.Local.json`, wykluczonym z Gita. Pliki ustawień są kopiowane do katalogu wynikowego biblioteki. Na innym komputerze trzeba dostarczyć własny plik lokalny albo zmienną środowiskową. Sekretów nie należy wpisywać do śledzonego `appsettings.json`.
+Jedynym źródłem połączenia jest `ConnectionStrings:ArchiveJobsDatabase` w wymaganym pliku `appsettings.json`. Zawiera on uzgodnione połączenie z serwerem i jest kopiowany do katalogu wynikowego biblioteki. Aby zmienić połączenie, edytuj ten plik. Plik jest wykluczony z Gita ze względu na hasło; po sklonowaniu repozytorium należy go utworzyć z własnym połączeniem.
 
 ## Migracje bez API / aplikacji konsolowej
 

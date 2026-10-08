@@ -4,5 +4,4 @@ public static class DatabaseEnvironment
 {
     public const string DatabaseSchema = "Archive";
     public const string DatabaseConnectionString = "ArchiveJobsDatabase";
-    public const string ConnectionStringEnvironmentVariable = "ARCHIVEJOBS_CONNECTION_STRING";
 }
