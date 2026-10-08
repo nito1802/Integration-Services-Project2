@@ -6,13 +6,13 @@ namespace IntegrationServicesProject2.Database;
 
 public interface IArchiveJobsDbContext
 {
-    DbSet<ArchiveJobEntity> ArchiveJobs { get; set; }
+    DbSet<ArchiveJob> ArchiveJobs { get; set; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 
 public class ArchiveJobsDbContext : DbContext, IArchiveJobsDbContext
 {
-    public DbSet<ArchiveJobEntity> ArchiveJobs { get; set; }
+    public DbSet<ArchiveJob> ArchiveJobs { get; set; }
 
     public ArchiveJobsDbContext()
     {
@@ -37,25 +37,19 @@ public class ArchiveJobsDbContext : DbContext, IArchiveJobsDbContext
     {
         modelBuilder.HasDefaultSchema(DatabaseEnvironment.DatabaseSchema);
 
-        modelBuilder.Entity<ArchiveJobEntity>(entity =>
+        modelBuilder.Entity<ArchiveJob>(entity =>
         {
-            entity.ToTable("ArchiveJobs");
-            entity.HasKey(job => job.Id);
-            entity.Property(job => job.Id).UseIdentityColumn();
-            entity.Property(job => job.DatabaseName).HasMaxLength(128).IsRequired();
-            entity.Property(job => job.TableName).HasMaxLength(257).IsRequired();
-            entity.Property(job => job.LastSuccesProcessedAt).HasColumnType("date");
 
             // Fixed sample values keep future migrations deterministic.
             entity.HasData(
-                new ArchiveJobEntity { Id = 1, DatabaseName = "MyData", TableName = "MyData.Snapshots", LastSuccesProcessedAt = new DateOnly(2026, 9, 29), ArchiveOlderThanDays = 90 },
-                new ArchiveJobEntity { Id = 2, DatabaseName = "SmartHome", TableName = "SmartHome.Events", LastSuccesProcessedAt = new DateOnly(2026, 10, 3), ArchiveOlderThanDays = 30 },
-                new ArchiveJobEntity { Id = 3, DatabaseName = "SalesDemo", TableName = "dbo.Orders", LastSuccesProcessedAt = new DateOnly(2026, 9, 15), ArchiveOlderThanDays = 180 },
-                new ArchiveJobEntity { Id = 4, DatabaseName = "WarehouseDemo", TableName = "audit.StockMovements", LastSuccesProcessedAt = new DateOnly(2026, 10, 1), ArchiveOlderThanDays = 60 },
-                new ArchiveJobEntity { Id = 5, DatabaseName = "TelemetryDemo", TableName = "dbo.Readings", LastSuccesProcessedAt = new DateOnly(2026, 9, 22), ArchiveOlderThanDays = 14 },
-                new ArchiveJobEntity { Id = 6, DatabaseName = "SupportDemo", TableName = "dbo.Tickets", LastSuccesProcessedAt = new DateOnly(2026, 8, 31), ArchiveOlderThanDays = 365 },
-                new ArchiveJobEntity { Id = 7, DatabaseName = "PaymentsDemo", TableName = "audit.Transactions", LastSuccesProcessedAt = new DateOnly(2026, 10, 5), ArchiveOlderThanDays = 120 },
-                new ArchiveJobEntity { Id = 8, DatabaseName = "LogsDemo", TableName = "dbo.ApplicationLogs", LastSuccesProcessedAt = new DateOnly(2026, 10, 7), ArchiveOlderThanDays = 7 });
+                new ArchiveJob { Id = 1, DatabaseName = "MyData", TableName = "MyData.Snapshots", LastSuccesProcessedAt = new DateOnly(2026, 9, 29), ArchiveOlderThanDays = 90 },
+                new ArchiveJob { Id = 2, DatabaseName = "SmartHome", TableName = "SmartHome.Events", LastSuccesProcessedAt = new DateOnly(2026, 10, 3), ArchiveOlderThanDays = 30 },
+                new ArchiveJob { Id = 3, DatabaseName = "SalesDemo", TableName = "dbo.Orders", LastSuccesProcessedAt = new DateOnly(2026, 9, 15), ArchiveOlderThanDays = 180 },
+                new ArchiveJob { Id = 4, DatabaseName = "WarehouseDemo", TableName = "audit.StockMovements", LastSuccesProcessedAt = new DateOnly(2026, 10, 1), ArchiveOlderThanDays = 60 },
+                new ArchiveJob { Id = 5, DatabaseName = "TelemetryDemo", TableName = "dbo.Readings", LastSuccesProcessedAt = new DateOnly(2026, 9, 22), ArchiveOlderThanDays = 14 },
+                new ArchiveJob { Id = 6, DatabaseName = "SupportDemo", TableName = "dbo.Tickets", LastSuccesProcessedAt = new DateOnly(2026, 8, 31), ArchiveOlderThanDays = 365 },
+                new ArchiveJob { Id = 7, DatabaseName = "PaymentsDemo", TableName = "audit.Transactions", LastSuccesProcessedAt = new DateOnly(2026, 10, 5), ArchiveOlderThanDays = 120 },
+                new ArchiveJob { Id = 8, DatabaseName = "LogsDemo", TableName = "dbo.ApplicationLogs", LastSuccesProcessedAt = new DateOnly(2026, 10, 7), ArchiveOlderThanDays = 7 });
         });
 
         base.OnModelCreating(modelBuilder);
