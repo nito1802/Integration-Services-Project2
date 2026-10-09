@@ -1,4 +1,4 @@
-﻿param([switch]$CompatibilityTest)
+param([switch]$CompatibilityTest)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $project=Join-Path $root 'Integration Services Project2'
@@ -30,7 +30,7 @@ $package.Description='CSV archive: ArchiveJobs -> tables -> days -> batches of 1
 $package.Variables.Remove('User::SQLStatement')
 function Add-Variable($name,$value) { [void]$package.Variables.Add($name,$false,'User',$value) }
 foreach($name in @('Tables')) { Add-Variable $name (New-Object object) }
-foreach($name in @('TableName','ColumnDate','ArchiwumPath','BeginScript','SQLStatement','FolderFullPath','OutputFile','AddNumber','QuotedTable','QuotedColumn','OrderBy','DatabaseName','JobError','CsvHeader')) { Add-Variable $name '' }
+foreach($name in @('TableName','ColumnDate','ArchiwumPath','BeginScript','SQLStatement','FolderFullPath','OutputFile','AddNumber','OrderBy','DatabaseName','JobError','CsvHeader')) { Add-Variable $name '' }
 foreach($name in @('Days','DaysCounter','LoopCounter','ArchiveJobId','FailedJobs')) { Add-Variable $name ([int]0) }
 Add-Variable 'BatchNumber' ([long]0)
 foreach($name in @('DateFrom','DateTo','CurrentDateFrom','CurrentDateTo')) { Add-Variable $name ([datetime]'2000-01-01') }
@@ -74,13 +74,13 @@ $tables.ForEachEnumerator.InnerObject.DataObjectVariable='User::Tables'
 foreach($entry in @(@('ArchiveJobId',0),@('DatabaseName',1),@('TableName',2),@('Days',3),@('ColumnDate',4))) { $mapping=$tables.VariableMappings.Add(); $mapping.VariableName='User::'+$entry[0]; $mapping.ValueIndex=$entry[1] }
 Link $package $getSettings $tables
 $startJob=Add-Script $tables 'Start archive job' '$Package::ArchiveRoot,User::DatabaseName' 'User::ArchiwumPath'
-$begin=Add-Script $tables 'BeginScript' 'User::TableName,User::ColumnDate,User::Days' 'User::BeginScript,User::LoopCounter,User::QuotedTable,User::QuotedColumn,User::OrderBy'
+$begin=Add-Script $tables 'BeginScript' 'User::TableName,User::ColumnDate,User::Days' 'User::BeginScript,User::LoopCounter,User::OrderBy'
 $days=Add-Script $tables 'Count days diff' 'User::BeginScript,User::Days' 'User::DaysCounter,User::DateFrom,User::DateTo'
 $dayLoop=$tables.Executables.Add('STOCK:FORLOOP'); $dayLoop.Name='For Loop Container'; $dayLoop.DelayValidation=$true; $dayLoop.FailPackageOnFailure=$true
 $dayLoop.InitExpression='@[User::LoopCounter] = 0'; $dayLoop.EvalExpression='!@[User::JobFailed] && @[User::LoopCounter] < @[User::DaysCounter]'; $dayLoop.AssignExpression='@[User::LoopCounter] = @[User::LoopCounter] + 1'
 Link $tables $startJob $begin
 Link $tables $begin $days
-$guid=Add-Script $tables 'GetGuid' 'System::StartTime,User::ArchiwumPath,User::TableName,User::QuotedTable' 'User::FolderFullPath,User::AddNumber,User::OutputFile,User::CsvHeader'
+$guid=Add-Script $tables 'GetGuid' 'System::StartTime,User::ArchiwumPath,User::TableName' 'User::FolderFullPath,User::AddNumber,User::OutputFile,User::CsvHeader'
 Link $tables $days $guid
 Link $tables $guid $dayLoop
 $getDate=Add-Script $dayLoop 'Get DateTo' 'User::DateFrom,User::LoopCounter' 'User::CurrentDateFrom,User::CurrentDateTo,User::BatchNumber,User::BatchHasRows'
@@ -89,7 +89,7 @@ $batches.InitExpression='@[User::BatchNumber] = 0'; $batches.EvalExpression='!@[
 Link $dayLoop $getDate $batches
 
 
-$construct=Add-Script $batches 'Construct SQL' 'User::QuotedTable,User::QuotedColumn,User::OrderBy' 'User::SQLStatement'
+$construct=Add-Script $batches 'Construct SQL' 'User::TableName,User::ColumnDate,User::OrderBy' 'User::SQLStatement'
 $export=Add-Script $batches 'Export data to CSV' 'User::SQLStatement,User::OutputFile,User::CurrentDateFrom,User::CurrentDateTo,User::TableName,User::CsvHeader' 'User::BatchNumber,User::BatchHasRows'
 
 Link $batches $construct $export

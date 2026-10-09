@@ -17,7 +17,7 @@
                 SqlConnection connection = (SqlConnection)Dts.Connections["ArchiveDb"].AcquireConnection(Dts.Transaction);
                 try
                 {
-                    using (var command = new SqlCommand("SELECT TOP (0) * FROM " + Convert.ToString(Dts.Variables["User::QuotedTable"].Value, CultureInfo.InvariantCulture) + ";", connection))
+                    using (var command = new SqlCommand("SELECT TOP (0) * FROM " + Convert.ToString(Dts.Variables["User::TableName"].Value, CultureInfo.InvariantCulture) + ";", connection))
                     using (var reader = command.ExecuteReader())
                     {
                         var fields = new string[reader.FieldCount];
