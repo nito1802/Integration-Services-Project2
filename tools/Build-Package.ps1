@@ -30,11 +30,11 @@ $package.Description='CSV archive: ArchiveJobs -> tables -> days -> batches of 1
 $package.Variables.Remove('User::SQLStatement')
 function Add-Variable($name,$value) { [void]$package.Variables.Add($name,$false,'User',$value) }
 foreach($name in @('Tables')) { Add-Variable $name (New-Object object) }
-foreach($name in @('TableName','ColumnDate','ArchiwumPath','BeginScript','CountSQL','SQLStatement','FolderFullPath','OutputFile','AddNumber','QuotedTable','QuotedColumn','OrderBy','DatabaseName','JobError','CsvHeader')) { Add-Variable $name '' }
+foreach($name in @('TableName','ColumnDate','ArchiwumPath','BeginScript','SQLStatement','FolderFullPath','OutputFile','AddNumber','QuotedTable','QuotedColumn','OrderBy','DatabaseName','JobError','CsvHeader')) { Add-Variable $name '' }
 foreach($name in @('Days','DaysCounter','LoopCounter','ArchiveJobId','FailedJobs')) { Add-Variable $name ([int]0) }
-foreach($name in @('FileRecordCounter','BatchNumber')) { Add-Variable $name ([long]0) }
+Add-Variable 'BatchNumber' ([long]0)
 foreach($name in @('DateFrom','DateTo','CurrentDateFrom','CurrentDateTo')) { Add-Variable $name ([datetime]'2000-01-01') }
-foreach($name in @('JobActive','JobFailed')) { Add-Variable $name $false }
+foreach($name in @('JobActive','JobFailed','BatchHasRows')) { Add-Variable $name $false }
 $archiveRoot=[IO.Path]::GetDirectoryName([string]$package.Parameters['OutputFile'].Value)
 foreach($obsolete in @('TableName','DateColumn','OlderThanDays','OutputFile')) { [void]$package.Parameters.Remove($obsolete) }
 $p=$package.Parameters.Add('ArchiveRoot',[TypeCode]::String); $p.Value=$archiveRoot
@@ -83,16 +83,14 @@ Link $tables $begin $days
 $guid=Add-Script $tables 'GetGuid' 'System::StartTime,User::ArchiwumPath,User::TableName,User::QuotedTable' 'User::FolderFullPath,User::AddNumber,User::OutputFile,User::CsvHeader'
 Link $tables $days $guid
 Link $tables $guid $dayLoop
-$getDate=Add-Script $dayLoop 'Get DateTo' 'User::DateFrom,User::LoopCounter,User::ArchiwumPath,User::TableName,User::QuotedTable,User::QuotedColumn' 'User::CurrentDateFrom,User::CurrentDateTo,User::BatchNumber,User::CountSQL'
-$count=Add-Script $dayLoop 'Count records' 'User::CountSQL,User::CurrentDateFrom,User::CurrentDateTo' 'User::FileRecordCounter'
+$getDate=Add-Script $dayLoop 'Get DateTo' 'User::DateFrom,User::LoopCounter' 'User::CurrentDateFrom,User::CurrentDateTo,User::BatchNumber,User::BatchHasRows'
 $batches=$dayLoop.Executables.Add('STOCK:FORLOOP'); $batches.Name='Loop through 1000'; $batches.DelayValidation=$true; $batches.FailPackageOnFailure=$true
-$batches.InitExpression='@[User::BatchNumber] = 0'; $batches.EvalExpression='!@[User::JobFailed] && @[User::FileRecordCounter] > 0'; $batches.AssignExpression='@[User::FileRecordCounter] = @[User::FileRecordCounter] - 1000'
-Link $dayLoop $getDate $count
-Link $dayLoop $count $batches
+$batches.InitExpression='@[User::BatchNumber] = 0'; $batches.EvalExpression='!@[User::JobFailed] && @[User::BatchHasRows]'
+Link $dayLoop $getDate $batches
 
 
 $construct=Add-Script $batches 'Construct SQL' 'User::QuotedTable,User::QuotedColumn,User::OrderBy' 'User::SQLStatement'
-$export=Add-Script $batches 'Export data to CSV' 'User::SQLStatement,User::OutputFile,User::CurrentDateFrom,User::CurrentDateTo,User::TableName,User::CsvHeader' 'User::BatchNumber'
+$export=Add-Script $batches 'Export data to CSV' 'User::SQLStatement,User::OutputFile,User::CurrentDateFrom,User::CurrentDateTo,User::TableName,User::CsvHeader' 'User::BatchNumber,User::BatchHasRows'
 
 Link $batches $construct $export
 $setStatus=Add-Script $tables 'SetTableStatus' '' ''

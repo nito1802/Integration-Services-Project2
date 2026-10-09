@@ -1,0 +1,4 @@
+﻿PASS: 0 rows; 1 queries including final empty batch; exact unique IDs; next empty day terminates.
+PASS: 500 rows; 2 queries including final empty batch; exact unique IDs; next empty day terminates.
+PASS: 1000 rows; 2 queries including final empty batch; exact unique IDs; next empty day terminates.
+PASS: 2500 rows; 4 queries including final empty batch; exact unique IDs; next empty day terminates.

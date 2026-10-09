@@ -1,4 +1,4 @@
-﻿# Archiwizacja CSV w SSIS
+# Archiwizacja CSV w SSIS
 
 Projekt `Integration Services Project2.Console` pozwala dodawać zadania do `Archive.ArchiveJobs`. Ustaw go jako startowy w Visual Studio i uruchom przez F5 / Ctrl+F5. Kontekst jest wstrzykiwany przez DI, a połączenie pochodzi z tego samego `appsettings.json` co biblioteka `.Database`. Instrukcja znajduje się w README konsolówki.
 
@@ -26,7 +26,7 @@ Przepływ: Get Archive Jobs → Foreach Loop Container → Start archive job →
 
 Na początku zadania zapisujemy czas próby, czyścimy błąd i status. Nie używamy jawnych transakcji SQL ani transakcji SSIS. Dane są czytane bezpośrednio ze źródła; nie tworzymy `#ArchiveDay`. Zakres to pełne dni sprzed północy serwera SQL pomniejszonej o retencję. Tabela musi mieć kolumnę daty i niefiltrowany unikalny klucz, również złożony. Partia używa `ORDER BY` po tym kluczu oraz `OFFSET/FETCH`. Zakładamy, że historyczne rekordy w eksportowanym zakresie nie są zmieniane ani usuwane, a nowe dane przychodzą poza tym zakresem.
 
-Plik od początku ma rozszerzenie `.csv`. GetGuid tworzy plik i zapisuje jeden nagłówek; kolejne paczki dopisują dane. Nie ma pliku `.tmp`, przemianowania ani końcowego sprawdzania liczby rekordów dnia/tabeli. Count records pozostaje, ponieważ steruje liczbą paczek danego dnia. Liczba wierszy zapisanych w paczce służy tylko do logowania.
+Plik od początku ma rozszerzenie `.csv`. GetGuid tworzy plik i zapisuje jeden nagłówek; kolejne paczki dopisują dane. Nie ma pliku `.tmp`, przemianowania ani końcowego sprawdzania liczby rekordów dnia/tabeli. Nie ma Count records ani FileRecordCounter. Dla każdego dnia pętla pobiera paczki przez OFFSET/FETCH aż zapytanie zwróci zero rekordów. BatchHasRows jest resetowane na true przy rozpoczęciu kolejnego dnia, a po każdej paczce przyjmuje wartość rows > 0.
 
 Błąd odczytu lub serializacji ustawia `JobFailed` i zapisuje wyjątek do `JobError`. Dalszy eksport tej tabeli jest pomijany. Końcowy krótki bloczek `SetTableStatus`, wykonywany także po błędzie, aktualizuje `ArchiveJobs` przez osobne połączenie: przy sukcesie obie daty dostają identyczne `SYSDATETIME()`, status Success i pusty ErrorMessage; przy błędzie zapisuje datę próby, Error oraz komunikat, zachowując datę poprzedniego sukcesu. Błąd konfiguracji tabeli również daje Error. Jeżeli nie można odczytać konfiguracji lub zapisać stanu, pakiet zatrzymuje się.
 

@@ -39,6 +39,7 @@
                     Info("Table=" + S("TableName") + "; from=" + Convert.ToDateTime(V("CurrentDateFrom")).ToString("o") +
                         "; to=" + Convert.ToDateTime(V("CurrentDateTo")).ToString("o") + "; batch=" + (Convert.ToInt64(V("BatchNumber")) + 1) +
                         "; path=" + outputFile + "; rows=" + rows + "; elapsedMs=" + timer.ElapsedMilliseconds);
+                    Set("BatchHasRows", rows > 0);
                     Set("BatchNumber", Convert.ToInt64(V("BatchNumber")) + 1L);
                 }
                 catch (Exception ex)
