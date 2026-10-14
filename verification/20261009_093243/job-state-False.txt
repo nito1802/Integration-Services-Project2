@@ -1,0 +1,1 @@
+﻿PASS: 3 Success, 1 Error; failure retained prior success date; processing continued after error; start cleared old errors; no open source transactions.

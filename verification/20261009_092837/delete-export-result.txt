@@ -1,0 +1,5 @@
+﻿PASS: full ScriptMain flow archived and deleted 3508 rows, retained the 3 rows at/after cutoff; composite keys; CSV content verified; continued after invalid job.
+PASS: second run produced 3 header-only CSV files; no previously deleted data was exported again.
+PASS: WriteFailure preserved all 1001 source records and last-success date; status Error; CSV was closed before delete.
+PASS: DeleteFailure preserved all 1001 source records and last-success date; status Error; CSV was closed before delete.
+PASS: 1001 datetime2(7) composite-key records deleted exactly; next job succeeded after write/delete failures.

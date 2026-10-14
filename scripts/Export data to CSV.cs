@@ -4,6 +4,7 @@
                 var timer = Stopwatch.StartNew();
                 string outputFile = Convert.ToString(Dts.Variables["User::OutputFile"].Value, CultureInfo.InvariantCulture);
                 long rows = 0;
+                var batchKeys = new DataTable();
                 SqlConnection connection = (SqlConnection)Dts.Connections["ArchiveDb"].AcquireConnection(Dts.Transaction);
                 try
                 {
@@ -12,10 +13,16 @@
                         command.CommandTimeout = 300;
                         command.Parameters.Add("@DateFrom", SqlDbType.DateTime2).Value = Convert.ToDateTime(Dts.Variables["User::CurrentDateFrom"].Value);
                         command.Parameters.Add("@DateTo", SqlDbType.DateTime2).Value = Convert.ToDateTime(Dts.Variables["User::CurrentDateTo"].Value);
-                        command.Parameters.Add("@Offset", SqlDbType.BigInt).Value = checked(Convert.ToInt64(Dts.Variables["User::BatchNumber"].Value) * 1000L);
-                        command.Parameters.Add("@BatchSize", SqlDbType.Int).Value = 1000;
                         using (var reader = command.ExecuteReader())
                         {
+                            DataTable schema = reader.GetSchemaTable();
+                            foreach (string key in Convert.ToString(Dts.Variables["User::KeyColumns"].Value).Split(','))
+                            {
+                                string name = key.Trim();
+                                int ordinal = reader.GetOrdinal(name);
+                                DataColumn field = batchKeys.Columns.Add(name, reader.GetFieldType(ordinal));
+                                field.ExtendedProperties["SqlDbType"] = (SqlDbType)Convert.ToInt32(schema.Rows[ordinal]["ProviderType"]);
+                            }
                             var fields = new string[reader.FieldCount];
                             for (int i = 0; i < fields.Length; i++)
                             {
@@ -36,11 +43,18 @@
                                         writer.Write("\"" + (value ?? "").Replace("\"", "\"\"") + "\"");
                                     }
                                     writer.WriteLine();
+                                    var values = new object[batchKeys.Columns.Count];
+                                    for (int i = 0; i < values.Length; i++)
+                                    {
+                                        values[i] = reader[batchKeys.Columns[i].ColumnName];
+                                        if (values[i] == DBNull.Value) throw new InvalidOperationException("Archive key must not contain NULL.");
+                                    }
+                                    batchKeys.Rows.Add(values);
                                     rows++;
                                 }
                                 writer.Flush();
                                 stream.Flush(true);
-                                }
+                            }
                         }
                     }
                     bool again = false;
@@ -48,6 +62,8 @@
                         "; to=" + Convert.ToDateTime(Dts.Variables["User::CurrentDateTo"].Value).ToString("o") + "; batch=" + (Convert.ToInt64(Dts.Variables["User::BatchNumber"].Value) + 1) +
                         "; path=" + outputFile + "; rows=" + rows + "; elapsedMs=" + timer.ElapsedMilliseconds, "", 0, ref again);
                     Dts.Variables["User::BatchHasRows"].Value = rows > 0;
+                    // The next task may delete these keys only after the CSV has been flushed and closed.
+                    Dts.Variables["User::BatchKeys"].Value = batchKeys;
                     Dts.Variables["User::BatchNumber"].Value = Convert.ToInt64(Dts.Variables["User::BatchNumber"].Value) + 1L;
                 }
                 catch (Exception ex)

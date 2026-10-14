@@ -26,11 +26,11 @@ $package.VersionBuild=$package.VersionBuild+1
 $package.MaxConcurrentExecutables=1
 $package.TransactionOption=[Microsoft.SqlServer.Dts.Runtime.DTSTransactionOption]::NotSupported
 $package.DelayValidation=$true
-$package.Description='CSV archive: ArchiveJobs -> tables -> days -> batches of 1000 -> SetTableStatus. Direct CSV output, no explicit transactions. Source tables are read only.'
+$package.Description='CSV archive: TOP (1000) -> flush and close CSV -> delete exported keys -> repeat until empty. No explicit transactions.'
 $package.Variables.Remove('User::SQLStatement')
 function Add-Variable($name,$value) { [void]$package.Variables.Add($name,$false,'User',$value) }
-foreach($name in @('Tables')) { Add-Variable $name (New-Object object) }
-foreach($name in @('TableName','ColumnDate','ArchiwumPath','BeginScript','SQLStatement','FolderFullPath','OutputFile','AddNumber','OrderBy','DatabaseName','JobError','CsvHeader')) { Add-Variable $name '' }
+foreach($name in @('Tables','BatchKeys')) { Add-Variable $name (New-Object object) }
+foreach($name in @('TableName','ColumnDate','ArchiwumPath','BeginScript','SQLStatement','FolderFullPath','OutputFile','AddNumber','KeyColumns','DatabaseName','JobError','CsvHeader')) { Add-Variable $name '' }
 foreach($name in @('Days','DaysCounter','LoopCounter','ArchiveJobId','FailedJobs')) { Add-Variable $name ([int]0) }
 Add-Variable 'BatchNumber' ([long]0)
 foreach($name in @('DateFrom','DateTo','CurrentDateFrom','CurrentDateTo')) { Add-Variable $name ([datetime]'2000-01-01') }
@@ -74,7 +74,7 @@ $tables.ForEachEnumerator.InnerObject.DataObjectVariable='User::Tables'
 foreach($entry in @(@('ArchiveJobId',0),@('DatabaseName',1),@('TableName',2),@('Days',3),@('ColumnDate',4))) { $mapping=$tables.VariableMappings.Add(); $mapping.VariableName='User::'+$entry[0]; $mapping.ValueIndex=$entry[1] }
 Link $package $getSettings $tables
 $startJob=Add-Script $tables 'Start archive job' '$Package::ArchiveRoot,User::DatabaseName' 'User::ArchiwumPath'
-$begin=Add-Script $tables 'BeginScript' 'User::TableName,User::ColumnDate,User::Days' 'User::BeginScript,User::LoopCounter,User::OrderBy'
+$begin=Add-Script $tables 'BeginScript' 'User::TableName,User::ColumnDate,User::Days' 'User::BeginScript,User::LoopCounter,User::KeyColumns'
 $days=Add-Script $tables 'Count days diff' 'User::BeginScript,User::Days' 'User::DaysCounter,User::DateFrom,User::DateTo'
 $dayLoop=$tables.Executables.Add('STOCK:FORLOOP'); $dayLoop.Name='For Loop Container'; $dayLoop.DelayValidation=$true; $dayLoop.FailPackageOnFailure=$true
 $dayLoop.InitExpression='@[User::LoopCounter] = 0'; $dayLoop.EvalExpression='!@[User::JobFailed] && @[User::LoopCounter] < @[User::DaysCounter]'; $dayLoop.AssignExpression='@[User::LoopCounter] = @[User::LoopCounter] + 1'
@@ -89,10 +89,12 @@ $batches.InitExpression='@[User::BatchNumber] = 0'; $batches.EvalExpression='!@[
 Link $dayLoop $getDate $batches
 
 
-$construct=Add-Script $batches 'Construct SQL' 'User::TableName,User::ColumnDate,User::OrderBy' 'User::SQLStatement'
-$export=Add-Script $batches 'Export data to CSV' 'User::SQLStatement,User::OutputFile,User::CurrentDateFrom,User::CurrentDateTo,User::TableName,User::CsvHeader' 'User::BatchNumber,User::BatchHasRows'
+$construct=Add-Script $batches 'Construct SQL' 'User::TableName,User::ColumnDate' 'User::SQLStatement'
+$export=Add-Script $batches 'Export data to CSV' 'User::SQLStatement,User::OutputFile,User::CurrentDateFrom,User::CurrentDateTo,User::TableName,User::CsvHeader,User::KeyColumns' 'User::BatchNumber,User::BatchHasRows,User::BatchKeys'
 
 Link $batches $construct $export
+$delete=Add-Script $batches 'Delete exported batch' 'User::BatchKeys' ''
+Link $batches $export $delete
 $setStatus=Add-Script $tables 'SetTableStatus' '' ''
 Link $tables $dayLoop $setStatus
 $summary=Add-Script $package 'Archive summary' '' ''

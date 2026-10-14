@@ -1,0 +1,6 @@
+﻿{
+    "Database":  "CodexArchiveFlow_0efddb47395e4d7c96c83e161567ee1b",
+    "ConnectionString":  "Data Source=(localdb)\\MSSQLLocalDB;Integrated Security=True;Initial Catalog=CodexArchiveFlow_0efddb47395e4d7c96c83e161567ee1b;Connect Timeout=60",
+    "ArchiveRoot":  "C:\\Users\\Dante\\Desktop\\Istotne\\source\\Visual Studio\\Test\\Integration Services Project2\\verification\\20261009_093135\\csv",
+    "RunDirectory":  "C:\\Users\\Dante\\Desktop\\Istotne\\source\\Visual Studio\\Test\\Integration Services Project2\\verification\\20261009_093135"
+}

@@ -16,7 +16,7 @@
                         foreach (DataRow field in reader.GetSchemaTable().Rows)
                             if (Convert.ToBoolean(field["IsKey"])) keys.Add(Convert.ToString(field["ColumnName"]));
                         if (keys.Count == 0) throw new InvalidOperationException("No unique key: " + table);
-                        Dts.Variables["User::OrderBy"].Value = string.Join(", ", keys.ToArray());
+                        Dts.Variables["User::KeyColumns"].Value = string.Join(", ", keys.ToArray());
                     }
                 }
                 finally { Dts.Connections["ArchiveDb"].ReleaseConnection(connection); }
