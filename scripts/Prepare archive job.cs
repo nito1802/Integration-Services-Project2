@@ -4,10 +4,9 @@
             Dts.Variables["User::JobFailed"].Value = false;
             Dts.Variables["User::JobError"].Value = "";
             Dts.Variables["User::OutputFile"].Value = "";
-            Run(delegate {
-                Dts.Variables["User::ArchiwumPath"].Value = Convert.ToString(Dts.Variables["$Package::ArchiveRoot"].Value);
-                SqlConnection source = (SqlConnection)Dts.Connections["ArchiveDb"].AcquireConnection(Dts.Transaction);
-                try { source.ChangeDatabase(Convert.ToString(Dts.Variables["User::DatabaseName"].Value, CultureInfo.InvariantCulture)); }
-                finally { Dts.Connections["ArchiveDb"].ReleaseConnection(source); }
-            });
+            Dts.Variables["User::ArchiwumPath"].Value = Convert.ToString(Dts.Variables["$Package::ArchiveRoot"].Value);
+            SqlConnection source = (SqlConnection)Dts.Connections["ArchiveDb"].AcquireConnection(Dts.Transaction);
+            try { source.ChangeDatabase(Convert.ToString(Dts.Variables["User::DatabaseName"].Value, CultureInfo.InvariantCulture)); }
+            finally { Dts.Connections["ArchiveDb"].ReleaseConnection(source); }
+            Dts.TaskResult = (int)DTSExecResult.Success;
         }

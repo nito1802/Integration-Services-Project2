@@ -88,9 +88,11 @@ function Bind-Result($hostTask,$column,$variable) {
     $binding=$hostTask.InnerObject.ResultSetBindings.Add()
     $binding.ResultName=$column; $binding.DtsVariableName=$variable
 }
-function Job-Sql($hostTask,$handlerName) {
+function Job-Sql($hostTask,$handlerName,$skipAfterError=$true) {
     $hostTask.FailPackageOnFailure=$false; $hostTask.FailParentOnFailure=$false; $hostTask.MaximumErrorCount=0
-    $hostTask.SetExpression('Disable','@[User::JobFailed]')
+    # OnError records the job failure. The scheduler can then reach SetTableStatus.
+    $hostTask.ForceExecutionResult=[Microsoft.SqlServer.Dts.Runtime.DTSForcedExecResult]::Success
+    if($skipAfterError) { $hostTask.SetExpression('Disable','@[User::JobFailed]') }
     $handler=$hostTask.EventHandlers.Add('OnError'); $handler.MaximumErrorCount=0
     [void](Add-Script $handler $handlerName 'System::ErrorDescription' 'System::Propagate')
 }
@@ -170,6 +172,12 @@ $report=Add-Script $tables 'Report archive job' '' ''
 Link $tables $setStatus $report
 $summary=Add-Script $package 'Archive summary' '' ''
 Link $package $tables $summary
+# Use the same SSIS error handling for C# and SQL tasks. Preparation resets the
+# previous job's flags, so it must run even when the preceding job failed.
+Job-Sql $prepareJob 'Capture preparation error' $false
+foreach($task in @($begin,$guid,$getDate,$construct,$export,$prepareDelete,$stageKeys,$checkDelete)) {
+    Job-Sql $task ('Capture '+$task.Name+' error')
+}
 $skeleton=Join-Path $PSScriptRoot 'package-skeleton.dtsx'
 $app.SaveToXml($skeleton,$package,$null)
 $xml=[xml](Get-Content -LiteralPath $skeleton -Raw)

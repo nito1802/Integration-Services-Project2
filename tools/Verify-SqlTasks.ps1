@@ -27,7 +27,7 @@ if($FullPackage) {
     $stubPath=Join-Path $build 'Stub.cs'; [IO.File]::WriteAllText($stubPath,$stub)
     $files=@($stubPath)
     $common=Get-Content -LiteralPath (Join-Path $root 'scripts/Common.cs') -Raw
-    $names=@('Prepare archive job','BeginScript','GetGuid','Get DateTo','Construct SQL','Export data to CSV','Prepare batch delete','Stage batch keys','Check deleted rows','Report archive job')
+    $names=@('Prepare archive job','BeginScript','GetGuid','Get DateTo','Construct SQL','Export data to CSV','Prepare batch delete','Stage batch keys','Check deleted rows','Report archive job','Capture SQL error')
     for($i=0;$i -lt $names.Count;$i++) {
         $main=Get-Content -LiteralPath (Join-Path $root ('scripts/'+$names[$i]+'.cs')) -Raw
         if($FailureMode -eq 'Write' -and $names[$i] -eq 'Export data to CSV') {
@@ -54,7 +54,17 @@ if($FullPackage) {
             $probe.Variables.Clear()
             foreach($variable in $package.Variables) { $v=New-Object ProbeVariable; $v.Value=$variable.Value; $probe.Variables.Add($variable.QualifiedName,$v) }
             $probe.Variables['$Package::ArchiveRoot'].Value=$output
-            $script=New-Object ('NativeProbe'+$index+'.ScriptMain'); $script.Dts=$probe; $script.Main()
+            $script=New-Object ('NativeProbe'+$index+'.ScriptMain'); $script.Dts=$probe
+            try { $script.Main() }
+            catch {
+                if($task.EventHandlers.Count -eq 0) { throw }
+                # Dispatch the production OnError source through the substitute host.
+                $v=New-Object ProbeVariable; $v.Value=$_.Exception.ToString(); $probe.Variables.Add('System::ErrorDescription',$v)
+                $v=New-Object ProbeVariable; $v.Value=$true; $probe.Variables.Add('System::Propagate',$v)
+                $handler=New-Object ('NativeProbe'+([Array]::IndexOf($names,'Capture SQL error'))+'.ScriptMain')
+                $handler.Dts=$probe; $handler.Main()
+                if($probe.Variables['System::Propagate'].Value) { throw 'Error handler did not stop propagation' }
+            }
             foreach($variable in $package.Variables) { if($variable.Namespace -eq 'User') { $variable.Value=$probe.Variables[$variable.QualifiedName].Value } }
             return
         }
