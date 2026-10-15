@@ -21,11 +21,5 @@
             }
             finally { Dts.Connections["ArchiveDb"].ReleaseConnection(connection); }
 
-            Dts.Variables["User::BeginScript"].Value =
-                "SET NOCOUNT ON; DECLARE @Cutoff date=DATEADD(day,-@Days,CONVERT(date,GETDATE())); " +
-                "DECLARE @First date=(SELECT CONVERT(date,MIN(" + column + ")) FROM " + table + " WHERE " + column + " < @Cutoff); " +
-                "SELECT CASE WHEN @First IS NULL THEN 0 ELSE DATEDIFF(day,@First,@Cutoff) END AS DaysCounter, " +
-                "COALESCE(@First,@Cutoff) AS DateFrom, @Cutoff AS DateTo;";
-            Dts.Variables["User::LoopCounter"].Value = 0;
             Dts.TaskResult = (int)DTSExecResult.Success;
         }

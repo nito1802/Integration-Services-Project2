@@ -25,21 +25,18 @@ function Place($id,$x,$y,$width=210,$height=46,$container=$false) {
 }
 # Coordinates are relative to the containing graph/panel.
 Place 'Package\Get Archive Jobs' 32 24
-Place 'Package\Foreach Loop Container' 32 120 1100 830 $true
-Place 'Package\Archive summary' 32 1010
+Place 'Package\Foreach Loop Container' 32 120 1000 660 $true
+Place 'Package\Archive summary' 32 840
 $jobs='Package\Foreach Loop Container'
 Place "$jobs\Start archive job" 28 24
 Place "$jobs\Prepare archive job" 294 24
 Place "$jobs\BeginScript" 560 24
-Place "$jobs\Count days diff" 560 120
+Place "$jobs\Get cutoff date" 560 120
 Place "$jobs\GetGuid" 294 120
-Place "$jobs\For Loop Container" 72 220 980 450 $true
-Place "$jobs\SetTableStatus" 294 720
-Place "$jobs\Report archive job" 560 720
-$days="$jobs\For Loop Container"
-Place "$days\Get DateTo" 24 24
-Place "$days\Loop through 1000" 72 110 870 280 $true
-$batch="$days\Loop through 1000"
+Place "$jobs\Loop through 1000" 72 220 870 280 $true
+Place "$jobs\SetTableStatus" 294 550
+Place "$jobs\Report archive job" 560 550
+$batch="$jobs\Loop through 1000"
 Place "$batch\Construct SQL" 24 24 180
 Place "$batch\Read archive batch" 236 24 180
 Place "$batch\Export data to CSV" 448 24 180

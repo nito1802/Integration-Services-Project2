@@ -50,8 +50,7 @@
                     }
                 }
                 bool again = false;
-                Dts.Events.FireInformation(0, "CSV Archive", "Table=" + Convert.ToString(Dts.Variables["User::TableName"].Value, CultureInfo.InvariantCulture) + "; from=" + Convert.ToDateTime(Dts.Variables["User::CurrentDateFrom"].Value).ToString("o") +
-                    "; to=" + Convert.ToDateTime(Dts.Variables["User::CurrentDateTo"].Value).ToString("o") + "; batch=" + (Convert.ToInt64(Dts.Variables["User::BatchNumber"].Value) + 1) +
+                Dts.Events.FireInformation(0, "CSV Archive", "Table=" + Convert.ToString(Dts.Variables["User::TableName"].Value, CultureInfo.InvariantCulture) + "; cutoff=" + Convert.ToDateTime(Dts.Variables["User::CutoffDate"].Value).ToString("o") + "; batch=" + (Convert.ToInt64(Dts.Variables["User::BatchNumber"].Value) + 1) +
                     "; path=" + outputFile + "; rows=" + rows + "; elapsedMs=" + timer.ElapsedMilliseconds, "", 0, ref again);
                 Dts.Variables["User::BatchHasRows"].Value = rows > 0;
                 // The next task may delete these keys only after the CSV has been flushed and closed.
@@ -60,7 +59,7 @@
             }
             catch (Exception ex)
             {
-                throw new IOException("Export failed. Table=" + Convert.ToString(Dts.Variables["User::TableName"].Value, CultureInfo.InvariantCulture) + "; day=" + Convert.ToDateTime(Dts.Variables["User::CurrentDateFrom"].Value).ToString("yyyy-MM-dd") +
+                throw new IOException("Export failed. Table=" + Convert.ToString(Dts.Variables["User::TableName"].Value, CultureInfo.InvariantCulture) + "; cutoff=" + Convert.ToDateTime(Dts.Variables["User::CutoffDate"].Value).ToString("yyyy-MM-dd") +
                     "; batch=" + (Convert.ToInt64(Dts.Variables["User::BatchNumber"].Value) + 1) + "; file=" + outputFile + "; rowsWritten=" + rows, ex);
             }
 

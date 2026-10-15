@@ -1,4 +1,4 @@
-param([switch]$Retry,[switch]$FullPackage,[ValidateSet('None','Write','Delete')][string]$FailureMode='None')
+param([switch]$Retry,[switch]$FullPackage,[switch]$SpreadDates,[ValidateSet('None','Write','Delete')][string]$FailureMode='None')
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $config=Get-Content -LiteralPath (Get-Content -LiteralPath (Join-Path $root 'verification/latest-config.txt')) -Raw | ConvertFrom-Json
@@ -11,6 +11,11 @@ $package.Parameters['ArchiveJobsConnectionString'].Value=$config.ConnectionStrin
 $output=Join-Path $config.RunDirectory $(if($Retry) {'retry-csv'} else {'native-csv'})
 $package.Parameters['ArchiveRoot'].Value=$output
 foreach($connection in $package.Connections) { $connection.ConnectionString=$config.ConnectionString }
+if($SpreadDates -and !$Retry) {
+    $db=New-Object Data.SqlClient.SqlConnection($config.ConnectionString); $db.Open()
+    try { $cmd=$db.CreateCommand(); $cmd.CommandText='UPDATE dbo.Orders SET CreatedAt=DATEADD(day,-3-CONVERT(int,OrderNo%20),CONVERT(date,GETDATE())) WHERE OrderNo<=2505;'; [void]$cmd.ExecuteNonQuery() } finally { $db.Dispose() }
+}
+$batchSizes=@{}
 if($FailureMode -eq 'Delete') {
     $db=New-Object Data.SqlClient.SqlConnection($config.ConnectionString); $db.Open()
     try { $cmd=$db.CreateCommand(); $cmd.CommandText="CREATE TRIGGER dbo.RejectArchiveDelete ON dbo.Orders INSTEAD OF DELETE AS THROW 50002,'Injected delete failure.',1;"; [void]$cmd.ExecuteNonQuery() } finally { $db.Dispose() }
@@ -27,7 +32,7 @@ if($FullPackage) {
     $stubPath=Join-Path $build 'Stub.cs'; [IO.File]::WriteAllText($stubPath,$stub)
     $files=@($stubPath)
     $common=Get-Content -LiteralPath (Join-Path $root 'scripts/Common.cs') -Raw
-    $names=@('Prepare archive job','BeginScript','GetGuid','Get DateTo','Construct SQL','Export data to CSV','Prepare batch delete','Stage batch keys','Check deleted rows','Report archive job','Capture SQL error')
+    $names=@('Prepare archive job','BeginScript','GetGuid','Construct SQL','Export data to CSV','Prepare batch delete','Stage batch keys','Check deleted rows','Report archive job','Capture SQL error')
     for($i=0;$i -lt $names.Count;$i++) {
         $main=Get-Content -LiteralPath (Join-Path $root ('scripts/'+$names[$i]+'.cs')) -Raw
         if($FailureMode -eq 'Write' -and $names[$i] -eq 'Export data to CSV') {
@@ -72,30 +77,28 @@ if($FullPackage) {
         $result=$task.Execute($package.Connections,$task.Variables,$null,$null,$null)
         $errors=@($package.Errors | Select-Object -Skip $before | ForEach-Object Description)
         if($result -ne 'Success' -or $errors.Count -gt 0) {
-            if($name -in @('Count days diff','Read archive batch','Create batch key table','Delete exported batch')) {
+            if($name -in @('Get cutoff date','Read archive batch','Create batch key table','Delete exported batch')) {
                 # TaskHost.Execute does not dispatch the package scheduler's event handlers.
                 $package.Variables['User::JobFailed'].Value=$true
                 $package.Variables['User::JobError'].Value=$errors -join [Environment]::NewLine
             } else { throw "Task $name failed: $($errors -join '; ')" }
         }
+        if($name -eq 'Read archive batch' -and !$package.Variables['User::JobFailed'].Value) {
+            $id=[int]$package.Variables['User::ArchiveJobId'].Value
+            $batchSizes[$id]=@($batchSizes[$id])+@([int]$package.Variables['User::BatchData'].Value.Tables[0].Rows.Count) | Where-Object { $null -ne $_ }
+        }
     }
     Step $package 'Get Archive Jobs'
     $jobs=$package.Variables['User::Tables'].Value.Tables[0].Copy()
     $tables=$package.Executables['Foreach Loop Container']
-    $days=$tables.Executables['For Loop Container']
-    $batches=$days.Executables['Loop through 1000']
+    $batches=$tables.Executables['Loop through 1000']
     foreach($job in $jobs.Rows) {
         foreach($entry in @(@('ArchiveJobId','Id'),@('DatabaseName','DatabaseName'),@('TableName','TableName'),@('Days','ArchiveOlderThanDays'),@('ColumnDate','DateColumn'))) {
             $package.Variables['User::'+$entry[0]].Value=$job[$entry[1]]
         }
-        foreach($name in @('Start archive job','Prepare archive job','BeginScript','Count days diff','GetGuid')) { Step $tables $name }
-        $package.Variables['User::LoopCounter'].Value=[int]0
-        while(!$package.Variables['User::JobFailed'].Value -and $package.Variables['User::LoopCounter'].Value -lt $package.Variables['User::DaysCounter'].Value) {
-            Step $days 'Get DateTo'
-            while(!$package.Variables['User::JobFailed'].Value -and $package.Variables['User::BatchHasRows'].Value) {
-                foreach($name in @('Construct SQL','Read archive batch','Export data to CSV','Prepare batch delete','Create batch key table','Stage batch keys','Delete exported batch','Check deleted rows')) { Step $batches $name }
-            }
-            $package.Variables['User::LoopCounter'].Value=[int]($package.Variables['User::LoopCounter'].Value+1)
+        foreach($name in @('Start archive job','Prepare archive job','BeginScript','Get cutoff date','GetGuid')) { Step $tables $name }
+        while(!$package.Variables['User::JobFailed'].Value -and $package.Variables['User::BatchHasRows'].Value) {
+            foreach($name in @('Construct SQL','Read archive batch','Export data to CSV','Prepare batch delete','Create batch key table','Stage batch keys','Delete exported batch','Check deleted rows')) { Step $batches $name }
         }
         foreach($name in @('SetTableStatus','Report archive job')) { Step $tables $name }
     }
@@ -118,7 +121,7 @@ try {
         $job=@($table.Rows | Where-Object Id -eq $id)[0]
         if($job.LastProcessedStatus -ne 'Success') { throw "Job $id did not succeed" }
     }
-    if(@($table.Rows | Where-Object Id -eq 2)[0].LastProcessedStatus -ne 'Error') { throw 'Expected SQL range failure' }
+    if(@($table.Rows | Where-Object Id -eq 2)[0].LastProcessedStatus -ne 'Error') { throw 'Expected SQL batch failure' }
     if($FailureMode -ne 'None' -and @($table.Rows | Where-Object Id -eq 1)[0].LastProcessedStatus -ne 'Error') { throw 'Expected injected failure' }
     $cmd.CommandText='SELECT (SELECT COUNT(*) FROM dbo.Orders)+(SELECT COUNT(*) FROM audit.Events);'
     $sourceExpected=if($FailureMode -eq 'None') {3} else {2509}
@@ -128,7 +131,17 @@ try {
     foreach($file in $files) { $rowCount+=@(Import-Csv -LiteralPath $file.FullName -Delimiter ';').Count }
     $expected=if($Retry) {0} elseif($FailureMode -eq 'Write') {1003} elseif($FailureMode -eq 'Delete') {2002} else {3508}
     if($rowCount -ne $expected) { throw "Unexpected CSV rows: $rowCount, expected $expected" }
-    if($files.Count -ne 3) { throw "Expected three successful CSV files, got $($files.Count)" }
+    if($files.Count -ne 4) { throw "Expected four CSV files (including header for failed read), got $($files.Count)" }
+    if(!$FullPackage -and !$Retry -and $FailureMode -eq 'None') {
+        if(($batchSizes[1] -join ',') -ne '1000,1000,506,0') { throw "Unexpected cross-day batches: $($batchSizes[1] -join ',')" }
+        if(($batchSizes[3] -join ',') -ne '1000,2,0') { throw 'Unexpected composite-key batches' }
+        $ordersFile=$files | Where-Object Name -like 'dbo.Orders_*' | Sort-Object Length -Descending | Select-Object -First 1
+        $orders=@(Import-Csv -LiteralPath $ordersFile.FullName -Delimiter ';')
+        $actual=@($orders | ForEach-Object { [long]$_.'OrderNo (bigint)' } | Sort-Object)
+        $expectedKeys=@(1..2505)+@(3000)
+        if(@(Compare-Object $expectedKeys $actual).Count -gt 0 -or $actual.Count -ne 2506) { throw 'CSV order keys differ from eligible source keys' }
+        "PASS: cross-day batch sizes=$($batchSizes[1] -join ','); composite-key batches=$($batchSizes[3] -join ',')" | Tee-Object -FilePath (Join-Path $config.RunDirectory 'batch-sizes.txt')
+    }
     $cmd.CommandText="SELECT COUNT(*) FROM Archive.ArchiveJobs WHERE LastProcessedStatus=N'Error' AND LastSuccesProcessedAt='2025-01-01';"
     $failedExpected=if($FailureMode -eq 'None') {1} else {2}
     if($cmd.ExecuteScalar() -ne $failedExpected) { throw 'Previous success date was overwritten on failure' }

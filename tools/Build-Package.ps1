@@ -30,11 +30,11 @@ $package.Description='CSV archive: TOP (1000) -> flush and close CSV -> delete e
 $package.Variables.Remove('User::SQLStatement')
 function Add-Variable($name,$value) { [void]$package.Variables.Add($name,$false,'User',$value) }
 foreach($name in @('Tables','BatchKeys','BatchData','TableSchema')) { Add-Variable $name (New-Object object) }
-foreach($name in @('TableName','ColumnDate','ArchiwumPath','BeginScript','SQLStatement','FolderFullPath','OutputFile','AddNumber','KeyColumns','DatabaseName','JobError','CsvHeader','PrepareKeysSql','DeleteSql')) { Add-Variable $name '' }
+foreach($name in @('TableName','ColumnDate','ArchiwumPath','SQLStatement','FolderFullPath','OutputFile','AddNumber','KeyColumns','DatabaseName','JobError','CsvHeader','PrepareKeysSql','DeleteSql')) { Add-Variable $name '' }
 Add-Variable 'DeletedRows' ([long]0)
-foreach($name in @('Days','DaysCounter','LoopCounter','ArchiveJobId','FailedJobs')) { Add-Variable $name ([int]0) }
+foreach($name in @('Days','ArchiveJobId','FailedJobs')) { Add-Variable $name ([int]0) }
 Add-Variable 'BatchNumber' ([long]0)
-foreach($name in @('DateFrom','DateTo','CurrentDateFrom','CurrentDateTo')) { Add-Variable $name ([datetime]'2000-01-01') }
+Add-Variable 'CutoffDate' ([datetime]'2000-01-01')
 foreach($name in @('JobActive','JobFailed','BatchHasRows')) { Add-Variable $name $false }
 $archiveRoot=[IO.Path]::GetDirectoryName([string]$package.Parameters['OutputFile'].Value)
 foreach($obsolete in @('TableName','DateColumn','OlderThanDays','OutputFile')) { [void]$package.Parameters.Remove($obsolete) }
@@ -105,37 +105,29 @@ foreach($entry in @(@('ArchiveJobId',0),@('DatabaseName',1),@('TableName',2),@('
 Link $package $getSettings $tables
 $startJob=Add-Sql $tables 'Start archive job' 'ArchiveJobsDb' "UPDATE [Archive].[ArchiveJobs] SET ErrorMessage=NULL, LastProcessedAt=SYSDATETIME(), LastProcessedStatus=NULL WHERE Id=@Id; IF @@ROWCOUNT<>1 THROW 50001,'Archive job no longer exists.',1;"
 Bind-Input $startJob '@Id' 'User::ArchiveJobId' Int32
-$prepareJob=Add-Script $tables 'Prepare archive job' '$Package::ArchiveRoot,User::DatabaseName' 'User::ArchiwumPath'
-$begin=Add-Script $tables 'BeginScript' 'User::TableName,User::ColumnDate,User::Days' 'User::BeginScript,User::LoopCounter,User::KeyColumns,User::TableSchema'
-$days=Add-Sql $tables 'Count days diff' 'ArchiveDb' 'User::BeginScript' 'SingleRow' $true
-Bind-Input $days '@Days' 'User::Days' Int32
-Bind-Result $days '0' 'User::DaysCounter'
-Bind-Result $days '1' 'User::DateFrom'
-Bind-Result $days '2' 'User::DateTo'
-# This SQL error belongs to the current job. Persist it and continue with the next job.
-Job-Sql $days 'Capture SQL error'
-$dayLoop=$tables.Executables.Add('STOCK:FORLOOP'); $dayLoop.Name='For Loop Container'; $dayLoop.DelayValidation=$true; $dayLoop.FailPackageOnFailure=$true
-$dayLoop.InitExpression='@[User::LoopCounter] = 0'; $dayLoop.EvalExpression='!@[User::JobFailed] && @[User::LoopCounter] < @[User::DaysCounter]'; $dayLoop.AssignExpression='@[User::LoopCounter] = @[User::LoopCounter] + 1'
+$prepareJob=Add-Script $tables 'Prepare archive job' '$Package::ArchiveRoot,User::DatabaseName' 'User::ArchiwumPath,User::BatchHasRows,User::BatchNumber'
+$begin=Add-Script $tables 'BeginScript' 'User::TableName,User::ColumnDate,User::Days' 'User::KeyColumns,User::TableSchema'
+$cutoff=Add-Sql $tables 'Get cutoff date' 'ArchiveDb' 'SELECT CONVERT(datetime2(7),DATEADD(day,-@Days,CONVERT(date,GETDATE()))) AS CutoffDate;' 'SingleRow'
+Bind-Input $cutoff '@Days' 'User::Days' Int32
+Bind-Result $cutoff '0' 'User::CutoffDate'
+Job-Sql $cutoff 'Capture cutoff error'
 Link $tables $startJob $prepareJob
 Link $tables $prepareJob $begin
-Link $tables $begin $days
+Link $tables $begin $cutoff
 $guid=Add-Script $tables 'GetGuid' 'System::StartTime,User::ArchiwumPath,User::TableName' 'User::FolderFullPath,User::AddNumber,User::OutputFile,User::CsvHeader'
-Link $tables $days $guid
+Link $tables $cutoff $guid
 $tables.PrecedenceConstraints[$tables.PrecedenceConstraints.Count-1].Value=[Microsoft.SqlServer.Dts.Runtime.DTSExecResult]::Completion
-Link $tables $guid $dayLoop
-$getDate=Add-Script $dayLoop 'Get DateTo' 'User::DateFrom,User::LoopCounter' 'User::CurrentDateFrom,User::CurrentDateTo,User::BatchNumber,User::BatchHasRows'
-$batches=$dayLoop.Executables.Add('STOCK:FORLOOP'); $batches.Name='Loop through 1000'; $batches.DelayValidation=$true; $batches.FailPackageOnFailure=$true
+$batches=$tables.Executables.Add('STOCK:FORLOOP'); $batches.Name='Loop through 1000'; $batches.DelayValidation=$true; $batches.FailPackageOnFailure=$true
 $batches.InitExpression='@[User::BatchNumber] = 0'; $batches.EvalExpression='!@[User::JobFailed] && @[User::BatchHasRows]'
-Link $dayLoop $getDate $batches
+Link $tables $guid $batches
 
 
 $construct=Add-Script $batches 'Construct SQL' 'User::TableName,User::ColumnDate' 'User::SQLStatement'
 $fetch=Add-Sql $batches 'Read archive batch' 'ArchiveDb' 'User::SQLStatement' 'Rowset' $true
-Bind-Input $fetch '@DateFrom' 'User::CurrentDateFrom' DateTime2
-Bind-Input $fetch '@DateTo' 'User::CurrentDateTo' DateTime2
+Bind-Input $fetch '@Cutoff' 'User::CutoffDate' DateTime2
 Bind-Result $fetch '0' 'User::BatchData'
 Job-Sql $fetch 'Capture batch read error'
-$export=Add-Script $batches 'Export data to CSV' 'User::BatchData,User::TableSchema,User::OutputFile,User::CurrentDateFrom,User::CurrentDateTo,User::TableName,User::CsvHeader,User::KeyColumns' 'User::BatchNumber,User::BatchHasRows,User::BatchKeys'
+$export=Add-Script $batches 'Export data to CSV' 'User::BatchData,User::TableSchema,User::OutputFile,User::CutoffDate,User::TableName,User::CsvHeader,User::KeyColumns' 'User::BatchNumber,User::BatchHasRows,User::BatchKeys'
 
 Link $batches $construct $fetch
 Link $batches $fetch $export
@@ -167,7 +159,7 @@ IF @@ROWCOUNT<>1 THROW 50001,'Archive job no longer exists.',1;
 Bind-Input $setStatus '@Id' 'User::ArchiveJobId' Int32
 Bind-Input $setStatus '@Failed' 'User::JobFailed' Boolean
 Bind-Input $setStatus '@Error' 'User::JobError' String
-Link $tables $dayLoop $setStatus
+Link $tables $batches $setStatus
 $report=Add-Script $tables 'Report archive job' '' ''
 Link $tables $setStatus $report
 $summary=Add-Script $package 'Archive summary' '' ''
@@ -175,7 +167,7 @@ Link $package $tables $summary
 # Use the same SSIS error handling for C# and SQL tasks. Preparation resets the
 # previous job's flags, so it must run even when the preceding job failed.
 Job-Sql $prepareJob 'Capture preparation error' $false
-foreach($task in @($begin,$guid,$getDate,$construct,$export,$prepareDelete,$stageKeys,$checkDelete)) {
+foreach($task in @($begin,$guid,$construct,$export,$prepareDelete,$stageKeys,$checkDelete)) {
     Job-Sql $task ('Capture '+$task.Name+' error')
 }
 $skeleton=Join-Path $PSScriptRoot 'package-skeleton.dtsx'

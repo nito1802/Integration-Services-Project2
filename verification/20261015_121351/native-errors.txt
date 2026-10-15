@@ -1,0 +1,4 @@
+Executing the query "SELECT TOP (1000) * FROM dbo.Orders WHERE MissingD..." failed with the following error: "Failed to create an IDataAdapter object. This provider may not be fully supported with the Execute SQL Task. Error message 'Invalid column name 'MissingDateColumn'.'.". Possible failure reasons: Problems with the query, "ResultSet" property not set correctly, parameters not set correctly, or connection not established correctly.
+
+To run a SSIS package outside of SQL Server Data Tools you must install Standard Edition (64-bit) of Integration Services or higher.
+
