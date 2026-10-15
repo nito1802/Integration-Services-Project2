@@ -1,4 +1,4 @@
--- Tabele i migracje tworzy biblioteka .Database.
+-- Tabele utworz skryptem CreateArchiveJobs.sql (alternatywnie migracjami .Database).
 -- Przykład nowego zadania w bazie konfiguracji; dostosuj bazę, tabelę i kolumnę daty.
 -- Nie wykonuj ponownie dla już istniejącego zadania.
 -- INSERT [Archive].[ArchiveJobs]
