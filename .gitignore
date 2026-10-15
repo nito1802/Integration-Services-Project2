@@ -370,3 +370,5 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /Integration Services Project2.Database/appsettings.json
+
+/tools/compatibility-test.dtsx

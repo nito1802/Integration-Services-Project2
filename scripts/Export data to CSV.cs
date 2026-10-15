@@ -5,17 +5,17 @@
                 string outputFile = Convert.ToString(Dts.Variables["User::OutputFile"].Value, CultureInfo.InvariantCulture);
                 long rows = 0;
                 var batchKeys = new DataTable();
-                SqlConnection connection = (SqlConnection)Dts.Connections["ArchiveDb"].AcquireConnection(Dts.Transaction);
+                var data = ((DataSet)Dts.Variables["User::BatchData"].Value).Tables[0];
                 try
                 {
-                    using (var command = new SqlCommand(Convert.ToString(Dts.Variables["User::SQLStatement"].Value, CultureInfo.InvariantCulture), connection))
                     {
-                        command.CommandTimeout = 300;
-                        command.Parameters.Add("@DateFrom", SqlDbType.DateTime2).Value = Convert.ToDateTime(Dts.Variables["User::CurrentDateFrom"].Value);
-                        command.Parameters.Add("@DateTo", SqlDbType.DateTime2).Value = Convert.ToDateTime(Dts.Variables["User::CurrentDateTo"].Value);
-                        using (var reader = command.ExecuteReader())
+                        using (var reader = data.CreateDataReader())
                         {
-                            DataTable schema = reader.GetSchemaTable();
+                            DataTable schema = (DataTable)Dts.Variables["User::TableSchema"].Value;
+                            if (reader.FieldCount != schema.Rows.Count) throw new InvalidOperationException("Table columns changed during this export.");
+                            for (int i = 0; i < reader.FieldCount; i++)
+                                if (reader.GetName(i) != Convert.ToString(schema.Rows[i]["ColumnName"]) || reader.GetFieldType(i) != (Type)schema.Rows[i]["DataType"])
+                                    throw new InvalidOperationException("Table columns changed during this export.");
                             foreach (string key in Convert.ToString(Dts.Variables["User::KeyColumns"].Value).Split(','))
                             {
                                 string name = key.Trim();
@@ -23,13 +23,6 @@
                                 DataColumn field = batchKeys.Columns.Add(name, reader.GetFieldType(ordinal));
                                 field.ExtendedProperties["SqlDbType"] = (SqlDbType)Convert.ToInt32(schema.Rows[ordinal]["ProviderType"]);
                             }
-                            var fields = new string[reader.FieldCount];
-                            for (int i = 0; i < fields.Length; i++)
-                            {
-                                string field = reader.GetName(i) + " (" + reader.GetDataTypeName(i) + ")";
-                                fields[i] = "\"" + field.Replace("\"", "\"\"") + "\"";
-                            }
-                            if (string.Join(";", fields) != Convert.ToString(Dts.Variables["User::CsvHeader"].Value, CultureInfo.InvariantCulture)) throw new InvalidOperationException("Table columns changed during this export.");
                             using (var stream = new FileStream(outputFile, FileMode.Open, FileAccess.Write, FileShare.None))
                             using (var writer = new StreamWriter(stream, new UTF8Encoding(false)))
                             {
@@ -71,6 +64,6 @@
                     throw new IOException("Export failed. Table=" + Convert.ToString(Dts.Variables["User::TableName"].Value, CultureInfo.InvariantCulture) + "; day=" + Convert.ToDateTime(Dts.Variables["User::CurrentDateFrom"].Value).ToString("yyyy-MM-dd") +
                         "; batch=" + (Convert.ToInt64(Dts.Variables["User::BatchNumber"].Value) + 1) + "; file=" + outputFile + "; rowsWritten=" + rows, ex);
                 }
-                finally { Dts.Connections["ArchiveDb"].ReleaseConnection(connection); }
+
             });
         }

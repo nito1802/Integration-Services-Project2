@@ -12,6 +12,7 @@
                     using (var command = new SqlCommand("SELECT TOP (0) * FROM " + table, connection))
                     using (var reader = command.ExecuteReader(CommandBehavior.KeyInfo))
                     {
+                        Dts.Variables["User::TableSchema"].Value = reader.GetSchemaTable();
                         var keys = new List<string>();
                         foreach (DataRow field in reader.GetSchemaTable().Rows)
                             if (Convert.ToBoolean(field["IsKey"])) keys.Add(Convert.ToString(field["ColumnName"]));
