@@ -1,81 +1,212 @@
 # Archiwizacja CSV w SSIS
 
-Projekt `Integration Services Project2.Console` pozwala dodawać zadania do `Archive.ArchiveJobs`. Ustaw go jako startowy w Visual Studio i uruchom przez F5 / Ctrl+F5. Kontekst jest wstrzykiwany przez DI, a połączenie pochodzi z tego samego `appsettings.json` co biblioteka `.Database`. Instrukcja znajduje się w README konsolówki.
+Pakiet `Integration Services Project2/Package.dtsx` odczytuje zadania z `Archive.ArchiveJobs`, eksportuje stare rekordy do CSV i usuwa ze źródła dokładnie rekordy zapisane do pliku. Dla każdego zadania powstaje osobny CSV i zapisywany jest wynik `Success` albo `Error`.
 
-Otwórz `Integration Services Project2.slnx`, następnie `Package.dtsx` i użyj Execute Package lub F5. Konfigurację tabel pakiet pobiera z `Archive.ArchiveJobs`, według `Id`. Parametr `ConnectionString` wskazuje serwer danych źródłowych, `ArchiveJobsConnectionString` wskazuje bazę z konfiguracją i statusami `ArchiveJobs`, a `ArchiveRoot` katalog wynikowy. Połączenia mogą wskazywać różne serwery; `DatabaseName` zadania odnosi się do bazy na serwerze źródłowym. Dawne `SettingsQuery` i konfiguracja CasherSettings zostały usunięte.
+Ten opis dotyczy aktualnego przepływu: **dwie zagnieżdżone pętle — po zadaniach/tabelach oraz po partiach do 1000 rekordów. Nie ma pętli po dniach.**
 
-Wynik to jeden CSV na tabelę na uruchomienie, np. `C:\Archive\2026-10-08\MyData.Snapshots_2026-10-08_GUID.csv`. Dzień w folderze pochodzi z daty rozpoczęcia pakietu. GUID zapobiega nadpisywaniu poprzednich eksportów. Nagłówek jest odczytywany na nowo dla każdej tabeli; pusta tabela daje sam nagłówek.
+## Uruchomienie i konfiguracja
 
-Konfiguracja `Archive.ArchiveJobs`:
+Otwórz projekt SSIS przez `Integration Services Project2.slnx` lub `Integration Services Project2/Integration Services Project2.dtproj`, następnie `Package.dtsx`. Pakiet uruchamia się przez Execute Package / F5 w Visual Studio z rozszerzeniem SQL Server Integration Services Projects. Projekt ma `TargetServerVersion = SQLServer2025`.
 
-| Kolumna | Znaczenie |
+| Parametr pakietu | Przeznaczenie |
 |---|---|
-| Id | Klucz zadania |
-| DatabaseName | Rzeczywista nazwa bazy na tym samym serwerze SQL |
-| TableName | Nazwa `schema.table`, np. `MyData.Snapshots` |
-| DateColumn | Kolumna daty, zwykle `CreatedAt` |
-| ArchiveOlderThanDays | Retencja w pełnych dniach |
-| LastSuccesProcessedAt | Data i czas ostatniego udanego eksportu |
-| LastProcessedAt | Data i czas ostatniej próby |
-| LastProcessedStatus | Tekst `Success` lub `Error`; NULL podczas przetwarzania / przed pierwszą próbą |
-| ErrorMessage | Szczegóły ostatniego błędu, czyszczone przy rozpoczęciu próby |
+| `ConnectionString` | Połączenie z serwerem danych źródłowych; używa go connection manager `ArchiveDb`. |
+| `ArchiveJobsConnectionString` | Połączenie z bazą konfiguracji i statusów; używa go `ArchiveJobsDb`. |
+| `ArchiveRoot` | Katalog główny wynikowych plików CSV. |
 
-`DatabaseName` nie jest nazwą schematu. Migracja poprawia dwa wcześniejsze przykładowe wpisy: `MyData.Snapshots` i `SmartHome.Events` należą do schematów w obecnej bazie `nito_superDb`. Pozostałe wcześniejsze wpisy demonstracyjne pozostają w tabeli; gdy wskazują nieistniejące bazy, otrzymują `Error`.
+Połączenia mogą wskazywać różne serwery. `DatabaseName` w zadaniu wybiera bazę na serwerze źródłowym. Oba connection managery są ADO.NET. `ArchiveDb` ma `RetainSameConnection = true`: zmiana bieżącej bazy i tymczasowa tabela kluczy muszą być widoczne w kolejnych bloczkach tej samej sesji.
 
-Przepływ: Get Archive Jobs → Foreach Loop Container → Start archive job → Prepare archive job → BeginScript → Get cutoff date → GetGuid → pętla partii (Construct SQL → Read archive batch → Export data to CSV → Prepare batch delete → Create batch key table → Stage batch keys → Delete exported batch → Check deleted rows) → SetTableStatus → Report archive job. Na końcu Archive summary podsumowuje wszystkie zadania. Complete day i Finalize table zostały usunięte.
+Schemat `Archive` i tabelę konfiguracji można utworzyć skryptem [CreateArchiveJobs.sql](CreateArchiveJobs.sql), bez uruchamiania migracji EF. Skrypt nie dodaje danych przykładowych, nie aktualizuje starszej struktury i pozostawia istniejącą tabelę bez zmian. Nie zapisuje historii migracji EF. Przykład dodania zadania znajduje się w [ArchiveJobs.example.sql](ArchiveJobs.example.sql).
 
-Na początku zadania zapisujemy czas próby, czyścimy błąd i status. Nie używamy jawnych transakcji SQL ani transakcji SSIS. Dane są czytane bezpośrednio ze źródła; nie tworzymy `#ArchiveDay`. Zakres to pełne dni sprzed północy serwera SQL pomniejszonej o retencję. Zakładamy kolumnę daty typu datetime2; jej typ nie jest sprawdzany. Nazwy tabel i kolumn są wpisywane do SQL bez nawiasów kwadratowych, więc muszą być poprawnymi nazwami niewymagającymi cytowania (np. dbo.Orders i CreatedAt). Klucz do wskazania usuwanych rekordów, również złożony, odczytujemy przez GetSchemaTable i CommandBehavior.KeyInfo po SELECT TOP (0), bez jawnych zapytań do sys. Brak klucza zgłasza błąd. Partia używa SELECT TOP (1000) bez OFFSET i ORDER BY. Eksport zapamiętuje klucze maksymalnie 1000 rekordów, zamyka i flushuje CSV, a dopiero potem Delete exported batch usuwa dokładnie te klucze. Po zamknięciu CSV bloczek Create batch key table tworzy #ArchiveBatchKeys o typach i kolacjach kluczy źródła. Stage batch keys kopiuje do niej dokładne wartości przez SqlBulkCopy z KeepIdentity. Delete exported batch wykonuje DELETE JOIN, a Check deleted rows sprawdza licznik. RetainSameConnection utrzymuje tę samą sesję SQL między bloczkami; tabela tymczasowa jest odtwarzana dla każdej partii. Zakładamy jeden aktywny przebieg dla danej tabeli oraz brak zewnętrznych zmian historycznych rekordów w czasie jej przetwarzania.
+| Kolumna `ArchiveJobs` | Znaczenie |
+|---|---|
+| `Id` | Identyfikator zadania; konfiguracja jest pobierana według rosnącego `Id`. |
+| `DatabaseName` | Nazwa bazy źródłowej; nie jest nazwą schematu. |
+| `TableName` | Nazwa tabeli wraz ze schematem, np. `dbo.Orders`. |
+| `DateColumn` | Nazwa kolumny używanej do sprawdzania retencji; w skrypcie tworzenia tabeli nie ma wartości domyślnej. |
+| `ArchiveOlderThanDays` | Dodatnia liczba dni retencji. |
+| `LastSuccesProcessedAt` | Czas zakończenia ostatniego udanego zadania. Pisownia nazwy kolumny jest zachowana z istniejącego modelu. |
+| `LastProcessedAt` | Czas rozpoczęcia próby, zastępowany czasem końcowego zapisu statusu. |
+| `LastProcessedStatus` | `Success`, `Error` albo `NULL` przed pierwszym wykonaniem / podczas przetwarzania. |
+| `ErrorMessage` | Szczegóły błędu; czyszczone na początku próby i przy sukcesie. |
 
-Plik od początku ma rozszerzenie `.csv`. GetGuid tworzy plik i zapisuje jeden nagłówek; kolejne paczki dopisują dane. Nie ma pliku `.tmp`, przemianowania ani końcowego sprawdzania liczby rekordów dnia/tabeli. Nie ma Count records ani FileRecordCounter. Pętla pobiera TOP (1000) ze wszystkich rekordów starszych niż CutoffDate, zapisuje CSV i usuwa tę paczkę aż zapytanie zwróci zero rekordów. BatchHasRows jest resetowane na true przy rozpoczęciu zadania, a po każdej paczce przyjmuje wartość rows > 0.
+`ArchiveJobStatus` jest enumem C#, nie osobną tabelą. `LastProcessedStatus` jest przechowywany jako `nvarchar(16)`; model EF ma `HasConversion<string>()`.
 
-Błąd odczytu, serializacji lub usuwania ustawia `JobFailed` i zapisuje wyjątek do `JobError`. Dalszy eksport tej tabeli jest pomijany. Końcowy bloczek Execute SQL Task `SetTableStatus`, wykonywany także po błędzie, aktualizuje `ArchiveJobs` przez osobne połączenie: przy sukcesie obie daty dostają identyczne `SYSDATETIME()`, status Success i pusty ErrorMessage; przy błędzie zapisuje datę próby, Error oraz komunikat, zachowując datę poprzedniego sukcesu. Błąd konfiguracji tabeli również daje Error. Jeżeli nie można odczytać konfiguracji lub zapisać stanu, pakiet zatrzymuje się.
+Projekt `Integration Services Project2.Console` pozwala dodawać zadania; można ustawić go jako startowy i uruchomić F5 / Ctrl+F5. Biblioteka `.Database` utrzymuje model i migracje. Oba projekty mają własne README. Ich `appsettings.json` jest niezależny od parametrów połączeń pakietu SSIS.
 
-Po błędzie plik `.csv` pozostaje na dysku i może zawierać tylko część danych. Samo rozszerzenie nie oznacza sukcesu — wynik zadania wskazuje LastProcessedStatus. Kolejne zadania są przetwarzane dalej, a Archive summary zgłasza końcowy błąd pakietu, jeśli którekolwiek zadanie miało Error. Nowa próba zawsze ma nowy GUID. Zapisane paczki są usuwane ze źródła. Błąd zapisu CSV nie uruchamia DELETE tej paczki. Przerwanie po zapisie CSV, ale przed DELETE, pozostawia dane również w bazie: ponowienie może zapisać je drugi raz do nowego pliku. Wcześniejsze udane usunięcia nie są wycofywane; taki częściowy CSV trzeba zachować.
+## Kolejność bloczków
 
-Format CSV: separator `;`, wszystkie pola w cudzysłowach, podwajanie cudzysłowów, UTF-8 z BOM, nagłówki `Nazwa (typ SQL)`, NULL jako puste pole, formatowanie invariant culture. Zmiana struktury podczas eksportu powoduje błąd.
+```text
+Get Archive Jobs
+└── Foreach Loop Container — każde zadanie / tabela
+    ├── Start archive job
+    ├── Prepare archive job
+    ├── BeginScript
+    ├── Get cutoff date
+    ├── GetGuid
+    ├── Loop through 1000 — partie dla bieżącego zadania
+    │   ├── Construct SQL
+    │   ├── Read archive batch
+    │   ├── Export data to CSV
+    │   ├── Prepare batch delete
+    │   ├── Create batch key table
+    │   ├── Stage batch keys
+    │   ├── Delete exported batch
+    │   └── Check deleted rows
+    ├── SetTableStatus
+    └── Report archive job
+Archive summary
+```
 
-Biblioteka `Integration Services Project2.Database` utrzymuje model i migracje. Instrukcja migracji bez osobnej aplikacji znajduje się w jej README. Konfiguracja biblioteki pochodzi z `appsettings.json`; połączenie SSIS jest osobnym parametrem pakietu.
+### Przed pętlą po zadaniach
 
-Źródła Script Tasks są w `scripts`. Po ich zmianie `tools/Build-Package.ps1` osadza kod i kompiluje skrypty przy użyciu Visual Studio 18 Insiders / SSIS 2025. Samo edytowanie pliku w `scripts` nie aktualizuje osadzonego kodu pakietu.
+**1. Get Archive Jobs — Execute SQL Task.** Odczytuje z `ArchiveJobsDb` kolumny `Id`, `DatabaseName`, `TableName`, `ArchiveOlderThanDays`, `DateColumn`, posortowane po `Id`. Pełny wynik trafia do zmiennej Object `User::Tables`. Błąd odczytu konfiguracji kończy pakiet.
 
-Weryfikacja:
+**2. Foreach Loop Container — pętla po zadaniach.** Iteruje po `User::Tables` przez Foreach ADO Enumerator. Mapuje kolumny wyniku do `ArchiveJobId`, `DatabaseName`, `TableName`, `Days` i `ColumnDate`. Dla każdego wiersza wykonuje kroki 3–18. To pętla po wpisach konfiguracji: dwa wpisy tej samej tabeli byłyby dwoma zadaniami.
 
-- `tools/Verify-ArchiveJobsDatabase.ps1`: dziewięć kolumn, typy datetime2 i tekstowy status.
-- `tools/Verify-MainExport.ps1`: starszy weryfikator eksportu bez usuwania; nie stosować do nowego flow, bo zarchiwizowanych rekordów nie ma już w źródle.
-- `tools/Create-TestDatabase.ps1 -IncludeFailure`: izolowany LocalDB z wieloma tabelami, kluczem złożonym, pustą tabelą i celowo błędnym zadaniem.
-- `tools/Verify-JobProcessing.ps1`: kontynuacja po błędzie, wyczyszczenie poprzedniego błędu, zachowanie daty sukcesu; `-RetrySucceeded` sprawdza ponowienie po naprawie konfiguracji.
-- `tools/Verify-Export.ps1`: dokładne klucze, retencja, wiele partii, Unicode, cudzysłowy, średniki, wielowierszowy tekst i BOM.
+### Przygotowanie bieżącego zadania
 
-Poprzedni test eksportu bez usuwania: `verification/20261009_013119`. Pełny pakiet uruchomiony w Visual Studio wyeksportował 3508 rekordów i CSV z nagłówkiem dla pustej tabeli; kontrolowany błąd konfiguracji dał Error i nie zatrzymał kolejnych zadań. Dodatkowy test rzeczywistych źródeł ScriptMain, z zastąpionym interfejsem hosta SSIS, wymusił błąd po pierwszej paczce: pozostał CSV z 1000 rekordami, bez tmp, a SetTableStatus zapisał Error i zachował poprzednią datę sukcesu. Wyniki: `verification-result.txt`, `job-state-False.txt`, `partial-csv-result.txt`.
+**3. Start archive job — Execute SQL Task.** Aktualizuje bieżący wpis w `ArchiveJobsDb`, używając parametru `@Id`. Ustawia `LastProcessedAt = SYSDATETIME()`, czyści `ErrorMessage` i ustawia `LastProcessedStatus = NULL`. Sprawdza, czy zmieniono dokładnie jeden wpis; brak wpisu zgłasza błąd. Nie zmienia daty ostatniego sukcesu. Niepowodzenie tego kroku zatrzymuje pakiet.
 
-Historyczny test eksportu z usuwaniem (przed zmianą na Execute SQL Task): tools/Create-TestDatabase.ps1 -IncludeFailure, następnie tools/Verify-DeleteExport.ps1. Test uruchamia rzeczywiste źródła ScriptMain z zastąpionym hostem SSIS i prawdziwymi połączeniami do izolowanego LocalDB; nie uruchamia produkcyjnego serwera. Sprawdza dokładną zawartość 3508 rekordów w CSV, pozostawienie danych przy granicy retencji, ponowienie bez powtórnego eksportu usuniętych danych, błędy zapisu/usuwania, statusy i precyzyjny klucz datetime2(7). Wynik: verification/20261009_093243/delete-export-result.txt.
+**4. Prepare archive job — Script Task.** Resetuje stan poprzedniego zadania: `JobActive = true`, `JobFailed = false`, `JobError = ""`, `OutputFile = ""`, `BatchHasRows = true`, `BatchNumber = 0`. Kopiuje parametr `ArchiveRoot` do `ArchiwumPath`. Pobiera połączenie `ArchiveDb`, wybiera `DatabaseName` przez `ChangeDatabase` i oddaje połączenie do SSIS w `finally`. Ten bloczek zawsze się wykonuje, również po błędzie poprzedniej tabeli. Nieistniejąca lub niedostępna baza jest błędem bieżącego zadania.
 
-Od 2026-10-14 wykonywanie zapytań dotyczących konfiguracji, statusów, zakresu dni, odczytu partii oraz usuwania odbywa się w Execute SQL Task (7 bloczków). Połączenia pozostają ADO.NET; nie trzeba zmieniać ich na OLE DB. SQL dynamiczny pochodzi ze zmiennych, wartości parametrów są mapowane w Parameter Mapping, a wyniki przez Result Set (dla ADO.NET numerowane od 0). C# nadal przygotowuje SQL, zapisuje CSV, przenosi klucze przez SqlBulkCopy i odczytuje metadane przez SELECT TOP (0)/KeyInfo w BeginScript i GetGuid. Historyczne źródła Get Archive Jobs.cs, Start archive job.cs, Count days diff.cs, Delete exported batch.cs i SetTableStatus.cs nie są już osadzane w pakiecie; pozostają jako odniesienie dla starych weryfikatorów.
+**5. BeginScript — Script Task.** Sprawdza, czy `Days > 0`. Wykonuje `SELECT TOP (0) * FROM tabela` z `CommandBehavior.KeyInfo`, żeby odczytać strukturę bez pobierania rekordów. Zapisuje metadane do `TableSchema`, a rozpoznane kolumny klucza do `KeyColumns`. Obsługuje klucze złożone; brak rozpoznanego klucza zgłasza wyjątek. Nie wylicza już pierwszego dnia ani liczby dni do przetworzenia.
 
-Bloczki SQL wewnątrz zadania mają OnError z Capture SQL error: zapis JobFailed/JobError i System::Propagate=false. Po błędzie przechodzimy przez połączenie Completion do kroku pomijającego dalszą pracę. Pętle kończą się przy JobFailed. Błąd pobrania konfiguracji lub zapisu statusu nadal kończy pakiet. Układ starego diagramu jest usuwany podczas budowania, aby projektant automatycznie rozmieścił aktualne zadania.
+**6. Get cutoff date — Execute SQL Task.** Ustala granicę raz na zadanie, według zegara serwera źródłowego:
 
-Aktualna weryfikacja (Windows PowerShell 5.1):
+```sql
+SELECT CONVERT(datetime2(7),
+    DATEADD(day, -@Days, CONVERT(date, GETDATE()))) AS CutoffDate;
+```
+
+`@Days` pochodzi z `User::Days`, a wynik `0` jest mapowany do `User::CutoffDate`. Granica jest północą bieżącego dnia SQL Servera pomniejszoną o retencję. Nie przesuwa się pomiędzy partiami. Przykładowo dla daty serwera 2026-10-15 i retencji 1 dzień eksportowane są rekordy z datą **mniejszą niż 2026-10-14 00:00:00**. Rekordy równe granicy i nowsze pozostają w bazie.
+
+**7. GetGuid — Script Task.** Generuje GUID, bezpieczną nazwę pliku i katalog dnia rozpoczęcia pakietu. Odczytuje nazwy i typy SQL kolumn przez `SELECT TOP (0)`. Tworzy nowy CSV przez `FileMode.CreateNew` i zapisuje nagłówek. Przykładowy wynik: `C:\Archive\2026-10-15\dbo.Orders_2026-10-15_GUID.csv`. Kolejne partie dopisują dane do tego samego pliku. Tabela bez kwalifikujących się danych daje CSV z samym nagłówkiem. Nieudany późniejszy odczyt również może pozostawić taki plik.
+
+### Pętla po partiach
+
+**8. Loop through 1000 — For Loop Container.** Znajduje się bezpośrednio wewnątrz pętli po zadaniach. Zeruje `BatchNumber` i powtarza kroki 9–16, dopóki:
+
+```text
+!@[User::JobFailed] && @[User::BatchHasRows]
+```
+
+Zakończenie następuje po błędzie albo po pustym wyniku SELECT. Partia mniejsza niż 1000 nie kończy pętli sama w sobie — wykonywany jest jeszcze odczyt sprawdzający, czy pozostały dane. Partie mogą łączyć rekordy z wielu dni.
+
+**9. Construct SQL — Script Task.** Buduje zapytanie w `User::SQLStatement`, podstawiając nazwę tabeli i kolumny daty:
+
+```sql
+SELECT TOP (1000) *
+FROM {Tabela}
+WHERE {KolumnaDaty} < @Cutoff;
+```
+
+Nie wykonuje zapytania. Nie ma `OFFSET`, dolnej granicy daty ani `ORDER BY`; kolejność rekordów nie jest gwarantowana. Każdy odczyt wybiera maksymalnie 1000 rekordów spełniających retencję. Usunięcie zapisanej partii pozwala kolejnemu odczytowi pobrać następne rekordy.
+
+**10. Read archive batch — Execute SQL Task.** Wykonuje SQL ze zmiennej `User::SQLStatement` na `ArchiveDb`. Mapuje parametr `@Cutoff` z `User::CutoffDate`. Pełny wynik jest zapisywany jako DataSet w `User::BatchData`; timeout wynosi 300 sekund. Nieistniejąca kolumna daty zgłasza błąd tutaj. Na tym etapie nie zapisuje się CSV ani nie usuwa danych.
+
+**11. Export data to CSV — Script Task.** Odczytuje `BatchData` i porównuje liczbę kolumn, ich nazwy oraz typy CLR z `TableSchema`. Dopisuje rekordy do wcześniej utworzonego CSV, a równolegle zapamiętuje ich klucze w DataTable. Klucz zawierający `NULL` zgłasza błąd. Po zapisie wykonuje `writer.Flush()` i `stream.Flush(true)`, po czym zamyka plik. Dopiero wtedy udostępnia klucze jako `User::BatchKeys`. Ustawia `BatchHasRows` na `rows > 0`, zwiększa `BatchNumber` i loguje tabelę, granicę daty, numer partii, liczbę rekordów, ścieżkę oraz czas. Błąd jest uzupełniany o kontekst pliku i partii, a następnie zgłaszany dalej do `OnError`.
+
+**12. Prepare batch delete — Script Task.** Na podstawie `BatchKeys` buduje dwa zapytania: `PrepareKeysSql` do odtworzenia tabeli tymczasowej oraz `DeleteSql` do usunięcia rekordów przez połączenie po wszystkich kolumnach klucza. Nazwy kolumn klucza są cytowane nawiasami kwadratowymi. Ten krok tylko przygotowuje tekst SQL.
+
+**13. Create batch key table — Execute SQL Task.** Wykonuje `PrepareKeysSql`: usuwa poprzednią `#ArchiveBatchKeys`, jeśli istnieje, i tworzy nową przez `SELECT TOP (0) ... INTO`. Kolumny pochodzą ze źródła, zachowując jego typy i kolacje. Zapytanie zawiera `CROSS JOIN (SELECT 1 AS n)`, aby nie przenosić właściwości `IDENTITY`. Tabela jest lokalna dla sesji `ArchiveDb` i jest odtwarzana dla każdej partii; nie przechowuje całej kopii danych źródłowych.
+
+**14. Stage batch keys — Script Task.** Kopiuje `BatchKeys` do `#ArchiveBatchKeys` przez `SqlBulkCopy` z mapowaniem kolumn po nazwach, timeoutem 300 sekund i `KeepIdentity`. Przekazuje oryginalne wartości kluczy, również złożonych. Kopiowanie następuje dopiero po zamknięciu CSV. Błąd tego kroku blokuje DELETE.
+
+**15. Delete exported batch — Execute SQL Task.** Wykonuje `DeleteSql` na `ArchiveDb`. `DELETE ... INNER JOIN #ArchiveBatchKeys` dopasowuje wszystkie składowe klucza, więc usuwa rekordy wskazane przez klucze zapisanej partii. Nie wykonuje niezależnego `DELETE TOP (1000)`. Zapytanie zwraca `CONVERT(bigint, @@ROWCOUNT)` mapowane z wyniku `0` do `User::DeletedRows`.
+
+**16. Check deleted rows — Script Task.** Porównuje `DeletedRows` z liczbą wierszy w `BatchKeys`. Rozbieżność zgłasza wyjątek z liczbą usuniętych i wyeksportowanych rekordów. Sprawdzenie odbywa się po DELETE i nie cofa usunięcia. Po poprawnym sprawdzeniu pętla przechodzi do następnej partii. Po pustym odczycie dalsze kroki partii operują na pustym zestawie kluczy, a kolejna ocena warunku kończy pętlę.
+
+### Zakończenie zadania i pakietu
+
+**17. SetTableStatus — Execute SQL Task.** Wykonuje się po zakończeniu pętli partii, także gdy została przerwana przez `JobFailed`. Na osobnym połączeniu `ArchiveJobsDb` zapisuje wynik bieżącego zadania:
+
+| Wynik | Zapis w `ArchiveJobs` |
+|---|---|
+| Sukces | `LastProcessedStatus = Success`, `ErrorMessage = NULL`; `LastProcessedAt` i `LastSuccesProcessedAt` dostają tę samą wartość `SYSDATETIME()`. |
+| Błąd | `LastProcessedStatus = Error`, `ErrorMessage = JobError`, `LastProcessedAt` dostaje czas zapisu; poprzednie `LastSuccesProcessedAt` pozostaje bez zmian. |
+
+Parametry to `@Id`, `@Failed` i `@Error`. Brak wpisu lub niepowodzenie aktualizacji zatrzymuje pakiet — nie można wtedy potwierdzić zapisu wyniku.
+
+**18. Report archive job — Script Task.** Ustawia `JobActive = false`. Dla błędu zwiększa `FailedJobs`; zapisuje do logu nazwę tabeli, status i ścieżkę CSV. Następnie `Foreach Loop Container` przechodzi do następnego zadania. Jest to krok raportujący, a nie drugi zapis statusu do bazy.
+
+**19. Archive summary — Script Task.** Działa raz, po zakończeniu pętli po zadaniach. Gdy `FailedJobs > 0`, zgłasza błąd z liczbą nieudanych zadań i ustawia wynik pakietu na `Failure`. W przeciwnym razie loguje sukces. Pakiet może więc przetworzyć poprawnie późniejsze tabele, a mimo to zakończyć się `Failure` z powodu wcześniejszych błędów.
+
+## Obsługa błędów — bloczki Capture … error
+
+Bloczki `Capture … error` są Script Tasks wewnątrz zdarzeń `OnError`, a nie kolejnymi krokami głównego przepływu. Wszystkie używają kodu z [scripts/Capture SQL error.cs](scripts/Capture%20SQL%20error.cs), również gdy błąd pochodzi z C#:
+
+```csharp
+Dts.Variables["User::JobFailed"].Value = true;
+Dts.Variables["User::JobError"].Value =
+    Convert.ToString(Dts.Variables["System::ErrorDescription"].Value);
+Dts.Variables["System::Propagate"].Value = false;
+Dts.TaskResult = (int)DTSExecResult.Success;
+```
+
+Handler zapisuje komunikat do zmiennych; do bazy zapisuje go dopiero `SetTableStatus`. Przy wielu zdarzeniach `OnError` późniejszy komunikat może zastąpić wcześniejszy.
+
+| Bloczek główny | Script Task w `OnError` |
+|---|---|
+| Prepare archive job | Capture preparation error |
+| BeginScript | Capture BeginScript error |
+| Get cutoff date | Capture cutoff error |
+| GetGuid | Capture GetGuid error |
+| Construct SQL | Capture Construct SQL error |
+| Read archive batch | Capture batch read error |
+| Export data to CSV | Capture Export data to CSV error |
+| Prepare batch delete | Capture Prepare batch delete error |
+| Create batch key table | Capture key table error |
+| Stage batch keys | Capture Stage batch keys error |
+| Delete exported batch | Capture batch delete error |
+| Check deleted rows | Capture Check deleted rows error |
+
+Te zadania mają `FailPackageOnFailure = false`, `FailParentOnFailure = false`, `MaximumErrorCount = 0` i `ForceExecutionResult = Success`. Wymuszony wynik pozwala dojść do zapisu statusu; **nie oznacza sukcesu archiwizacji**. O nim decydują `JobFailed`, zapis w `ArchiveJobs` i końcowe podsumowanie.
+
+Po błędzie kolejne operacje są pomijane przez wyrażenie `Disable = @[User::JobFailed]`, a pętla partii kończy się przez swój warunek. Wyjątkiem jest `Prepare archive job`, który zawsze resetuje stan przed następnym zadaniem. Wybrane połączenia po bloczkach SQL mają warunek `Completion`, aby przejść do kroku pomijającego pracę także po błędzie.
+
+`Get Archive Jobs`, `Start archive job`, `SetTableStatus`, `Report archive job` i `Archive summary` nie mają mechanizmu kontynuacji błędu bieżącej tabeli. Skrypty nie używają helpera `Run`. Wyjątki C# mogą w debuggerze Visual Studio otworzyć osobne okno `DTS Script Task: Runtime Error`, które wymaga zamknięcia, aby test kontynuował wykonanie.
+
+## Zasady zapisu i usuwania ważne dla review
+
+- Kolejność to **odczyt → zapis i zamknięcie CSV → przekazanie kluczy → DELETE → kontrola liczby usuniętych rekordów**. Błąd zapisu nie uruchamia DELETE tej partii.
+- Nie ma jawnej transakcji SQL ani transakcji SSIS obejmującej plik i bazę. Wcześniejsze udane usunięcia nie są wycofywane po późniejszym błędzie.
+- Przerwanie między zapisem CSV a DELETE pozostawia rekordy również w źródle; ponowienie może wyeksportować je drugi raz do nowego pliku z nowym GUID.
+- Częściowy CSV pozostaje na dysku i trzeba go zachować, bo wcześniejsze partie mogły już zostać usunięte. Rozszerzenie `.csv` nie potwierdza sukcesu; należy sprawdzić status zadania.
+- Zakładamy jedno aktywne przetwarzanie danej tabeli oraz brak równoległych zmian historycznych rekordów. Odczyt i usunięcie nie są jedną atomową operacją.
+- Nazwy tabel i kolumn daty w dynamicznym SQL pochodzą z zaufanej konfiguracji i nie są cytowane. Muszą być poprawnymi nazwami niewymagającymi cytowania, np. `dbo.Orders` i `CreatedAt`. Wartości dat i identyfikator zadania są parametryzowane.
+- Zakładamy kolumnę daty typu `datetime2`; jej typ nie jest osobno walidowany. Warunek `< @Cutoff` nie obejmuje wartości `NULL`.
+- Kontrola struktury przy eksporcie porównuje nazwy, liczbę kolumn i typy CLR. Nie wykrywa każdej zmiany definicji SQL, np. samej długości `nvarchar`.
+- `Check deleted rows` sprawdza licznik partii. Nie ma końcowego porównania całej tabeli z CSV ani pliku `.tmp` i późniejszej zmiany nazwy.
+
+CSV ma separator `;`, wszystkie pola w cudzysłowach, podwajanie cudzysłowów wewnątrz wartości, UTF-8 z BOM i nagłówki `Nazwa (typ SQL)`. `NULL` jest zapisywane jako puste pole. Wartości są formatowane przez `Convert.ToString(..., CultureInfo.InvariantCulture)`.
+
+## Źródła i budowanie
+
+Aktywne Script Tasks mają źródła w `scripts`. [tools/Build-Package.ps1](tools/Build-Package.ps1) składa przepływ, ustawia parametry i mapowania, kompiluje skrypty oraz osadza kod i DLL w `Package.dtsx`. Samo edytowanie pliku `.cs` nie aktualizuje pakietu. Budowanie korzysta z lokalnej instalacji Visual Studio 18 Insiders / SSIS 2025. [tools/Set-PackageLayout.ps1](tools/Set-PackageLayout.ps1) zapisuje układ diagramu, w tym wcięcia kontenerów i dwa rzędy bloczków partii.
+
+Historyczne źródła `Get Archive Jobs.cs`, `Start archive job.cs`, `Count days diff.cs`, `Get DateTo.cs`, `Delete exported batch.cs` i `SetTableStatus.cs` pozostają w repozytorium dla starszych weryfikatorów; nie są aktywnymi Script Tasks obecnego pakietu. Źródłem prawdy dla aktywnych kroków jest `Package.dtsx` i jego skrypt budujący.
+
+## Weryfikacja
+
+Aktualny test w Windows PowerShell 5.1:
 
 ```powershell
 .\tools\Build-Package.ps1
 .\tools\Build-Package.ps1 -CompatibilityTest
 .\tools\Create-TestDatabase.ps1 -IncludeFailure
-.\tools\Verify-SqlTasks.ps1
+.\tools\Verify-SqlTasks.ps1 -SpreadDates
 .\tools\Verify-SqlTasks.ps1 -Retry
-# Każdy scenariusz błędu wymaga świeżej bazy:
+
+# Każda wymuszona awaria wymaga świeżej bazy:
 .\tools\Create-TestDatabase.ps1 -IncludeFailure
 .\tools\Verify-SqlTasks.ps1 -FailureMode Write
 .\tools\Create-TestDatabase.ps1 -IncludeFailure
 .\tools\Verify-SqlTasks.ps1 -FailureMode Delete
 ```
 
-Test korzysta z rzeczywistych TaskHost Execute SQL Task i ich mapowań, rzeczywistych źródeł C# z zastępczym hostem oraz izolowanej bazy LocalDB. Sprawdza 3508 rekordów, wiele partii, IDENTITY, klucz złożony, pustą tabelę, retencję, ponowienie, błędy zapisu/DELETE, zachowanie daty poprzedniego sukcesu i dalsze przetwarzanie. Zainstalowany runtime nie pozwala wykonywać całego pakietu poza SSDT (wymaga Standard Edition SSIS). Dlatego kolejność i reakcję na błędy SQL odtwarza skrypt testowy; harmonogram i wykonanie OnError pozostają do sprawdzenia w Visual Studio. Opcja -FullPackage wykonuje pełny pakiet, jeśli odpowiedni runtime jest dostępny. Starsze Verify-DeleteExport.ps1 i Verify-JobProcessing.ps1 nie sprawdzają nowego przepływu.
+Weryfikator korzysta z rzeczywistych TaskHost Execute SQL Task, ich parametrów i wyników, źródeł C# z zastępczym hostem oraz izolowanej LocalDB. Sprawdza 3508 rekordów, dokładne klucze CSV zamówień, klucz złożony, pustą tabelę, retencję, ponowienie, błędy zapisu i DELETE, zachowanie daty poprzedniego sukcesu oraz kontynuowanie kolejnych zadań. `SpreadDates` rozkłada dane zamówień na 20 dni; partie wynoszą `1000, 1000, 506, 0`, gdzie końcowe zero wykrywa koniec. Wyniki: `verification/20261015_121326` (eksport i ponowienie), `verification/20261015_121351` (błąd zapisu), `verification/20261015_121356` (błąd DELETE).
 
-Wyniki: verification/20261014_161405/native-result.txt i native-retry-result.txt, verification/20261014_161538/native-result.txt (błąd zapisu), verification/20261014_161556/native-result.txt (błąd DELETE).
-Od 2026-10-15 skrypty nie używają helpera Run ani delegatów. Main zawiera czynności zadania i ustawia TaskResult=Success po ich zakończeniu. Wyjątki obsługuje SSIS: skrypty zadania mają OnError z Capture SQL error, Disable zależne od JobFailed i ForceExecutionResult=Success, aby po zapisaniu błędu dojść do SetTableStatus. Przygotowanie zadania zawsze działa i resetuje stan poprzedniej tabeli. Zapis statusu oraz końcowe podsumowanie pozostają krokami krytycznymi. ForceExecutionResult nie oznacza sukcesu archiwizacji: o nim decydują JobFailed, status w ArchiveJobs i końcowe Archive summary. Weryfikator testuje również rzeczywisty kod handlera przy wyjątkach C#; pełne uruchomienie zdarzeń przez silnik SSIS nadal wymaga SSDT.
+Test odtwarza kolejność zadań i obsługę zdarzeń przez pomocniczy host; nie uruchamia pełnego schedulera SSIS. Nowy przepływ bez podziału na dni wymaga osobnego pełnego uruchomienia w Visual Studio. Opcja `-FullPackage` wymaga runtime z uprawnieniem do wykonania całego pakietu poza SSDT; lokalna instalacja zgłasza wymóg Standard Edition SSIS.
 
-Tabele konfiguracji mozna utworzyc bez EF: uruchom `CreateArchiveJobs.sql` w bazie wskazanej przez `ArchiveJobsConnectionString`. Skrypt tworzy schemat Archive i aktualna tabele ArchiveJobs, bez danych przykladowych. Ponowne uruchomienie nie zmienia istniejacej tabeli ani rekordow; nie jest to skrypt aktualizacji starszej struktury. ArchiveJobStatus jest enumem w C#, nie osobna tabela SQL. LastProcessedStatus ma typ nvarchar(16) i przechowuje Error, Success albo NULL. Model EF ma juz HasConversion<string>(). Przy tworzeniu przez SQL nie trzeba uruchamiac migracji EF; skrypt nie zapisuje historii migracji.
-
-Aktualny przepływ od 2026-10-15: bez pętli dni. Get cutoff date ustala raz na zadanie CutoffDate jako północ serwera SQL pomniejszoną o ArchiveOlderThanDays. Read archive batch wykonuje SELECT TOP (1000) * FROM tabela WHERE kolumnaDaty < @Cutoff. Partie mogą łączyć rekordy z wielu dni; rekordy równe granicy i nowsze pozostają w źródle. Nie ma Count days diff, Get DateTo ani zmiennych DaysCounter/LoopCounter/DateFrom/DateTo/CurrentDateFrom/CurrentDateTo w pakiecie. BeginScript służy do walidacji retencji i metadanych kluczy. Błąd nieistniejącej kolumny daty występuje teraz w Read archive batch. Nieudany odczyt może pozostawić CSV z samym nagłówkiem. Historyczne opisy i wyniki testów powyżej dotyczą wcześniejszych wersji.
-
-Test nowych partii: Build-Package.ps1 -CompatibilityTest, Create-TestDatabase.ps1 -IncludeFailure, Verify-SqlTasks.ps1 -SpreadDates, a następnie Verify-SqlTasks.ps1 -Retry. Parametr SpreadDates rozkłada 2506 kwalifikujących się rekordów na wiele dni; oczekiwane partie wynoszą 1000,1000,506,0 (ostatni SELECT wykrywa koniec). Sprawdzane są dokładne klucze CSV, klucz złożony, granica retencji, błędy i statusy. Test korzysta z natywnych bloczków SQL i zastępczego hosta skryptów; pełny scheduler SSIS nowego przepływu nie jest w nim uruchamiany.
+Starsze wyniki pełnych crash testów w Visual Studio są w `verification/20261015_094342`; dotyczą wersji sprzed usunięcia pętli dni. Starsze `Verify-MainExport.ps1`, `Verify-Export.ps1`, `Verify-DeleteExport.ps1` i `Verify-JobProcessing.ps1` nie weryfikują aktualnego przepływu. `Verify-ArchiveJobsDatabase.ps1` sprawdza strukturę dziewięciu kolumn tabeli konfiguracji.
