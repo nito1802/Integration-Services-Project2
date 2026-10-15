@@ -10057,4 +10057,33 @@ namespace ST_b7f8db24bb4d42dd8af9630c4b14f5cd.Properties {
     <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[{7BB4277E-EECC-43C7-A87C-A10008BDFEA1\}]" DTS:CreationName="" DTS:DTSID="{7BB4277E-EECC-43C7-A87C-A10008BDFEA1}" DTS:From="Package\Foreach Loop Container" DTS:LogicalAnd="True" DTS:ObjectName="{7BB4277E-EECC-43C7-A87C-A10008BDFEA1}" DTS:To="Package\Archive summary" />
     <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[{C5E97A6F-B8DD-4F15-8842-0ECAA6A4985B\}]" DTS:CreationName="" DTS:DTSID="{C5E97A6F-B8DD-4F15-8842-0ECAA6A4985B}" DTS:From="Package\Get Archive Jobs" DTS:LogicalAnd="True" DTS:ObjectName="{C5E97A6F-B8DD-4F15-8842-0ECAA6A4985B}" DTS:To="Package\Foreach Loop Container" />
   </DTS:PrecedenceConstraints>
-</DTS:Executable>
+<DTS:DesignTimeProperties><![CDATA[<Objects Version="8">
+  <Package design-time-name="Package">
+    <LayoutInfo>
+      <GraphLayout xmlns="clr-namespace:Microsoft.SqlServer.IntegrationServices.Designer.Model.Serialization;assembly=Microsoft.SqlServer.IntegrationServices.Graph">
+        <NodeLayout Id="Package\Get Archive Jobs" TopLeft="32,24" Size="210,46" />
+        <ContainerLayout Id="Package\Foreach Loop Container" TopLeft="32,120" Size="1100,830" HeaderHeight="43" IsExpanded="True" PanelSize="1100,787" />
+        <NodeLayout Id="Package\Archive summary" TopLeft="32,1010" Size="210,46" />
+        <NodeLayout Id="Package\Foreach Loop Container\Start archive job" TopLeft="28,24" Size="210,46" />
+        <NodeLayout Id="Package\Foreach Loop Container\Prepare archive job" TopLeft="294,24" Size="210,46" />
+        <NodeLayout Id="Package\Foreach Loop Container\BeginScript" TopLeft="560,24" Size="210,46" />
+        <NodeLayout Id="Package\Foreach Loop Container\Count days diff" TopLeft="560,120" Size="210,46" />
+        <NodeLayout Id="Package\Foreach Loop Container\GetGuid" TopLeft="294,120" Size="210,46" />
+        <ContainerLayout Id="Package\Foreach Loop Container\For Loop Container" TopLeft="72,220" Size="980,450" HeaderHeight="43" IsExpanded="True" PanelSize="980,407" />
+        <NodeLayout Id="Package\Foreach Loop Container\SetTableStatus" TopLeft="294,720" Size="210,46" />
+        <NodeLayout Id="Package\Foreach Loop Container\Report archive job" TopLeft="560,720" Size="210,46" />
+        <NodeLayout Id="Package\Foreach Loop Container\For Loop Container\Get DateTo" TopLeft="24,24" Size="210,46" />
+        <ContainerLayout Id="Package\Foreach Loop Container\For Loop Container\Loop through 1000" TopLeft="72,110" Size="870,280" HeaderHeight="43" IsExpanded="True" PanelSize="870,237" />
+        <NodeLayout Id="Package\Foreach Loop Container\For Loop Container\Loop through 1000\Construct SQL" TopLeft="24,24" Size="180,46" />
+        <NodeLayout Id="Package\Foreach Loop Container\For Loop Container\Loop through 1000\Read archive batch" TopLeft="236,24" Size="180,46" />
+        <NodeLayout Id="Package\Foreach Loop Container\For Loop Container\Loop through 1000\Export data to CSV" TopLeft="448,24" Size="180,46" />
+        <NodeLayout Id="Package\Foreach Loop Container\For Loop Container\Loop through 1000\Prepare batch delete" TopLeft="660,24" Size="180,46" />
+        <NodeLayout Id="Package\Foreach Loop Container\For Loop Container\Loop through 1000\Create batch key table" TopLeft="660,156" Size="180,46" />
+        <NodeLayout Id="Package\Foreach Loop Container\For Loop Container\Loop through 1000\Stage batch keys" TopLeft="448,156" Size="180,46" />
+        <NodeLayout Id="Package\Foreach Loop Container\For Loop Container\Loop through 1000\Delete exported batch" TopLeft="236,156" Size="180,46" />
+        <NodeLayout Id="Package\Foreach Loop Container\For Loop Container\Loop through 1000\Check deleted rows" TopLeft="24,156" Size="180,46" />
+      </GraphLayout>
+    </LayoutInfo>
+  </Package>
+</Objects>
+]]></DTS:DesignTimeProperties></DTS:Executable>

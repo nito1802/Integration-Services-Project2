@@ -222,6 +222,7 @@ foreach($layout in @($xml.SelectNodes('//DTS:DesignTimeProperties',$ns))) { [voi
 $xml.DocumentElement.SetAttribute('LastModifiedProductVersion','www.microsoft.com/SqlServer/Dts','17.0.1016.0')
 if($CompatibilityTest) { $destination=Join-Path $PSScriptRoot 'compatibility-test.dtsx' } else { $destination=$packagePath }
 $xml.Save($destination)
+& (Join-Path $PSScriptRoot 'Set-PackageLayout.ps1') -Path $destination
 if (!$CompatibilityTest) {
     $projectFile=Join-Path $project 'Integration Services Project2.dtproj'
     $projectXml=[xml](Get-Content -LiteralPath $projectFile -Raw)
