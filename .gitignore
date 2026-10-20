@@ -6,6 +6,8 @@ verification/main-run/
 verification/console-run/
 verification/*/designer-test/
 verification/*/csv*/
+verification/*/native-csv/
+verification/*/retry-csv/
 verification/*/test-process-id.txt
 Integration Services Project2.Database/appsettings.json
 ##

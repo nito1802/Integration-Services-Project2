@@ -1,0 +1,8 @@
+To run a SSIS package outside of SQL Server Data Tools you must install Standard Edition (64-bit) of Integration Services or higher.
+
+To run a SSIS package outside of SQL Server Data Tools you must install Standard Edition (64-bit) of Integration Services or higher.
+
+To run a SSIS package outside of SQL Server Data Tools you must install Standard Edition (64-bit) of Integration Services or higher.
+
+To run a SSIS package outside of SQL Server Data Tools you must install Standard Edition (64-bit) of Integration Services or higher.
+

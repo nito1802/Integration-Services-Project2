@@ -1,0 +1,4 @@
+Executing the query "SET NOCOUNT ON; DELETE s FROM dbo.Orders s INNER J..." failed with the following error: "Injected delete failure.". Possible failure reasons: Problems with the query, "ResultSet" property not set correctly, parameters not set correctly, or connection not established correctly.
+
+To run a SSIS package outside of SQL Server Data Tools you must install Standard Edition (64-bit) of Integration Services or higher.
+

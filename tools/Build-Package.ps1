@@ -1,4 +1,4 @@
-param([switch]$CompatibilityTest)
+﻿param([switch]$CompatibilityTest)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $project=Join-Path $root 'Integration Services Project2'
@@ -9,7 +9,7 @@ $current=[xml](Get-Content -LiteralPath $packagePath -Raw)
 $currentNs=New-Object Xml.XmlNamespaceManager($current.NameTable)
 $currentNs.AddNamespace('DTS','www.microsoft.com/SqlServer/Dts')
 $currentValues=@{}
-foreach($name in @('ConnectionString','ArchiveJobsConnectionString','ArchiveRoot')) {
+foreach($name in @('ConnectionString','ArchiveJobsConnectionString','ArchiveRoot','MaxRecordsPerCsv','SevenZipPath')) {
     $valueNode=$current.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="'+$name+'"]/DTS:Property[@DTS:Name="ParameterValue"]',$currentNs)
     if($valueNode) { $currentValues[$name]=$valueNode.InnerText }
 }
@@ -26,14 +26,17 @@ $package.VersionBuild=$package.VersionBuild+1
 $package.MaxConcurrentExecutables=1
 $package.TransactionOption=[Microsoft.SqlServer.Dts.Runtime.DTSTransactionOption]::NotSupported
 $package.DelayValidation=$true
-$package.Description='CSV archive: TOP (1000) -> flush and close CSV -> delete exported keys -> repeat until empty. No explicit transactions.'
+$package.Description='Daily CSV parts with configurable row limit; flush before key deletion; daily ZIP via Execute Process Tasks.'
 $package.Variables.Remove('User::SQLStatement')
 function Add-Variable($name,$value) { [void]$package.Variables.Add($name,$false,'User',$value) }
 foreach($name in @('Tables','BatchKeys','BatchData','TableSchema')) { Add-Variable $name (New-Object object) }
-foreach($name in @('TableName','ColumnDate','ArchiwumPath','SQLStatement','FolderFullPath','OutputFile','AddNumber','KeyColumns','DatabaseName','JobError','CsvHeader','PrepareKeysSql','DeleteSql')) { Add-Variable $name '' }
+foreach($name in @('TableName','ColumnDate','ArchiwumPath','SQLStatement','FolderFullPath','OutputFile','KeyColumns','DatabaseName','JobError','CsvHeader','PrepareKeysSql','DeleteSql','ZipFile','ZipArguments','ZipTestArguments')) { Add-Variable $name '' }
 Add-Variable 'DeletedRows' ([long]0)
 foreach($name in @('Days','ArchiveJobId','FailedJobs')) { Add-Variable $name ([int]0) }
 Add-Variable 'BatchNumber' ([long]0)
+Add-Variable 'CurrentDateFrom' ([datetime]'2000-01-01')
+Add-Variable 'CurrentDateTo' ([datetime]'2000-01-01')
+Add-Variable 'DayHasFiles' $false
 Add-Variable 'CutoffDate' ([datetime]'2000-01-01')
 foreach($name in @('JobActive','JobFailed','BatchHasRows')) { Add-Variable $name $false }
 $archiveRoot=[IO.Path]::GetDirectoryName([string]$package.Parameters['OutputFile'].Value)
@@ -44,6 +47,10 @@ if($currentValues.ContainsKey('ArchiveRoot')) { $package.Parameters['ArchiveRoot
 $p=$package.Parameters.Add('ArchiveJobsConnectionString',[TypeCode]::String)
 $p.Value=if($currentValues.ContainsKey('ArchiveJobsConnectionString')) { $currentValues['ArchiveJobsConnectionString'] } else { $package.Parameters['ConnectionString'].Value }
 $p.Description='Connection to the database containing Archive.ArchiveJobs (job configuration and processing status).'
+foreach($entry in @(@('MaxRecordsPerCsv',[TypeCode]::Int32,1000),@('SevenZipPath',[TypeCode]::String,'C:\Program Files\7-Zip\7z.exe'))) {
+    $p=$package.Parameters.Add($entry[0],$entry[1]); $p.Value=$entry[2]
+    if($currentValues.ContainsKey($entry[0])) { $p.Value=[Convert]::ChangeType($currentValues[$entry[0]],$entry[1]) }
+}
 $connection=$package.Connections.Add('ADO.NET:System.Data.SqlClient.SqlConnection, System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089')
 $connection.Name='ArchiveDb'
 $connection.SetExpression('ConnectionString','@[$Package::ConnectionString]')
@@ -114,20 +121,24 @@ Job-Sql $cutoff 'Capture cutoff error'
 Link $tables $startJob $prepareJob
 Link $tables $prepareJob $begin
 Link $tables $begin $cutoff
-$guid=Add-Script $tables 'GetGuid' 'System::StartTime,User::ArchiwumPath,User::TableName' 'User::FolderFullPath,User::AddNumber,User::OutputFile,User::CsvHeader'
-Link $tables $cutoff $guid
-$tables.PrecedenceConstraints[$tables.PrecedenceConstraints.Count-1].Value=[Microsoft.SqlServer.Dts.Runtime.DTSExecResult]::Completion
-$batches=$tables.Executables.Add('STOCK:FORLOOP'); $batches.Name='Loop through 1000'; $batches.DelayValidation=$true; $batches.FailPackageOnFailure=$true
-$batches.InitExpression='@[User::BatchNumber] = 0'; $batches.EvalExpression='!@[User::JobFailed] && @[User::BatchHasRows]'
-Link $tables $guid $batches
-
-
+$firstDay=Add-Script $tables 'Find first day' 'User::TableName,User::ColumnDate,User::CutoffDate,$Package::MaxRecordsPerCsv,$Package::SevenZipPath' 'User::CurrentDateFrom'
+Link $tables $cutoff $firstDay
+$daysLoop=$tables.Executables.Add('STOCK:FORLOOP'); $daysLoop.Name='Loop through days'; $daysLoop.DelayValidation=$true
+$daysLoop.EvalExpression='!@[User::JobFailed] && @[User::CurrentDateFrom] < @[User::CutoffDate]'
+$daysLoop.AssignExpression='@[User::CurrentDateFrom] = DATEADD("day",1,@[User::CurrentDateFrom])'
+Link $tables $firstDay $daysLoop
+$guid=Add-Script $daysLoop 'GetGuid' 'User::CurrentDateFrom,User::ArchiwumPath,User::TableName' 'User::FolderFullPath,User::OutputFile,User::CsvHeader,User::CurrentDateTo,User::BatchHasRows,User::BatchNumber,User::DayHasFiles,User::ZipFile,User::ZipArguments,User::ZipTestArguments'
+$batches=$daysLoop.Executables.Add('STOCK:FORLOOP'); $batches.Name='Loop through CSV parts'; $batches.DelayValidation=$true
+$batches.EvalExpression='!@[User::JobFailed] && @[User::BatchHasRows]'
+Link $daysLoop $guid $batches
 $construct=Add-Script $batches 'Construct SQL' 'User::TableName,User::ColumnDate' 'User::SQLStatement'
 $fetch=Add-Sql $batches 'Read archive batch' 'ArchiveDb' 'User::SQLStatement' 'Rowset' $true
-Bind-Input $fetch '@Cutoff' 'User::CutoffDate' DateTime2
+Bind-Input $fetch '@From' 'User::CurrentDateFrom' DateTime2
+Bind-Input $fetch '@To' 'User::CurrentDateTo' DateTime2
+Bind-Input $fetch '@Limit' '$Package::MaxRecordsPerCsv' Int32
 Bind-Result $fetch '0' 'User::BatchData'
 Job-Sql $fetch 'Capture batch read error'
-$export=Add-Script $batches 'Export data to CSV' 'User::BatchData,User::TableSchema,User::OutputFile,User::CutoffDate,User::TableName,User::CsvHeader,User::KeyColumns' 'User::BatchNumber,User::BatchHasRows,User::BatchKeys'
+$export=Add-Script $batches 'Export data to CSV' 'User::BatchData,User::TableSchema,User::OutputFile,User::CutoffDate,User::TableName,User::CsvHeader,User::KeyColumns,User::FolderFullPath,User::CurrentDateFrom' 'User::BatchNumber,User::BatchHasRows,User::BatchKeys,User::DayHasFiles'
 
 Link $batches $construct $fetch
 Link $batches $fetch $export
@@ -147,6 +158,25 @@ Link $batches $stageKeys $delete
 $checkDelete=Add-Script $batches 'Check deleted rows' 'User::BatchKeys,User::DeletedRows' ''
 Link $batches $delete $checkDelete
 $batches.PrecedenceConstraints[$batches.PrecedenceConstraints.Count-1].Value=[Microsoft.SqlServer.Dts.Runtime.DTSExecResult]::Completion
+function Add-ZipProcess($name,$argumentsVariable) {
+    $hostTask=$daysLoop.Executables.Add('STOCK:ExecuteProcessTask'); $hostTask.Name=$name; $hostTask.DelayValidation=$true
+    $task=$hostTask.InnerObject
+    $task.RequireFullFileName=$true
+    $task.Executable=[string]$package.Parameters['SevenZipPath'].Value
+    $task.FailTaskIfReturnCodeIsNotSuccessValue=$true; $task.SuccessValue=0
+    $task.TimeOut=600; $task.TerminateProcessAfterTimeOut=$true
+    $hostTask.SetExpression('Executable','@[$Package::SevenZipPath]')
+    $hostTask.SetExpression('Arguments','@[User::'+$argumentsVariable+']')
+    Job-Sql $hostTask ('Capture '+$name+' error')
+    $hostTask.SetExpression('Disable','@[User::JobFailed] || !@[User::DayHasFiles]')
+    return $hostTask
+}
+$zip=Add-ZipProcess 'Create daily ZIP' 'ZipArguments'
+$testZip=Add-ZipProcess 'Test daily ZIP' 'ZipTestArguments'
+$cleanup=Add-Script $daysLoop 'Clean archived CSV files' 'User::FolderFullPath,User::DayHasFiles' ''
+Link $daysLoop $batches $zip
+Link $daysLoop $zip $testZip
+Link $daysLoop $testZip $cleanup
 $setStatus=Add-Sql $tables 'SetTableStatus' 'ArchiveJobsDb' @'
 DECLARE @Now datetime2=SYSDATETIME();
 UPDATE [Archive].[ArchiveJobs]
@@ -159,7 +189,7 @@ IF @@ROWCOUNT<>1 THROW 50001,'Archive job no longer exists.',1;
 Bind-Input $setStatus '@Id' 'User::ArchiveJobId' Int32
 Bind-Input $setStatus '@Failed' 'User::JobFailed' Boolean
 Bind-Input $setStatus '@Error' 'User::JobError' String
-Link $tables $batches $setStatus
+Link $tables $daysLoop $setStatus
 $report=Add-Script $tables 'Report archive job' '' ''
 Link $tables $setStatus $report
 $summary=Add-Script $package 'Archive summary' '' ''
@@ -167,7 +197,7 @@ Link $package $tables $summary
 # Use the same SSIS error handling for C# and SQL tasks. Preparation resets the
 # previous job's flags, so it must run even when the preceding job failed.
 Job-Sql $prepareJob 'Capture preparation error' $false
-foreach($task in @($begin,$guid,$construct,$export,$prepareDelete,$stageKeys,$checkDelete)) {
+foreach($task in @($begin,$firstDay,$guid,$construct,$export,$prepareDelete,$stageKeys,$checkDelete,$cleanup)) {
     Job-Sql $task ('Capture '+$task.Name+' error')
 }
 $skeleton=Join-Path $PSScriptRoot 'package-skeleton.dtsx'
@@ -221,20 +251,21 @@ if (!$CompatibilityTest) {
     $projectNs=New-Object Xml.XmlNamespaceManager($projectXml.NameTable)
     $projectNs.AddNamespace('SSIS','www.microsoft.com/SqlServer/SSIS')
     foreach($parameterNode in @($projectXml.SelectNodes('//SSIS:PackageMetaData/SSIS:Parameters/SSIS:Parameter',$projectNs))) {
-        if($parameterNode.GetAttribute('Name','www.microsoft.com/SqlServer/SSIS') -notin @('ConnectionString','ArchiveJobsConnectionString','ArchiveRoot')) {
+        if($parameterNode.GetAttribute('Name','www.microsoft.com/SqlServer/SSIS') -notin @('ConnectionString','ArchiveJobsConnectionString','ArchiveRoot','MaxRecordsPerCsv','SevenZipPath')) {
             [void]$parameterNode.ParentNode.RemoveChild($parameterNode)
         }
     }
     $parameterList=$projectXml.SelectSingleNode('//SSIS:PackageMetaData/SSIS:Parameters',$projectNs)
-    $jobsParameter=$parameterList.SelectSingleNode('SSIS:Parameter[@SSIS:Name="ArchiveJobsConnectionString"]',$projectNs)
-    if(!$jobsParameter) {
-        $jobsParameter=$parameterList.SelectSingleNode('SSIS:Parameter[@SSIS:Name="ConnectionString"]',$projectNs).CloneNode($true)
-        $jobsParameter.SetAttribute('Name','www.microsoft.com/SqlServer/SSIS','ArchiveJobsConnectionString')
-        $jobsParameter.SelectSingleNode('SSIS:Properties/SSIS:Property[@SSIS:Name="ID"]',$projectNs).InnerText=[string]$package.Parameters['ArchiveJobsConnectionString'].ID
-        [void]$parameterList.AppendChild($jobsParameter)
-    }
-    foreach($parameterName in @('ConnectionString','ArchiveJobsConnectionString','ArchiveRoot')) {
-        $projectXml.SelectSingleNode('//SSIS:PackageMetaData/SSIS:Parameters/SSIS:Parameter[@SSIS:Name="'+$parameterName+'"]/SSIS:Properties/SSIS:Property[@SSIS:Name="Value"]',$projectNs).InnerText=[string]$package.Parameters[$parameterName].Value
+    foreach($parameterName in @('ConnectionString','ArchiveJobsConnectionString','ArchiveRoot','MaxRecordsPerCsv','SevenZipPath')) {
+        $node=$parameterList.SelectSingleNode('SSIS:Parameter[@SSIS:Name="'+$parameterName+'"]',$projectNs)
+        if(!$node) {
+            $node=$parameterList.SelectSingleNode('SSIS:Parameter[@SSIS:Name="ConnectionString"]',$projectNs).CloneNode($true)
+            $node.SetAttribute('Name','www.microsoft.com/SqlServer/SSIS',$parameterName)
+            [void]$parameterList.AppendChild($node)
+        }
+        $node.SelectSingleNode('SSIS:Properties/SSIS:Property[@SSIS:Name="ID"]',$projectNs).InnerText=[string]$package.Parameters[$parameterName].ID
+        $node.SelectSingleNode('SSIS:Properties/SSIS:Property[@SSIS:Name="Value"]',$projectNs).InnerText=[string]$package.Parameters[$parameterName].Value
+        $node.SelectSingleNode('SSIS:Properties/SSIS:Property[@SSIS:Name="DataType"]',$projectNs).InnerText=if($parameterName -eq 'MaxRecordsPerCsv') {'9'} else {'18'}
     }
     $projectXml.Save($projectFile)
 }

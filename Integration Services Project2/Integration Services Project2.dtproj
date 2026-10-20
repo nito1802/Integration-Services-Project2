@@ -52,7 +52,7 @@
               <SSIS:Parameters>
                 <SSIS:Parameter SSIS:Name="ArchiveRoot">
                   <SSIS:Properties>
-                    <SSIS:Property SSIS:Name="ID">{B44E3A85-28BF-466C-AD24-F791BEEC31E5}</SSIS:Property>
+                    <SSIS:Property SSIS:Name="ID">{97E1E04F-B47E-4646-8279-9ADF71FD7879}</SSIS:Property>
                     <SSIS:Property SSIS:Name="CreationName">
                     </SSIS:Property>
                     <SSIS:Property SSIS:Name="Description">
@@ -80,7 +80,7 @@
                 </SSIS:Parameter>
                 <SSIS:Parameter SSIS:Name="ArchiveJobsConnectionString">
                   <SSIS:Properties>
-                    <SSIS:Property SSIS:Name="ID">{CC6ABEB8-DD5C-46DF-97BC-906599B9A29C}</SSIS:Property>
+                    <SSIS:Property SSIS:Name="ID">{87563FB1-2A59-4303-BE6A-ECE560BA3E9F}</SSIS:Property>
                     <SSIS:Property SSIS:Name="CreationName">
                     </SSIS:Property>
                     <SSIS:Property SSIS:Name="Description">
@@ -89,6 +89,34 @@
                     <SSIS:Property SSIS:Name="Required">0</SSIS:Property>
                     <SSIS:Property SSIS:Name="Sensitive">0</SSIS:Property>
                     <SSIS:Property SSIS:Name="Value">Data Source=mssql3.webio.pl,2401;Database=nito_superDb;Uid=nito_user_db;Password=SEbu4b!scxEug38;TrustServerCertificate=True</SSIS:Property>
+                    <SSIS:Property SSIS:Name="DataType">18</SSIS:Property>
+                  </SSIS:Properties>
+                </SSIS:Parameter>
+                <SSIS:Parameter SSIS:Name="MaxRecordsPerCsv">
+                  <SSIS:Properties>
+                    <SSIS:Property SSIS:Name="ID">{B2EA3081-957F-492E-8CB2-42AD63B8A831}</SSIS:Property>
+                    <SSIS:Property SSIS:Name="CreationName">
+                    </SSIS:Property>
+                    <SSIS:Property SSIS:Name="Description">
+                    </SSIS:Property>
+                    <SSIS:Property SSIS:Name="IncludeInDebugDump">0</SSIS:Property>
+                    <SSIS:Property SSIS:Name="Required">0</SSIS:Property>
+                    <SSIS:Property SSIS:Name="Sensitive">0</SSIS:Property>
+                    <SSIS:Property SSIS:Name="Value">1000</SSIS:Property>
+                    <SSIS:Property SSIS:Name="DataType">9</SSIS:Property>
+                  </SSIS:Properties>
+                </SSIS:Parameter>
+                <SSIS:Parameter SSIS:Name="SevenZipPath">
+                  <SSIS:Properties>
+                    <SSIS:Property SSIS:Name="ID">{9A6330A5-E3C4-41E6-AC84-2EF23D3D1FCD}</SSIS:Property>
+                    <SSIS:Property SSIS:Name="CreationName">
+                    </SSIS:Property>
+                    <SSIS:Property SSIS:Name="Description">
+                    </SSIS:Property>
+                    <SSIS:Property SSIS:Name="IncludeInDebugDump">0</SSIS:Property>
+                    <SSIS:Property SSIS:Name="Required">0</SSIS:Property>
+                    <SSIS:Property SSIS:Name="Sensitive">0</SSIS:Property>
+                    <SSIS:Property SSIS:Name="Value">C:\Program Files\7-Zip\7z.exe</SSIS:Property>
                     <SSIS:Property SSIS:Name="DataType">18</SSIS:Property>
                   </SSIS:Properties>
                 </SSIS:Parameter>
