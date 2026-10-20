@@ -12,11 +12,13 @@ $layout=New-Object Text.StringBuilder
 <Objects Version="8">
   <Package design-time-name="Package">
     <LayoutInfo>
-      <GraphLayout xmlns="clr-namespace:Microsoft.SqlServer.IntegrationServices.Designer.Model.Serialization;assembly=Microsoft.SqlServer.IntegrationServices.Graph">
+      <GraphLayout xmlns="clr-namespace:Microsoft.SqlServer.IntegrationServices.Designer.Model.Serialization;assembly=Microsoft.SqlServer.IntegrationServices.Graph" xmlns:mssgle="clr-namespace:Microsoft.SqlServer.Graph.LayoutEngine;assembly=Microsoft.SqlServer.Graph" xmlns:assembly="http://schemas.microsoft.com/winfx/2006/xaml">
 '@)
+$positions=@{}
 function Place($id,$x,$y,$width=210,$height=46,$container=$false) {
     if(!$xml.SelectSingleNode('//DTS:Executable[@DTS:refId="'+$id+'"]',$ns)) { throw "Missing task: $id" }
     $escaped=[Security.SecurityElement]::Escape($id)
+    $positions[$id]=@{X=$x;Y=$y;W=$width;H=$height}
     if($container) {
         [void]$layout.AppendLine("        <ContainerLayout Id=`"$escaped`" TopLeft=`"$x,$y`" Size=`"$width,$height`" HeaderHeight=`"43`" IsExpanded=`"True`" PanelSize=`"$width,$($height-43)`" />")
     } else {
@@ -45,6 +47,35 @@ Place "$batch\Create batch key table" 660 156 180
 Place "$batch\Stage batch keys" 448 156 180
 Place "$batch\Delete exported batch" 236 156 180
 Place "$batch\Check deleted rows" 24 156 180
+foreach($constraint in $xml.SelectNodes('//DTS:PrecedenceConstraint',$ns)) {
+    $from=$positions[$constraint.GetAttribute('From',$ns.LookupNamespace('DTS'))]
+    $to=$positions[$constraint.GetAttribute('To',$ns.LookupNamespace('DTS'))]
+    if(!$from -or !$to) { throw 'Missing arrow endpoint layout' }
+    $id=[Security.SecurityElement]::Escape($constraint.GetAttribute('refId',$ns.LookupNamespace('DTS')))
+    if($from.Y -eq $to.Y) {
+        $direction=if($to.X -gt $from.X) { 1 } else { -1 }
+        $sx=if($direction -eq 1) { $from.X+$from.W } else { $from.X }
+        $sy=$from.Y+$from.H/2
+        $tx=if($direction -eq 1) { $to.X } else { $to.X+$to.W }
+        $dx=$tx-$sx; $dy=0; $ex=$dx-7.5*$direction; $ey=0
+        $segments="<mssgle:LineSegment End=`"$ex,$ey`" />"
+    } else {
+        $sx=$from.X+$from.W/2; $sy=$from.Y+$from.H
+        $dx=$to.X+$to.W/2-$sx; $dy=$to.Y-$sy
+        $ex=$dx; $ey=$dy-7.5; $mid=$dy/2
+        $segments="<mssgle:LineSegment End=`"0,$mid`" /><mssgle:LineSegment End=`"$dx,$mid`" /><mssgle:LineSegment End=`"$ex,$ey`" />"
+    }
+    [void]$layout.AppendLine(@"
+        <EdgeLayout Id="$id" TopLeft="$sx,$sy">
+          <EdgeLayout.Curve>
+            <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="$dx,$dy" Start="0,0" End="$ex,$ey">
+              <mssgle:Curve.Segments><mssgle:SegmentCollection>$segments</mssgle:SegmentCollection></mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
+        </EdgeLayout>
+"@)
+}
 [void]$layout.AppendLine(@'
       </GraphLayout>
     </LayoutInfo>

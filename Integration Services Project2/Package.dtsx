@@ -9221,7 +9221,7 @@ namespace ST_389de5756a524060b5929d0b6100a06f.Properties {
 <DTS:DesignTimeProperties><![CDATA[<Objects Version="8">
   <Package design-time-name="Package">
     <LayoutInfo>
-      <GraphLayout xmlns="clr-namespace:Microsoft.SqlServer.IntegrationServices.Designer.Model.Serialization;assembly=Microsoft.SqlServer.IntegrationServices.Graph">
+      <GraphLayout xmlns="clr-namespace:Microsoft.SqlServer.IntegrationServices.Designer.Model.Serialization;assembly=Microsoft.SqlServer.IntegrationServices.Graph" xmlns:mssgle="clr-namespace:Microsoft.SqlServer.Graph.LayoutEngine;assembly=Microsoft.SqlServer.Graph" xmlns:assembly="http://schemas.microsoft.com/winfx/2006/xaml">
         <NodeLayout Id="Package\Get Archive Jobs" TopLeft="32,24" Size="210,46" />
         <ContainerLayout Id="Package\Foreach Loop Container" TopLeft="32,120" Size="1000,660" HeaderHeight="43" IsExpanded="True" PanelSize="1000,617" />
         <NodeLayout Id="Package\Archive summary" TopLeft="32,840" Size="210,46" />
@@ -9241,6 +9241,134 @@ namespace ST_389de5756a524060b5929d0b6100a06f.Properties {
         <NodeLayout Id="Package\Foreach Loop Container\Loop through 1000\Stage batch keys" TopLeft="448,156" Size="180,46" />
         <NodeLayout Id="Package\Foreach Loop Container\Loop through 1000\Delete exported batch" TopLeft="236,156" Size="180,46" />
         <NodeLayout Id="Package\Foreach Loop Container\Loop through 1000\Check deleted rows" TopLeft="24,156" Size="180,46" />
+        <EdgeLayout Id="Package\Foreach Loop Container\Loop through 1000.PrecedenceConstraints[{3377BACB-84EB-472F-9F2D-88E1630A470E\}]" TopLeft="660,179">
+          <EdgeLayout.Curve>
+            <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="-32,0" Start="0,0" End="-24.5,0">
+              <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="-24.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout Id="Package\Foreach Loop Container\Loop through 1000.PrecedenceConstraints[{648021C7-DA4B-4427-8411-FA91138F9D4A\}]" TopLeft="750,70">
+          <EdgeLayout.Curve>
+            <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="0,86" Start="0,0" End="0,78.5">
+              <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="0,43" /><mssgle:LineSegment End="0,43" /><mssgle:LineSegment End="0,78.5" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout Id="Package\Foreach Loop Container\Loop through 1000.PrecedenceConstraints[{6B528928-7B9E-470D-8502-2CE56B7D3BA0\}]" TopLeft="236,179">
+          <EdgeLayout.Curve>
+            <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="-32,0" Start="0,0" End="-24.5,0">
+              <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="-24.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout Id="Package\Foreach Loop Container\Loop through 1000.PrecedenceConstraints[{7D3B93DA-FEBD-4717-8D71-814E9109C86C\}]" TopLeft="628,47">
+          <EdgeLayout.Curve>
+            <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="32,0" Start="0,0" End="24.5,0">
+              <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="24.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout Id="Package\Foreach Loop Container\Loop through 1000.PrecedenceConstraints[{9D0E081E-81B2-4B36-8606-A7C2A5BD0B40\}]" TopLeft="448,179">
+          <EdgeLayout.Curve>
+            <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="-32,0" Start="0,0" End="-24.5,0">
+              <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="-24.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout Id="Package\Foreach Loop Container\Loop through 1000.PrecedenceConstraints[{B3D912D0-D7DC-4A91-B98E-B41738D53D9C\}]" TopLeft="416,47">
+          <EdgeLayout.Curve>
+            <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="32,0" Start="0,0" End="24.5,0">
+              <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="24.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout Id="Package\Foreach Loop Container\Loop through 1000.PrecedenceConstraints[{F6E405B0-C58D-4A76-A85D-5AF5182371C9\}]" TopLeft="204,47">
+          <EdgeLayout.Curve>
+            <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="32,0" Start="0,0" End="24.5,0">
+              <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="24.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout Id="Package\Foreach Loop Container.PrecedenceConstraints[{122AAB73-CC57-40DC-8CF2-227184CD51F1\}]" TopLeft="238,47">
+          <EdgeLayout.Curve>
+            <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="56,0" Start="0,0" End="48.5,0">
+              <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="48.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout Id="Package\Foreach Loop Container.PrecedenceConstraints[{366D4B6D-F88E-4E7E-A58B-A8CB30603BA9\}]" TopLeft="665,70">
+          <EdgeLayout.Curve>
+            <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="0,50" Start="0,0" End="0,42.5">
+              <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="0,25" /><mssgle:LineSegment End="0,25" /><mssgle:LineSegment End="0,42.5" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout Id="Package\Foreach Loop Container.PrecedenceConstraints[{507ECA23-A5F3-432E-AFD6-2687433EF72C\}]" TopLeft="504,47">
+          <EdgeLayout.Curve>
+            <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="56,0" Start="0,0" End="48.5,0">
+              <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="48.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout Id="Package\Foreach Loop Container.PrecedenceConstraints[{6B692949-1E54-4663-B4D6-2CB105C2EA61\}]" TopLeft="504,573">
+          <EdgeLayout.Curve>
+            <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="56,0" Start="0,0" End="48.5,0">
+              <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="48.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout Id="Package\Foreach Loop Container.PrecedenceConstraints[{76A4E61A-484F-462E-AA41-1C049AC9FB47\}]" TopLeft="560,143">
+          <EdgeLayout.Curve>
+            <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="-56,0" Start="0,0" End="-48.5,0">
+              <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="-48.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout Id="Package\Foreach Loop Container.PrecedenceConstraints[{C09200A2-7B0C-40EA-852E-273E91DC89B2\}]" TopLeft="507,500">
+          <EdgeLayout.Curve>
+            <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="-108,50" Start="0,0" End="-108,42.5">
+              <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="0,25" /><mssgle:LineSegment End="-108,25" /><mssgle:LineSegment End="-108,42.5" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout Id="Package\Foreach Loop Container.PrecedenceConstraints[{DDD56013-2D08-404F-84F6-039CCAD7D4AD\}]" TopLeft="399,166">
+          <EdgeLayout.Curve>
+            <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="108,54" Start="0,0" End="108,46.5">
+              <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="0,27" /><mssgle:LineSegment End="108,27" /><mssgle:LineSegment End="108,46.5" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout Id="Package.PrecedenceConstraints[{92ED41E2-2D17-4CD1-8294-847100C5C8F2\}]" TopLeft="137,70">
+          <EdgeLayout.Curve>
+            <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="395,50" Start="0,0" End="395,42.5">
+              <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="0,25" /><mssgle:LineSegment End="395,25" /><mssgle:LineSegment End="395,42.5" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout Id="Package.PrecedenceConstraints[{D3667EAE-7832-4D43-A9BB-2108B587E877\}]" TopLeft="532,780">
+          <EdgeLayout.Curve>
+            <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="-395,60" Start="0,0" End="-395,52.5">
+              <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="0,30" /><mssgle:LineSegment End="-395,30" /><mssgle:LineSegment End="-395,52.5" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
+        </EdgeLayout>
       </GraphLayout>
     </LayoutInfo>
   </Package>
