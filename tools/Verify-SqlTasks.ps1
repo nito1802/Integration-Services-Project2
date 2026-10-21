@@ -1,4 +1,4 @@
-﻿param([switch]$Ssis2025,[switch]$KeyTypes,[switch]$NativeProcessTasks,[switch]$Retry,[switch]$FullPackage,[switch]$SpreadDates,[ValidateSet('None','Write','Delete','Zip','ZipTest','FolderCollision','ZipCollision')][string]$FailureMode='None',[int]$MaxRecordsPerCsv=1000)
+﻿param([switch]$Ssis2025,[switch]$KeyTypes,[switch]$NativeProcessTasks,[switch]$Retry,[switch]$FullPackage,[switch]$SpreadDates,[ValidateSet('None','Read','Write','Delete','Zip','ZipTest','FolderCollision','ZipCollision')][string]$FailureMode='None',[int]$MaxRecordsPerCsv=1000)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $config=Get-Content -LiteralPath (Get-Content -LiteralPath (Join-Path $root 'verification/latest-config.txt')) -Raw | ConvertFrom-Json
@@ -69,7 +69,7 @@ if($FullPackage) {
     function Step($container,$name) {
         $task=$container.Executables[$name]
         if($task.GetExpression('Disable') -and $package.Variables['User::JobFailed'].Value) { return }
-        if($name -in @('Create daily ZIP','Verify ZIP integrity') -and !$package.Variables['User::DayHasFiles'].Value) { return }
+        if($name -in @('Create daily ZIP','Verify ZIP integrity') -and ($package.Variables['User::JobFailed'].Value -or !$package.Variables['User::DayHasFiles'].Value)) { return }
         $index=[Array]::IndexOf($names,$name)
         if($index -ge 0) {
             $probe.Variables.Clear()
@@ -117,6 +117,9 @@ if($FullPackage) {
                 } finally { $process.Dispose() }
                 return
             }
+        }
+        if($FailureMode -eq 'Read' -and $name -eq 'Read archive batch' -and $package.Variables['User::ArchiveJobId'].Value -eq 1) {
+            $package.Variables['User::SQLStatement'].Value='SELECT MissingArchiveReadColumn FROM dbo.Orders;'
         }
         $before=$package.Errors.Count
         $result=$task.Execute($package.Connections,$task.Variables,$null,$null,$null)
@@ -217,7 +220,7 @@ try {
     }
     $loose=@(Get-ChildItem -LiteralPath $output -Filter '*.csv' -Recurse)
     foreach($file in $loose) { $rowCount+=@(Import-Csv -LiteralPath $file.FullName -Delimiter ';').Count }
-    $expected=if($Retry) {0} elseif($FailureMode -eq 'Write') {1003} elseif($FailureMode -eq 'Delete') {1002+$MaxRecordsPerCsv} elseif($FailureMode -eq 'ZipTest') {6012} elseif($FailureMode -eq 'Zip') {3507} elseif($FailureMode -in @('FolderCollision','ZipCollision')) {1002} else {3508}
+    $expected=if($Retry) {0} elseif($FailureMode -eq 'Read') {1002} elseif($FailureMode -eq 'Write') {1003} elseif($FailureMode -eq 'Delete') {1002+$MaxRecordsPerCsv} elseif($FailureMode -eq 'ZipTest') {6012} elseif($FailureMode -eq 'Zip') {3507} elseif($FailureMode -in @('FolderCollision','ZipCollision')) {1002} else {3508}
     if($rowCount -ne $expected) { throw "Unexpected archived/retained CSV rows: $rowCount, expected $expected" }
     if($FailureMode -eq 'None') {
         if($loose.Count -ne 0) { throw 'Successful archive left loose CSV files' }

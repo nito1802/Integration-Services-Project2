@@ -153,7 +153,7 @@ $export=Add-Script $batches 'Write batch to CSV' 'User::BatchData,User::TableSch
 
 Link $batches $construct $fetch
 Link $batches $fetch $export
-$batches.PrecedenceConstraints[$batches.PrecedenceConstraints.Count-1].Value=[Microsoft.SqlServer.Dts.Runtime.DTSExecResult]::Completion
+$batches.PrecedenceConstraints[$batches.PrecedenceConstraints.Count-1].Value=[Microsoft.SqlServer.Dts.Runtime.DTSExecResult]::Success
 $prepareDelete=Add-Script $batches 'Prepare delete query and keys' 'User::BatchKeys,User::TableName' 'User::BatchKeysXml,User::DeleteSql'
 Link $batches $export $prepareDelete
 $delete=Add-Sql $batches 'Delete exported batch' 'ArchiveDb' 'User::DeleteSql' 'SingleRow' $true
@@ -163,7 +163,7 @@ Bind-Input $delete '@Keys' 'User::BatchKeysXml' String -1
 Link $batches $prepareDelete $delete
 $checkDelete=Add-Script $batches 'Verify deleted row count' 'User::BatchKeys,User::DeletedRows' ''
 Link $batches $delete $checkDelete
-$batches.PrecedenceConstraints[$batches.PrecedenceConstraints.Count-1].Value=[Microsoft.SqlServer.Dts.Runtime.DTSExecResult]::Completion
+$batches.PrecedenceConstraints[$batches.PrecedenceConstraints.Count-1].Value=[Microsoft.SqlServer.Dts.Runtime.DTSExecResult]::Success
 function Add-ZipProcess($name,$argumentsVariable) {
     $hostTask=$daysLoop.Executables.Add('STOCK:ExecuteProcessTask'); $hostTask.Name=$name; $hostTask.DelayValidation=$true
     $task=$hostTask.InnerObject

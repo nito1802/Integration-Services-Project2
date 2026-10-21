@@ -57,3 +57,9 @@ Removed the custom catalog query (index selection, joins to sys.columns/sys.type
 Both packages rebuilt; static checks confirm the large catalog query is absent from embedded scripts. Verify-SqlTasks -KeyTypes passed on isolated fixture 20261021_084209: 3508 exported rows, exact order keys, composite key types, correct deletion and 3 retained source rows. This uses the local SQL engine, not a full SSDT scheduler run. The previous LegacyMetadataCatalog simulation flag is retired because the query no longer accesses sys.columns at all.
 
 Documentation: https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-objects/sys-dm-exec-describe-first-result-set-transact-sql
+
+## Success-only arrows
+
+The two Completion constraints (Read archive batch to Write batch to CSV, and Delete exported batch to Verify deleted row count) now use Success. The builder and both package artifacts were updated. Static checks confirm every precedence constraint uses Success; both source tasks retain ForceExecutionResult=Success and their OnError handlers. Existing ZIP expressions were preserved.
+
+Targeted native SQL/source-host failure tests passed: read failure 20261021_090849 and delete failure 20261021_090956. Failed order jobs received Error, later event/empty-table jobs succeeded, previous success timestamps were preserved, and failed DELETE retained the CSV. The delete test initially exposed a test-host omission: it skipped ZIP only for no files, without checking JobFailed. The host now mirrors both ZIP incoming conditions. Full SSIS scheduler/event dispatch remains subject to the runtime limitation described above.

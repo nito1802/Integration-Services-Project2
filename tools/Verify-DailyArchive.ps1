@@ -17,7 +17,7 @@ Fresh
 Verify -TestArguments @('-SpreadDates','-MaxRecordsPerCsv','37')
 Fresh
 Verify -TestArguments @('-KeyTypes')
-foreach($mode in @('Write','Delete','Zip','ZipTest','FolderCollision','ZipCollision')) {
+foreach($mode in @('Read','Write','Delete','Zip','ZipTest','FolderCollision','ZipCollision')) {
     Fresh
     Verify -TestArguments @('-FailureMode',$mode)
 }

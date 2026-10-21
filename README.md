@@ -130,3 +130,5 @@ Wyniki aktualnej weryfikacji opisuje `verification/daily-archive-results.md`.
 Wszystkie operacje bazodanowe aktywnego pakietu są Execute SQL Tasks. C# przygotowuje SQL i parametry, przetwarza pobrane DataSety, zapisuje CSV oraz obsługuje pliki i stan zadania. Nie wykonuje SQL ani nie pobiera połączeń. Pakowanie i test ZIP pozostają Execute Process Tasks.
 
 Weryfikacja wersji bez operacji bazodanowych w C#: `verification/execute-sql-only-results.md`.
+
+Wszystkie połączenia przepływu używają zielonego warunku `Success`. Dla błędów tabeli `OnError` ustawia `JobFailed`, a `ForceExecutionResult = Success` umożliwia dojście do zapisu wyniku i kolejnej tabeli. Warunki przy ZIP pozostają bez zmian.
