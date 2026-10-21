@@ -52,7 +52,7 @@
               <SSIS:Parameters>
                 <SSIS:Parameter SSIS:Name="ArchiveRoot">
                   <SSIS:Properties>
-                    <SSIS:Property SSIS:Name="ID">{97E1E04F-B47E-4646-8279-9ADF71FD7879}</SSIS:Property>
+                    <SSIS:Property SSIS:Name="ID">{AC10708F-8497-44F4-970A-A25C1A6EA565}</SSIS:Property>
                     <SSIS:Property SSIS:Name="CreationName">
                     </SSIS:Property>
                     <SSIS:Property SSIS:Name="Description">
@@ -80,7 +80,7 @@
                 </SSIS:Parameter>
                 <SSIS:Parameter SSIS:Name="ArchiveJobsConnectionString">
                   <SSIS:Properties>
-                    <SSIS:Property SSIS:Name="ID">{87563FB1-2A59-4303-BE6A-ECE560BA3E9F}</SSIS:Property>
+                    <SSIS:Property SSIS:Name="ID">{3C84AE77-26C8-4A77-87D1-4050DF1443B8}</SSIS:Property>
                     <SSIS:Property SSIS:Name="CreationName">
                     </SSIS:Property>
                     <SSIS:Property SSIS:Name="Description">
@@ -94,7 +94,7 @@
                 </SSIS:Parameter>
                 <SSIS:Parameter SSIS:Name="MaxRecordsPerCsv">
                   <SSIS:Properties>
-                    <SSIS:Property SSIS:Name="ID">{B2EA3081-957F-492E-8CB2-42AD63B8A831}</SSIS:Property>
+                    <SSIS:Property SSIS:Name="ID">{B8EC4708-40B1-401B-A27B-DE4D610B4CA6}</SSIS:Property>
                     <SSIS:Property SSIS:Name="CreationName">
                     </SSIS:Property>
                     <SSIS:Property SSIS:Name="Description">
@@ -108,7 +108,7 @@
                 </SSIS:Parameter>
                 <SSIS:Parameter SSIS:Name="SevenZipPath">
                   <SSIS:Properties>
-                    <SSIS:Property SSIS:Name="ID">{9A6330A5-E3C4-41E6-AC84-2EF23D3D1FCD}</SSIS:Property>
+                    <SSIS:Property SSIS:Name="ID">{1FD281C3-8E40-4D3F-A1C9-52FD44885CCB}</SSIS:Property>
                     <SSIS:Property SSIS:Name="CreationName">
                     </SSIS:Property>
                     <SSIS:Property SSIS:Name="Description">

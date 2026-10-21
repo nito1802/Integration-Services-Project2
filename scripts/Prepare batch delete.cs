@@ -10,10 +10,10 @@
                 select.Add("s." + name);
                 match.Add("s." + name + "=k." + name);
             }
-            // A join prevents SELECT INTO from copying the source identity property.
+            // KeepIdentity in Stage batch keys preserves source values for inherited IDENTITY columns.
             Dts.Variables["User::PrepareKeysSql"].Value =
                 "IF OBJECT_ID('tempdb..#ArchiveBatchKeys') IS NOT NULL DROP TABLE #ArchiveBatchKeys; " +
-                "SELECT TOP (0) " + string.Join(",", select.ToArray()) + " INTO #ArchiveBatchKeys FROM " + table + " s CROSS JOIN (SELECT 1 AS n) x;";
+                "SELECT TOP (0) " + string.Join(",", select.ToArray()) + " INTO #ArchiveBatchKeys FROM " + table + " s;";
             Dts.Variables["User::DeleteSql"].Value =
                 "SET NOCOUNT ON; DELETE s FROM " + table + " s INNER JOIN #ArchiveBatchKeys k ON " + string.Join(" AND ", match.ToArray()) +
                 "; SELECT CONVERT(bigint,@@ROWCOUNT) AS DeletedRows;";

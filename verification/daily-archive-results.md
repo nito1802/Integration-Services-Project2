@@ -31,3 +31,7 @@ The package was rebuilt with `YYYY_MM_DD.zip` and `YYYY_MM_DD_part1.csv`, `part2
 - Existing day ZIP: `20261020_144054`.
 
 Both collision cases stop the affected job before batch export/deletion, preserve existing content byte for byte, retain all 2506 eligible order rows, and allow subsequent jobs to complete. Tests also assert exact filename patterns inside the ZIPs. Embedded production scripts match source files. The SSDT/runtime limitation above still applies.
+
+## Key table without CROSS JOIN
+
+Both packages rebuilt successfully. Native SQL / source-host test passed against isolated LocalDB fixture 20261020_170943: 3508 exported rows, exact order keys preserved for IDENTITY, composite-key table processed, 3 retained source rows. Stage batch keys retains SqlBulkCopyOptions.KeepIdentity. Embedded Prepare batch delete sources contain plain SELECT TOP (0) INTO without CROSS JOIN. Full scheduler/runtime limitation above still applies.
