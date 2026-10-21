@@ -1,0 +1,28 @@
+﻿# Daily staging / deletion after ZIP — 2026-10-21
+
+Both packages rebuilt. Stage archive day copies a day into #ArchiveDay. The batch loop contains only prepare SELECT, read snapshot batch and write CSV. Stable key ordering and OFFSET/FETCH prevent repeated rows. Verify exported day checks the written row count before ZIP. Delete archived day joins source keys to the snapshot only after ZIP creation and integrity verification. Drop staged day runs even after failure; failed-day CSV files remain.
+
+Removed XML/base64, BatchKeys/BatchKeysXml and Prepare delete query and keys. All database operations remain Execute SQL Tasks. The source retains one session and uses database-qualified table names, without changing database context in C#. Native routing tests confirmed constant @@SPID for queries against multiple database catalogs. Export tests deliberately use master as source initial catalog, with fixture tables in another database.
+
+The full daily suite passed: 3508 archived rows, exact keys, 1000/37 row limits, retry, composite key types, a source row inserted after staging (retained), failures of stage/read/write/ZIP/ZIP test/DELETE, and existing-folder/ZIP collisions. The host checks source rows still exist before both ZIP processes. NULL-key rejection passed in 20261021_093458. Final CSV precision/binary regression passed in 20261021_093757: dates preserve fractional precision, binary values use 0x hex, floating point uses round-trip formatting.
+
+Static checks confirm both embedded packages match sources, no database APIs or XML/base64 conversion in active C#, Success constraints throughout, and DELETE dependent solely on Verify ZIP integrity. Snapshot data occupies one day in tempdb; C# loads only a batch. Existing historical records must not be updated concurrently.
+
+Tests manually drive scheduler/error semantics and use a process host for real 7-Zip. Full native SSIS scheduler/process-task execution still requires SSDT or an appropriately licensed runtime; no full SSDT run is claimed.
+
+## Evidence
+
+- 20261021_093112: PASS: native SQL tasks and ZIP arguments (process task requires SSDT); mode=None; CSV rows=3508; source rows=3; SQL error persisted; following jobs succeeded; previous success date preserved. Scheduler/event-handler execution requires SSDT.
+- 20261021_093125: PASS: native SQL tasks and ZIP arguments (process task requires SSDT); mode=None; CSV rows=3508; source rows=3; SQL error persisted; following jobs succeeded; previous success date preserved. Scheduler/event-handler execution requires SSDT.
+- 20261021_093142: PASS: native SQL tasks and ZIP arguments (process task requires SSDT); mode=None; CSV rows=3508; source rows=3; SQL error persisted; following jobs succeeded; previous success date preserved. Scheduler/event-handler execution requires SSDT.
+- 20261021_093149: PASS: native SQL tasks and ZIP arguments (process task requires SSDT); mode=None; CSV rows=3508; source rows=4; SQL error persisted; following jobs succeeded; previous success date preserved. Scheduler/event-handler execution requires SSDT.
+- 20261021_093157: PASS: native SQL tasks and ZIP arguments (process task requires SSDT); mode=Stage; CSV rows=1002; source rows=2509; SQL error persisted; following jobs succeeded; previous success date preserved. Scheduler/event-handler execution requires SSDT.
+- 20261021_093203: PASS: native SQL tasks and ZIP arguments (process task requires SSDT); mode=Read; CSV rows=1002; source rows=2509; SQL error persisted; following jobs succeeded; previous success date preserved. Scheduler/event-handler execution requires SSDT.
+- 20261021_093208: PASS: native SQL tasks and ZIP arguments (process task requires SSDT); mode=Write; CSV rows=1003; source rows=2509; SQL error persisted; following jobs succeeded; previous success date preserved. Scheduler/event-handler execution requires SSDT.
+- 20261021_093214: PASS: native SQL tasks and ZIP arguments (process task requires SSDT); mode=Delete; CSV rows=6012; source rows=2509; SQL error persisted; following jobs succeeded; previous success date preserved. Scheduler/event-handler execution requires SSDT.
+- 20261021_093221: PASS: native SQL tasks and ZIP arguments (process task requires SSDT); mode=Zip; CSV rows=3507; source rows=2509; SQL error persisted; following jobs succeeded; previous success date preserved. Scheduler/event-handler execution requires SSDT.
+- 20261021_093226: PASS: native SQL tasks and ZIP arguments (process task requires SSDT); mode=ZipTest; CSV rows=6012; source rows=2509; SQL error persisted; following jobs succeeded; previous success date preserved. Scheduler/event-handler execution requires SSDT.
+- 20261021_093235: PASS: native SQL tasks and ZIP arguments (process task requires SSDT); mode=FolderCollision; CSV rows=1002; source rows=2509; SQL error persisted; following jobs succeeded; previous success date preserved. Scheduler/event-handler execution requires SSDT.
+- 20261021_093240: PASS: native SQL tasks and ZIP arguments (process task requires SSDT); mode=ZipCollision; CSV rows=1002; source rows=2509; SQL error persisted; following jobs succeeded; previous success date preserved. Scheduler/event-handler execution requires SSDT.
+- 20261021_093458: PASS: native SQL tasks and ZIP arguments (process task requires SSDT); mode=NullKey; CSV rows=1002; source rows=2509; SQL error persisted; following jobs succeeded; previous success date preserved. Scheduler/event-handler execution requires SSDT.
+- 20261021_093757: PASS: native SQL tasks and ZIP arguments (process task requires SSDT); mode=None; CSV rows=3508; source rows=3; SQL error persisted; following jobs succeeded; previous success date preserved. Scheduler/event-handler execution requires SSDT.

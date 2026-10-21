@@ -21,5 +21,26 @@
             Dts.Variables["User::ZipFile"].Value = zip;
             Dts.Variables["User::ZipArguments"].Value = "a -tzip -y \"" + zip + "\" \"" + Path.Combine(folder, "*.csv") + "\"";
             Dts.Variables["User::ZipTestArguments"].Value = "t -tzip \"" + zip + "\"";
+            Dts.Variables["User::DayRows"].Value = 0L;
+            Dts.Variables["User::DayExportedRows"].Value = 0L;
+            string table = Convert.ToString(Dts.Variables["User::QualifiedTableName"].Value);
+            string column = Convert.ToString(Dts.Variables["User::ColumnDate"].Value);
+            string from = Convert.ToDateTime(Dts.Variables["User::CurrentDateFrom"].Value).ToString("yyyy-MM-ddTHH:mm:ss.fffffff",CultureInfo.InvariantCulture);
+            string to = Convert.ToDateTime(Dts.Variables["User::CurrentDateTo"].Value).ToString("yyyy-MM-ddTHH:mm:ss.fffffff",CultureInfo.InvariantCulture);
+            Dts.Variables["User::StageDaySql"].Value = "SET NOCOUNT ON; IF OBJECT_ID('tempdb..#ArchiveDay') IS NOT NULL DROP TABLE #ArchiveDay; " +
+                "SELECT * INTO #ArchiveDay FROM " + table + " WHERE " + column + " >= CONVERT(datetime2(7),N'" + from + "',126) AND " +
+                column + " < CONVERT(datetime2(7),N'" + to + "',126); SELECT COUNT_BIG(*) AS DayRows FROM #ArchiveDay;";
+            var matches = new List<string>();
+            var nullKeys = new List<string>();
+            foreach(string key in Convert.ToString(Dts.Variables["User::KeyColumns"].Value).Split(',')) {
+                string name = "[" + key.Trim().Replace("]","]]") + "]";
+                matches.Add("s." + name + "=d." + name);
+                nullKeys.Add(name + " IS NULL");
+            }
+            Dts.Variables["User::StageDaySql"].Value = Convert.ToString(Dts.Variables["User::StageDaySql"].Value).Replace(
+                "SELECT COUNT_BIG(*) AS DayRows", "IF EXISTS(SELECT 1 FROM #ArchiveDay WHERE " + string.Join(" OR ",nullKeys.ToArray()) +
+                ") THROW 50004,'Archive key must not contain NULL.',1; SELECT COUNT_BIG(*) AS DayRows");
+            Dts.Variables["User::DeleteSql"].Value = "SET NOCOUNT ON; DELETE s FROM " + table +
+                " s INNER JOIN #ArchiveDay d ON " + string.Join(" AND ",matches.ToArray()) + "; SELECT CONVERT(bigint,@@ROWCOUNT) AS DeletedRows;";
             Dts.TaskResult = (int)DTSExecResult.Success;
         }

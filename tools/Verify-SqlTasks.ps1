@@ -1,4 +1,4 @@
-﻿param([switch]$Ssis2025,[switch]$KeyTypes,[switch]$NativeProcessTasks,[switch]$Retry,[switch]$FullPackage,[switch]$SpreadDates,[ValidateSet('None','Read','Write','Delete','Zip','ZipTest','FolderCollision','ZipCollision')][string]$FailureMode='None',[int]$MaxRecordsPerCsv=1000)
+﻿param([switch]$InsertAfterSnapshot,[switch]$Ssis2025,[switch]$KeyTypes,[switch]$NativeProcessTasks,[switch]$Retry,[switch]$FullPackage,[switch]$SpreadDates,[ValidateSet('None','NullKey','Stage','Read','Write','Delete','Zip','ZipTest','FolderCollision','ZipCollision')][string]$FailureMode='None',[int]$MaxRecordsPerCsv=1000)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $config=Get-Content -LiteralPath (Get-Content -LiteralPath (Join-Path $root 'verification/latest-config.txt')) -Raw | ConvertFrom-Json
@@ -7,13 +7,16 @@ if($Ssis2025) { [void][Reflection.Assembly]::LoadFrom('C:/Program Files/Microsof
 $app=New-Object Microsoft.SqlServer.Dts.Runtime.Application
 $packagePath=if($Ssis2025) { Join-Path $root 'Integration Services Project2/Package.dtsx' } else { Join-Path $PSScriptRoot 'compatibility-test.dtsx' }
 $package=$app.LoadPackage($packagePath,$null)
-$package.Parameters['ConnectionString'].Value=$config.ConnectionString
+$sourceConnection=New-Object Data.SqlClient.SqlConnectionStringBuilder($config.ConnectionString)
+$sourceConnection['Initial Catalog']='master'
+$package.Parameters['ConnectionString'].Value=$sourceConnection.ConnectionString
 $package.Parameters['ArchiveJobsConnectionString'].Value=$config.ConnectionString
 $output=Join-Path $config.RunDirectory $(if($Retry) {'retry-csv'} else {'native-csv'})
 [void](New-Item -ItemType Directory -Path $output -Force)
 $package.Parameters['ArchiveRoot'].Value=$output
 $package.Parameters['MaxRecordsPerCsv'].Value=$MaxRecordsPerCsv
 foreach($connection in $package.Connections) { $connection.ConnectionString=$config.ConnectionString }
+$package.Connections['ArchiveDb'].ConnectionString=$sourceConnection.ConnectionString
 if($SpreadDates -and !$Retry) {
     $db=New-Object Data.SqlClient.SqlConnection($config.ConnectionString); $db.Open()
     try { $cmd=$db.CreateCommand(); $cmd.CommandText='UPDATE dbo.Orders SET CreatedAt=DATEADD(day,-3-CONVERT(int,OrderNo%20),CONVERT(date,GETDATE())) WHERE OrderNo<=2505;'; [void]$cmd.ExecuteNonQuery() } finally { $db.Dispose() }
@@ -52,7 +55,7 @@ if($FullPackage) {
     $stubPath=Join-Path $build 'Stub.cs'; [IO.File]::WriteAllText($stubPath,$stub)
     $files=@($stubPath)
     $common=Get-Content -LiteralPath (Join-Path $root 'scripts/Common.cs') -Raw
-    $names=@('Initialize job variables','Prepare metadata and date queries','Initialize daily archive','Prepare batch select query','Write batch to CSV','Prepare delete query and keys','Verify deleted row count','Log job result','Capture SQL error','Prepare export schema and header','Delete temporary CSV files')
+    $names=@('Initialize job variables','Prepare metadata and date queries','Initialize daily archive','Prepare batch select query','Write batch to CSV','Verify exported day','Verify deleted row count','Log job result','Capture SQL error','Prepare export schema and header','Delete temporary CSV files')
     for($i=0;$i -lt $names.Count;$i++) {
         $main=Get-Content -LiteralPath (Join-Path $root ('scripts/'+$names[$i]+'.cs')) -Raw
         if($FailureMode -eq 'Write' -and $names[$i] -eq 'Write batch to CSV') {
@@ -70,6 +73,7 @@ if($FullPackage) {
         $task=$container.Executables[$name]
         if($task.GetExpression('Disable') -and $package.Variables['User::JobFailed'].Value) { return }
         if($name -in @('Create daily ZIP','Verify ZIP integrity') -and ($package.Variables['User::JobFailed'].Value -or !$package.Variables['User::DayHasFiles'].Value)) { return }
+        if($name -in @('Delete archived day','Verify deleted row count') -and !$package.Variables['User::DayHasFiles'].Value) { return }
         $index=[Array]::IndexOf($names,$name)
         if($index -ge 0) {
             $probe.Variables.Clear()
@@ -86,10 +90,36 @@ if($FullPackage) {
                 $handler.Dts=$probe; $handler.Main()
                 if($probe.Variables['System::Propagate'].Value) { throw 'Error handler did not stop propagation' }
             }
+            if($FailureMode -eq 'NullKey' -and $name -eq 'Prepare export schema and header' -and $package.Variables['User::ArchiveJobId'].Value -eq 1) {
+                $probe.Variables['User::KeyColumns'].Value='OrderNo, Note'
+            }
+            if($KeyTypes -and $name -eq 'Write batch to CSV' -and !$probe.Variables['User::JobFailed'].Value -and $probe.Variables['User::TableName'].Value -eq 'audit.Events') {
+                $data=$probe.Variables['User::BatchData'].Value.Tables[0]
+                if($data.Rows.Count -gt 0) {
+                    $written=@(Import-Csv -LiteralPath $probe.Variables['User::OutputFile'].Value -Delimiter ';')
+                    for($r=0;$r -lt $data.Rows.Count;$r++) {
+                        $source=$data.Rows[$r]; $csv=$written[$r]
+                        $hex='0x'+[BitConverter]::ToString($source.BinaryKey).Replace('-','')
+                        if($csv.'BinaryKey (varbinary)' -ne $hex) { throw 'CSV binary value lost' }
+                        if($csv.'DateKey (datetime)' -ne $source.DateKey.ToString('o',[Globalization.CultureInfo]::InvariantCulture)) { throw 'CSV datetime precision lost' }
+                        if($csv.'OffsetKey (datetimeoffset)' -ne $source.OffsetKey.ToString('o',[Globalization.CultureInfo]::InvariantCulture)) { throw 'CSV datetimeoffset precision lost' }
+                        if($csv.'TimeKey (time)' -ne $source.TimeKey.ToString('c',[Globalization.CultureInfo]::InvariantCulture)) { throw 'CSV time precision lost' }
+                        if($csv.'FloatKey (float)' -ne $source.FloatKey.ToString('R',[Globalization.CultureInfo]::InvariantCulture)) { throw 'CSV float precision lost' }
+                    }
+                }
+            }
             foreach($variable in $package.Variables) { if($variable.Namespace -eq 'User') { $variable.Value=$probe.Variables[$variable.QualifiedName].Value } }
             return
         }
         if($name -in @('Create daily ZIP','Verify ZIP integrity')) {
+            $dbCheck=New-Object Data.SqlClient.SqlConnection($config.ConnectionString); $dbCheck.Open()
+            try {
+                $check=$dbCheck.CreateCommand()
+                $check.CommandText='SELECT COUNT_BIG(*) FROM '+$package.Variables['User::TableName'].Value+' WHERE '+$package.Variables['User::ColumnDate'].Value+' >= @From AND '+$package.Variables['User::ColumnDate'].Value+' < @To;'
+                [void]$check.Parameters.AddWithValue('@From',$package.Variables['User::CurrentDateFrom'].Value)
+                [void]$check.Parameters.AddWithValue('@To',$package.Variables['User::CurrentDateTo'].Value)
+                if([long]$check.ExecuteScalar() -ne ([long]$package.Variables['User::DayRows'].Value + $(if($InsertAfterSnapshot -and $package.Variables['User::ArchiveJobId'].Value -eq 1 -and $package.Variables['User::CurrentDateFrom'].Value -eq $insertedDay) {1} else {0}))) { throw 'Source day was modified/deleted before ZIP verification' }
+            } finally { $dbCheck.Dispose() }
             # Exercise the real Execute Process Task. Inject failure via unsupported 7z command.
             $variable=if($name -eq 'Create daily ZIP') {'ZipArguments'} else {'ZipTestArguments'}
             $task.InnerObject.Executable=[string]$package.Parameters['SevenZipPath'].Value
@@ -119,13 +149,16 @@ if($FullPackage) {
             }
         }
         if($FailureMode -eq 'Read' -and $name -eq 'Read archive batch' -and $package.Variables['User::ArchiveJobId'].Value -eq 1) {
-            $package.Variables['User::SQLStatement'].Value='SELECT MissingArchiveReadColumn FROM dbo.Orders;'
+            $package.Variables['User::SQLStatement'].Value='SELECT MissingArchiveReadColumn FROM #ArchiveDay;'
+        }
+        if($FailureMode -eq 'Stage' -and $name -eq 'Stage archive day' -and $package.Variables['User::ArchiveJobId'].Value -eq 1) {
+            $package.Variables['User::StageDaySql'].Value='SELECT * FROM MissingArchiveStageTable;'
         }
         $before=$package.Errors.Count
         $result=$task.Execute($package.Connections,$task.Variables,$null,$null,$null)
         $errors=@($package.Errors | Select-Object -Skip $before | ForEach-Object Description)
         if($result -ne 'Success' -or $errors.Count -gt 0) {
-            if($name -in @('Calculate retention cutoff','Read archive batch','Read column definitions','Read SQL types and keys','Find first archive day','Delete exported batch','Create daily ZIP','Verify ZIP integrity')) {
+            if($name -in @('Calculate retention cutoff','Read archive batch','Read column definitions','Read SQL types and keys','Find first archive day','Stage archive day','Drop staged day','Delete archived day','Create daily ZIP','Verify ZIP integrity')) {
                 # TaskHost.Execute does not dispatch the package scheduler's event handlers.
                 $package.Variables['User::JobFailed'].Value=$true
                 $package.Variables['User::JobError'].Value=$errors -join [Environment]::NewLine
@@ -159,10 +192,19 @@ if($FullPackage) {
                 [IO.File]::WriteAllText($collisionFile,'existing archive - do not overwrite')
             }
             Step $daily 'Initialize daily archive'
-            while(!$package.Variables['User::JobFailed'].Value -and $package.Variables['User::BatchHasRows'].Value) {
-                foreach($name in @('Prepare batch select query','Read archive batch','Write batch to CSV','Prepare delete query and keys','Delete exported batch','Verify deleted row count')) { Step $batches $name }
+            Step $daily 'Stage archive day'
+            if($InsertAfterSnapshot -and !$Retry -and !$package.Variables['User::JobFailed'].Value -and $package.Variables['User::ArchiveJobId'].Value -eq 1 -and !$insertedDay) {
+                $insertedDay=$package.Variables['User::CurrentDateFrom'].Value
+                $dbInsert=New-Object Data.SqlClient.SqlConnection($config.ConnectionString); $dbInsert.Open()
+                try {
+                    $insert=$dbInsert.CreateCommand(); $insert.CommandText="SET IDENTITY_INSERT dbo.Orders ON; INSERT dbo.Orders(OrderNo,CreatedAt,Note,Amount) VALUES(4000,@Day,N'Inserted after snapshot',1); SET IDENTITY_INSERT dbo.Orders OFF;"
+                    [void]$insert.Parameters.AddWithValue('@Day',$insertedDay); [void]$insert.ExecuteNonQuery()
+                } finally { $dbInsert.Dispose() }
             }
-            foreach($name in @('Create daily ZIP','Verify ZIP integrity','Delete temporary CSV files')) { Step $daily $name }
+            while(!$package.Variables['User::JobFailed'].Value -and $package.Variables['User::BatchHasRows'].Value) {
+                foreach($name in @('Prepare batch select query','Read archive batch','Write batch to CSV')) { Step $batches $name }
+            }
+            foreach($name in @('Verify exported day','Create daily ZIP','Verify ZIP integrity','Delete archived day','Verify deleted row count','Drop staged day','Delete temporary CSV files')) { Step $daily $name }
             $package.Variables['User::CurrentDateFrom'].Value=([datetime]$package.Variables['User::CurrentDateFrom'].Value).AddDays(1)
         }
         foreach($name in @('Save job result','Log job result')) { Step $tables $name }
@@ -189,8 +231,9 @@ try {
     if(@($table.Rows | Where-Object Id -eq 2)[0].LastProcessedStatus -ne 'Error') { throw 'Expected missing date column failure' }
     if($FailureMode -ne 'None' -and @($table.Rows | Where-Object Id -eq 1)[0].LastProcessedStatus -ne 'Error') { throw 'Expected injected failure' }
     $cmd.CommandText='SELECT (SELECT COUNT(*) FROM dbo.Orders)+(SELECT COUNT(*) FROM audit.Events);'
-    $sourceExpected=if($FailureMode -eq 'None') {3} elseif($FailureMode -in @('Zip','ZipTest')) {4} else {2509}
+    $sourceExpected=if($InsertAfterSnapshot) {4} elseif($FailureMode -eq 'None') {3} else {2509}
     if($cmd.ExecuteScalar() -ne $sourceExpected) { throw 'Unexpected source rows after deletion' }
+    if($InsertAfterSnapshot) { $cmd.CommandText='SELECT COUNT(*) FROM dbo.Orders WHERE OrderNo=4000;'; if($cmd.ExecuteScalar() -ne 1) { throw 'Unstaged row was deleted' } }
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zips=@(Get-ChildItem -LiteralPath $output -Filter '*.zip' -Recurse)
     $rowCount=0; $orderKeys=@(); $csvCount=0
@@ -220,7 +263,7 @@ try {
     }
     $loose=@(Get-ChildItem -LiteralPath $output -Filter '*.csv' -Recurse)
     foreach($file in $loose) { $rowCount+=@(Import-Csv -LiteralPath $file.FullName -Delimiter ';').Count }
-    $expected=if($Retry) {0} elseif($FailureMode -eq 'Read') {1002} elseif($FailureMode -eq 'Write') {1003} elseif($FailureMode -eq 'Delete') {1002+$MaxRecordsPerCsv} elseif($FailureMode -eq 'ZipTest') {6012} elseif($FailureMode -eq 'Zip') {3507} elseif($FailureMode -in @('FolderCollision','ZipCollision')) {1002} else {3508}
+    $expected=if($Retry) {0} elseif($FailureMode -in @('Read','Stage','NullKey')) {1002} elseif($FailureMode -eq 'Write') {1003} elseif($FailureMode -eq 'Delete') {6012} elseif($FailureMode -eq 'ZipTest') {6012} elseif($FailureMode -eq 'Zip') {3507} elseif($FailureMode -in @('FolderCollision','ZipCollision')) {1002} else {3508}
     if($rowCount -ne $expected) { throw "Unexpected archived/retained CSV rows: $rowCount, expected $expected" }
     if($FailureMode -eq 'None') {
         if($loose.Count -ne 0) { throw 'Successful archive left loose CSV files' }

@@ -3,7 +3,6 @@
             var timer = Stopwatch.StartNew();
             string outputFile = Convert.ToString(Dts.Variables["User::OutputFile"].Value, CultureInfo.InvariantCulture);
             long rows = 0;
-            var batchKeys = new DataTable();
             var data = ((DataSet)Dts.Variables["User::BatchData"].Value).Tables[0];
             if (data.Rows.Count > 0) {
                 outputFile = Path.Combine(Convert.ToString(Dts.Variables["User::FolderFullPath"].Value),
@@ -21,13 +20,6 @@
                         for (int i = 0; i < reader.FieldCount; i++)
                             if (reader.GetName(i) != Convert.ToString(schema.Rows[i]["ColumnName"]) || reader.GetFieldType(i) != (Type)schema.Rows[i]["DataType"])
                                 throw new InvalidOperationException("Table columns changed during this export.");
-                        foreach (string key in Convert.ToString(Dts.Variables["User::KeyColumns"].Value).Split(','))
-                        {
-                            string name = key.Trim();
-                            int ordinal = reader.GetOrdinal(name);
-                            DataColumn field = batchKeys.Columns.Add(name, reader.GetFieldType(ordinal));
-                            field.ExtendedProperties["SqlType"] = Convert.ToString(schema.Rows[ordinal]["SqlType"]);
-                        }
                         if (data.Rows.Count > 0)
                         using (var stream = new FileStream(outputFile, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                         using (var writer = new StreamWriter(stream, new UTF8Encoding(true)))
@@ -38,17 +30,18 @@
                                 for (int i = 0; i < reader.FieldCount; i++)
                                 {
                                     if (i > 0) writer.Write(";");
-                                    string value = reader.IsDBNull(i) ? "" : Convert.ToString(reader.GetValue(i), CultureInfo.InvariantCulture);
+                                    object item = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                                    string value = item == null ? "" :
+                                        item is byte[] ? "0x" + BitConverter.ToString((byte[])item).Replace("-", "") :
+                                        item is DateTime ? ((DateTime)item).ToString("o", CultureInfo.InvariantCulture) :
+                                        item is DateTimeOffset ? ((DateTimeOffset)item).ToString("o", CultureInfo.InvariantCulture) :
+                                        item is TimeSpan ? ((TimeSpan)item).ToString("c", CultureInfo.InvariantCulture) :
+                                        item is double ? ((double)item).ToString("R", CultureInfo.InvariantCulture) :
+                                        item is float ? ((float)item).ToString("R", CultureInfo.InvariantCulture) :
+                                        Convert.ToString(item, CultureInfo.InvariantCulture);
                                     writer.Write("\"" + (value ?? "").Replace("\"", "\"\"") + "\"");
                                 }
                                 writer.WriteLine();
-                                var values = new object[batchKeys.Columns.Count];
-                                for (int i = 0; i < values.Length; i++)
-                                {
-                                    values[i] = reader[batchKeys.Columns[i].ColumnName];
-                                    if (values[i] == DBNull.Value) throw new InvalidOperationException("Archive key must not contain NULL.");
-                                }
-                                batchKeys.Rows.Add(values);
                                 rows++;
                             }
                             writer.Flush();
@@ -61,8 +54,7 @@
                     "; path=" + outputFile + "; rows=" + rows + "; elapsedMs=" + timer.ElapsedMilliseconds, "", 0, ref again);
                 if (rows > 0) Dts.Variables["User::DayHasFiles"].Value = true;
                 Dts.Variables["User::BatchHasRows"].Value = rows > 0;
-                // The next task may delete these keys only after the CSV has been flushed and closed.
-                Dts.Variables["User::BatchKeys"].Value = batchKeys;
+                Dts.Variables["User::DayExportedRows"].Value = Convert.ToInt64(Dts.Variables["User::DayExportedRows"].Value) + rows;
                 Dts.Variables["User::BatchNumber"].Value = Convert.ToInt64(Dts.Variables["User::BatchNumber"].Value) + 1L;
             }
             catch (Exception ex)

@@ -14,7 +14,7 @@ Otwórz `Integration Services Project2.slnx` lub projekt `.dtproj`, następnie `
 | `MaxRecordsPerCsv` | Dodatni limit rekordów danych w jednym CSV; domyślnie `1000`. Nagłówek nie wlicza się do limitu. |
 | `SevenZipPath` | Pełna ścieżka do `7z.exe`; domyślnie `C:\Program Files\7-Zip\7z.exe`. |
 
-`DatabaseName` zadania wybiera bazę na serwerze źródłowym. Połączenia mogą wskazywać różne serwery. `ArchiveDb.ConnectionString` ma wyrażenie, które do bazowego connection stringa dodaje `Initial Catalog` z bieżącego `DatabaseName` (wartość jest cytowana). Nie ma `ChangeDatabase` ani otwierania połączeń w C#. `RetainSameConnection = false`: każdy SQL Task pobiera połączenie z aktualną konfiguracją. Tabela tymczasowa kluczy jest tworzona i używana wewnątrz jednego Execute SQL Task, więc nie wymaga współdzielonej sesji. Użytkownik uruchamiający pakiet musi mieć dostęp do katalogu archiwum i programu 7-Zip.
+`DatabaseName` wybiera bazę źródłową przez pełną nazwę tabeli `[baza].[schemat].[tabela]` w przygotowywanym SQL. `ArchiveDb` używa bazowego parametru `ConnectionString` i `RetainSameConnection = true`, aby wszystkie kroki widziały tę samą `#ArchiveDay`. Sesja nie zmienia bieżącej bazy między zadaniami. Nie ma `ChangeDatabase`, otwierania połączeń ani wykonywania SQL w C#. `ArchiveJobsDb` może wskazywać inny serwer. Użytkownik pakietu potrzebuje dostępu do źródeł, katalogu archiwum i 7-Zip.
 
 Schemat konfiguracji tworzy `CreateArchiveJobs.sql`, a przykład zadania znajduje się w `ArchiveJobs.example.sql`. Konfiguracja obejmuje `Id`, `DatabaseName`, `TableName`, `DateColumn`, `ArchiveOlderThanDays` oraz kolumny statusu `LastSuccesProcessedAt`, `LastProcessedAt`, `LastProcessedStatus`, `ErrorMessage`. Zachowano istniejącą pisownię `LastSuccesProcessedAt`.
 
@@ -32,17 +32,19 @@ Load archive jobs
     ├── Calculate retention cutoff
     ├── Find first archive day — Execute SQL Task, MIN daty kwalifikujących się danych
     ├── For each archive day
-    │   ├── Initialize daily archive — katalog roboczy, nagłówek, granice dnia
+    │   ├── Initialize daily archive — ścieżki, granice dnia i treść SQL
+    │   ├── Stage archive day — Execute SQL Task, kopia dnia do #ArchiveDay
     │   ├── Process daily batches
-    │   │   ├── Prepare batch select query
-    │   │   ├── Read archive batch
-    │   │   ├── Write batch to CSV — nowy CSV z nagłówkiem
-    │   │   ├── Prepare delete query and keys — C#, SQL i parametr XML kluczy
-    │   │   ├── Delete exported batch — Execute SQL Task, tabela kluczy i DELETE
-    │   │   └── Verify deleted row count
+    │   │   ├── Prepare batch select query — stronicowanie tabeli tymczasowej
+    │   │   ├── Read archive batch — Execute SQL Task
+    │   │   └── Write batch to CSV — nowy CSV z nagłówkiem
+    │   ├── Verify exported day — liczba zapisanych wierszy vs #ArchiveDay
     │   ├── Create daily ZIP — Execute Process Task
     │   ├── Verify ZIP integrity — Execute Process Task
-    │   └── Delete temporary CSV files
+    │   ├── Delete archived day — Execute SQL Task, DELETE źródła po kluczach #ArchiveDay
+    │   ├── Verify deleted row count
+    │   ├── Drop staged day — Execute SQL Task, również po błędzie
+    │   └── Delete temporary CSV files — tylko po sukcesie dnia
     ├── Save job result
     └── Log job result
 Check overall archive result
@@ -55,15 +57,27 @@ SELECT CONVERT(datetime2(7),
     DATEADD(day, -@Days, CONVERT(date, GETDATE()))) AS CutoffDate;
 ```
 
-Przetwarzanie zaczyna się od najstarszego kwalifikującego się dnia i kończy przed `CutoffDate`. Dla każdego dnia wykonywane jest:
+Przetwarzanie zaczyna się od najstarszego kwalifikującego się dnia i kończy przed `CutoffDate`. `Stage archive day` kopiuje pełny zakres dnia:
 
 ```sql
-SELECT TOP (@Limit) * FROM {Tabela}
-WHERE {KolumnaDaty} >= @From AND {KolumnaDaty} < @To;
+SELECT * INTO #ArchiveDay
+FROM [Baza].[Schemat].[Tabela]
+WHERE KolumnaDaty >= @From AND KolumnaDaty < @To;
 ```
 
-Powyżej pokazano logiczną postać filtra. W wykonywanym SQL limit pochodzi z `MaxRecordsPerCsv`, a granice są kolejnymi północami. C# zapisuje dodatni limit jako liczbę oraz daty w formacie ISO z jawnym `CONVERT(datetime2(7), ..., 126)`. Bloczek pełnego wyniku nie ma zewnętrznych mapowań parametrów, aby uniknąć problemów adaptera w SSDT. Rekordy na granicy retencji i nowsze oraz daty `NULL` pozostają w bazie. Partie nie łączą dni. Pusta partia kończy pętlę; nie tworzy CSV. Puste dni i puste tabele nie tworzą ZIP. Dla pustego dnia przejściowy katalog roboczy jest usuwany.
+Powyżej pokazano logiczną postać filtra; rzeczywisty SQL zawiera typowane daty ISO, bez parametrów zewnętrznych, aby lokalna tabela tymczasowa nie była tworzona w zagnieżdżonym zakresie procedury. Sprawdzany jest brak NULL w kluczach, a licznik snapshotu trafia do `DayRows`. Cały dzień zajmuje miejsce w tempdb; C# pobiera tylko bieżącą partię do pamięci.
 
+Każda partia jest odczytywana z niezmienianej tabeli tymczasowej w kolejności unikalnego klucza:
+
+```sql
+SELECT * FROM #ArchiveDay
+ORDER BY Klucz1, Klucz2
+OFFSET @ZapisaneWiersze ROWS FETCH NEXT @Limit ROWS ONLY;
+```
+
+`@Limit` oznacza `MaxRecordsPerCsv`; offset rośnie dopiero po udanym zapisie, Flush i zamknięciu CSV. W wykonywanym zapytaniu są to nieujemne literały liczbowe. Nie pobieramy ponownie tych samych rekordów i nie czytamy źródła między partiami. Pusty odczyt kończy pętlę. `Verify exported day` wymaga, by suma zapisanych wierszy zgadzała się z `DayRows`, zanim pakiet rozpocznie pakowanie.
+
+Rekordy na granicy retencji i nowsze oraz daty NULL pozostają w źródle. Puste dni nie tworzą CSV ani ZIP. Ich pusta tabela tymczasowa i folder roboczy są sprzątane.
 ## Pliki i ZIP
 
 Przykład dla 2500 rekordów jednego dnia przy limicie 1000:
@@ -91,21 +105,22 @@ Rok i dzień wynikają z daty danych. Przed rozpoczęciem eksportu dnia pakiet s
 | `FailTaskIfReturnCodeIsNotSuccessValue` | `True` | `True` |
 | `TimeOut` / `TerminateProcessAfterTimeOut` | 600 sekund / True | 600 sekund / True |
 
-Oba bloczki pomijają dni bez plików oraz zadania z błędem. Dopiero po udanym utworzeniu i sprawdzeniu ZIP usuwane są robocze CSV. Niezerowy kod 7-Zip (również ostrzeżenie) oznacza błąd; CSV pozostają. Nieudany ZIP także pozostaje do diagnostyki, a jego obecność nie potwierdza sukcesu zadania.
+Oba bloczki pomijają dni bez plików oraz zadania z błędem. Dopiero po udanym utworzeniu i sprawdzeniu ZIP wykonywany jest DELETE źródła; po sprawdzeniu licznika usuwane są robocze CSV. Niezerowy kod 7-Zip (również ostrzeżenie) oznacza błąd; CSV pozostają. Nieudany ZIP także pozostaje do diagnostyki, a jego obecność nie potwierdza sukcesu zadania.
 
-CSV: separator `;`, UTF-8 z BOM, wszystkie pola w cudzysłowach, podwajanie cudzysłowów, nagłówki `Nazwa (typ SQL)`, `NULL` jako puste pole, wartości formatowane z `InvariantCulture`. Zawartość pola może obejmować nowe linie, więc limit dotyczy rekordów CSV, nie fizycznych linii tekstu.
+CSV: separator `;`, UTF-8 z BOM, wszystkie pola w cudzysłowach, podwajanie cudzysłowów, nagłówki `Nazwa (typ SQL)`, `NULL` jako puste pole, wartości formatowane z `InvariantCulture`; daty i czas w formacie zachowującym precyzję (`o` / `c`), float/double w formacie `R`, dane binarne jako `0x` + zapis szesnastkowy. Zawartość pola może obejmować nowe linie, więc limit dotyczy rekordów CSV, nie fizycznych linii tekstu.
 
 ## Zapis, usuwanie i błędy
 
-Kolejność partii: odczyt → kontrola schematu → nowy CSV z nagłówkiem → `Flush` i zamknięcie pliku → przekazanie kluczy → DELETE po wszystkich kolumnach klucza → kontrola liczby usuniętych rekordów. Brak klucza tabeli lub klucz z `NULL` oznacza błąd. C# serializuje klucze zapisanej partii do parametru tekstowego XML; wartości są kodowane base64, aby zachować także puste ciągi, Unicode, znaki kontrolne i klucze binarne. Execute SQL Task `Delete exported batch` odtwarza ich właściwe typy SQL, tworzy i wypełnia lokalną `#ArchiveBatchKeys`, a następnie wykonuje DELETE przez JOIN po wszystkich składowych klucza. Obsługa odziedziczonego `IDENTITY` odbywa się w tym SQL przez `SET IDENTITY_INSERT`. Cała tabela tymczasowa istnieje tylko w obrębie tego jednego bloczka; nie wykonujemy niezależnego `DELETE TOP`. Błąd odtworzenia kluczy przerywa bloczek przed DELETE.
+Kolejność dnia: kopia źródła do `#ArchiveDay` → zapis wszystkich CSV → kontrola liczby zapisanych wierszy → utworzenie ZIP → test integralności ZIP → DELETE źródła przez JOIN z kluczami `#ArchiveDay` → kontrola liczby usuniętych wierszy → DROP tabeli tymczasowej → usunięcie roboczych CSV.
 
-DELETE następuje po trwałym zapisie CSV, **przed pakowaniem dnia**. Błąd pakowania pozostawia CSV zawierające już usunięte rekordy. Należy je zachować i spakować ponownie osobno; ponowne uruchomienie zadania nie odtworzy ich z bazy.
+Nie ma XML/base64, `BatchKeys`, przesyłania kluczy z C# do SQL ani `IDENTITY_INSERT`. Oryginalne wartości i typy kluczy pozostają w kopii SQL. `DROP TABLE #ArchiveDay` usuwa tylko kopię; źródło usuwa osobny DELETE. Nowy rekord dodany do źródła po utworzeniu kopii nie znajduje się w JOIN i pozostaje w bazie.
 
-Nie ma atomowej transakcji plik–baza. Przerwanie po zapisie, ale przed DELETE może spowodować ponowny eksport tych samych rekordów. Wcześniejsze udane partie nie są wycofywane po późniejszym błędzie. Zakładamy jedno aktywne przetwarzanie danej tabeli i brak równoległych zmian historycznych danych. Kontrola liczby po DELETE nie cofa usunięcia przy rozbieżności.
+Błąd odczytu, CSV lub ZIP blokuje DELETE całego bieżącego dnia: źródłowe dane dnia pozostają w bazie, a utworzone CSV/ZIP są zachowane do sprawdzenia. Tabela tymczasowa jest sprzątana także po błędzie, a kolejne zadanie nadal jest przetwarzane. Błąd DELETE również zachowuje pliki. Dni zakończone wcześniej poprawnie nie są wycofywane.
 
+Nie ma atomowej transakcji plik–baza. Przerwanie po utworzeniu ZIP, a przed DELETE pozostawia dane w obu miejscach; ponowienie napotka ochronę istniejącego folderu/ZIP. Zakładamy jedno aktywne przetwarzanie tabeli oraz brak zmian już istniejących historycznych rekordów podczas archiwizacji. Kontrola licznika po DELETE wykrywa rozbieżność, lecz nie cofa usunięcia.
 Metadane pochodzą z krótkiego zapytania do `sys.dm_exec_describe_first_result_set` w trybie browse. SQL Server zwraca nazwy kolumn, pełne definicje typów i oznaczenie kolumn klucza unikalnego. Nie ma ręcznego przeglądania indeksów ani odtwarzania długości, precyzji i skali typów. C# przygotowuje nagłówek oraz łączy wynik z typami CLR pustego SELECT. Brak rozpoznanego klucza lub NULL w wartości klucza oznacza błąd. Funkcja wymaga SQL Server 2012 lub nowszego; jej pole `is_hidden` opisuje wynik funkcji i nie jest kolumną `sys.columns.is_hidden`.
 
-Nazwy tabel i kolumn daty pochodzą z zaufanej konfiguracji i są wstawiane do SQL bez cytowania; parametry zadań Single row / None są wiązane. Zadania Full result set otrzymują gotowe zapytania bez zewnętrznych parametrów; literał nazwy tabeli w zapytaniu metadanych ma podwojone apostrofy, a daty i limit powstają wyłącznie z typowanych wartości. Zakładamy kolumnę daty `datetime2`. Kolejność wierszy wewnątrz dnia nie jest gwarantowana.
+Nazwy tabel i kolumn daty pochodzą z zaufanej konfiguracji i są wstawiane do SQL bez cytowania; parametry zadań Single row / None są wiązane. Zadania Full result set otrzymują gotowe zapytania bez zewnętrznych parametrów; literał nazwy tabeli w zapytaniu metadanych ma podwojone apostrofy, a daty i limit powstają wyłącznie z typowanych wartości. Zakładamy kolumnę daty `datetime2`. Partie z #ArchiveDay mają stabilną kolejność po rozpoznanych kolumnach klucza.
 
 Zdarzenia `OnError` zapisują `JobFailed` i `JobError` oraz zatrzymują propagację. Wymuszony wynik zadania pozwala dojść do `Save job result`, lecz nie oznacza sukcesu archiwizacji. Po błędzie kolejne operacje są pomijane, a obie pętle kończą się. Status `Error` zachowuje poprzednie `LastSuccesProcessedAt`; `Success` ustawia datę ostatniego sukcesu. Kolejne zadania są przetwarzane, a `Check overall archive result` kończy pakiet błędem, jeśli którekolwiek zadanie się nie udało. Błąd odczytu konfiguracji lub zapisu statusu zatrzymuje pakiet.
 
@@ -132,3 +147,5 @@ Wszystkie operacje bazodanowe aktywnego pakietu są Execute SQL Tasks. C# przygo
 Weryfikacja wersji bez operacji bazodanowych w C#: `verification/execute-sql-only-results.md`.
 
 Wszystkie połączenia przepływu używają zielonego warunku `Success`. Dla błędów tabeli `OnError` ustawia `JobFailed`, a `ForceExecutionResult = Success` umożliwia dojście do zapisu wyniku i kolejnej tabeli. Warunki przy ZIP pozostają bez zmian.
+
+Wyniki aktualnego przepływu z kopią dnia i DELETE po ZIP: `verification/daily-snapshot-results.md`.

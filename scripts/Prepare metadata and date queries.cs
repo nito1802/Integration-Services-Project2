@@ -3,7 +3,10 @@
             if (Convert.ToInt32(Dts.Variables["User::Days"].Value) <= 0) throw new ArgumentException("Days must be positive.");
             if (Convert.ToInt32(Dts.Variables["$Package::MaxRecordsPerCsv"].Value) <= 0) throw new ArgumentException("MaxRecordsPerCsv must be positive.");
             if (!File.Exists(Convert.ToString(Dts.Variables["$Package::SevenZipPath"].Value))) throw new FileNotFoundException("SevenZipPath does not exist.");
-            string table = Convert.ToString(Dts.Variables["User::TableName"].Value);
+            string database = Convert.ToString(Dts.Variables["User::DatabaseName"].Value);
+            if(string.IsNullOrWhiteSpace(database)) throw new ArgumentException("DatabaseName is required.");
+            string table = "[" + database.Replace("]","]]") + "]." + Convert.ToString(Dts.Variables["User::TableName"].Value);
+            Dts.Variables["User::QualifiedTableName"].Value = table;
             string column = Convert.ToString(Dts.Variables["User::ColumnDate"].Value);
             Dts.Variables["User::ShapeSql"].Value = "SELECT TOP (0) * FROM " + table + ";";
             Dts.Variables["User::FirstDaySql"].Value = "SELECT CONVERT(datetime2(7),COALESCE(CONVERT(date,MIN(" + column + ")),@Cutoff)) FROM " + table + " WHERE " + column + " < @Cutoff;";
