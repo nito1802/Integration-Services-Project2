@@ -41,10 +41,10 @@
                 <SSIS:Property SSIS:Name="Name">ArchiveClosedOrders</SSIS:Property>
                 <SSIS:Property SSIS:Name="VersionMajor">1</SSIS:Property>
                 <SSIS:Property SSIS:Name="VersionMinor">0</SSIS:Property>
-                <SSIS:Property SSIS:Name="VersionBuild">30</SSIS:Property>
+                <SSIS:Property SSIS:Name="VersionBuild">32</SSIS:Property>
                 <SSIS:Property SSIS:Name="VersionComments">
                 </SSIS:Property>
-                <SSIS:Property SSIS:Name="VersionGUID">{1009A764-587E-48BB-BCBF-F11273E73029}</SSIS:Property>
+                <SSIS:Property SSIS:Name="VersionGUID">{BC761C76-0181-4257-B042-1A35FDF656E9}</SSIS:Property>
                 <SSIS:Property SSIS:Name="PackageFormatVersion">8</SSIS:Property>
                 <SSIS:Property SSIS:Name="Description">CSV archive: configuration -&gt; tables -&gt; full days -&gt; stable batches of 1000. One CSV per table and execution, in execution-date folder. Source tables are read only.</SSIS:Property>
                 <SSIS:Property SSIS:Name="ProtectionLevel">0</SSIS:Property>
@@ -52,7 +52,7 @@
               <SSIS:Parameters>
                 <SSIS:Parameter SSIS:Name="ArchiveRoot">
                   <SSIS:Properties>
-                    <SSIS:Property SSIS:Name="ID">{AC10708F-8497-44F4-970A-A25C1A6EA565}</SSIS:Property>
+                    <SSIS:Property SSIS:Name="ID">{9C39BF6A-4BDD-4B62-A839-6C891E99B500}</SSIS:Property>
                     <SSIS:Property SSIS:Name="CreationName">
                     </SSIS:Property>
                     <SSIS:Property SSIS:Name="Description">
@@ -80,7 +80,7 @@
                 </SSIS:Parameter>
                 <SSIS:Parameter SSIS:Name="ArchiveJobsConnectionString">
                   <SSIS:Properties>
-                    <SSIS:Property SSIS:Name="ID">{3C84AE77-26C8-4A77-87D1-4050DF1443B8}</SSIS:Property>
+                    <SSIS:Property SSIS:Name="ID">{7D81E017-2867-4D7D-91F6-1ABFC0C54539}</SSIS:Property>
                     <SSIS:Property SSIS:Name="CreationName">
                     </SSIS:Property>
                     <SSIS:Property SSIS:Name="Description">
@@ -94,7 +94,7 @@
                 </SSIS:Parameter>
                 <SSIS:Parameter SSIS:Name="MaxRecordsPerCsv">
                   <SSIS:Properties>
-                    <SSIS:Property SSIS:Name="ID">{B8EC4708-40B1-401B-A27B-DE4D610B4CA6}</SSIS:Property>
+                    <SSIS:Property SSIS:Name="ID">{1ED47BB4-2F8E-40C7-AC70-54B8D5DA7E59}</SSIS:Property>
                     <SSIS:Property SSIS:Name="CreationName">
                     </SSIS:Property>
                     <SSIS:Property SSIS:Name="Description">
@@ -108,7 +108,7 @@
                 </SSIS:Parameter>
                 <SSIS:Parameter SSIS:Name="SevenZipPath">
                   <SSIS:Properties>
-                    <SSIS:Property SSIS:Name="ID">{1FD281C3-8E40-4D3F-A1C9-52FD44885CCB}</SSIS:Property>
+                    <SSIS:Property SSIS:Name="ID">{EFF0A1E4-6CA8-46F4-BE16-3FDB22FD6B68}</SSIS:Property>
                     <SSIS:Property SSIS:Name="CreationName">
                     </SSIS:Property>
                     <SSIS:Property SSIS:Name="Description">

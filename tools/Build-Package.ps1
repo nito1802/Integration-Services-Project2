@@ -9,9 +9,10 @@ $current=[xml](Get-Content -LiteralPath $packagePath -Raw)
 $currentNs=New-Object Xml.XmlNamespaceManager($current.NameTable)
 $currentNs.AddNamespace('DTS','www.microsoft.com/SqlServer/Dts')
 $currentValues=@{}
+$currentParameterIds=@{}
 foreach($name in @('ConnectionString','ArchiveJobsConnectionString','ArchiveRoot','MaxRecordsPerCsv','SevenZipPath')) {
     $valueNode=$current.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="'+$name+'"]/DTS:Property[@DTS:Name="ParameterValue"]',$currentNs)
-    if($valueNode) { $currentValues[$name]=$valueNode.InnerText }
+    if($valueNode) { $currentValues[$name]=$valueNode.InnerText; $currentParameterIds[$name]=$valueNode.ParentNode.GetAttribute('DTSID','www.microsoft.com/SqlServer/Dts') }
 }
 $original=[xml](Get-Content -LiteralPath $backup -Raw)
 $originalNs=New-Object Xml.XmlNamespaceManager($original.NameTable)
@@ -22,15 +23,15 @@ $app=New-Object Microsoft.SqlServer.Dts.Runtime.Application
 $package=$app.LoadPackage($backup,$null)
 while($package.PrecedenceConstraints.Count -gt 0) { $package.PrecedenceConstraints.Remove(0) }
 while($package.Executables.Count -gt 0) { $package.Executables.Remove(0) }
-$package.VersionBuild=$package.VersionBuild+1
+$package.VersionBuild=[Math]::Max($package.VersionBuild,[int]$current.DocumentElement.GetAttribute('VersionBuild','www.microsoft.com/SqlServer/Dts'))+1
 $package.MaxConcurrentExecutables=1
 $package.TransactionOption=[Microsoft.SqlServer.Dts.Runtime.DTSTransactionOption]::NotSupported
 $package.DelayValidation=$true
 $package.Description='Daily CSV parts with configurable row limit; flush before key deletion; daily ZIP via Execute Process Tasks.'
 $package.Variables.Remove('User::SQLStatement')
 function Add-Variable($name,$value) { [void]$package.Variables.Add($name,$false,'User',$value) }
-foreach($name in @('Tables','BatchKeys','BatchData','TableSchema')) { Add-Variable $name (New-Object object) }
-foreach($name in @('TableName','ColumnDate','ArchiwumPath','SQLStatement','FolderFullPath','OutputFile','KeyColumns','DatabaseName','JobError','CsvHeader','PrepareKeysSql','DeleteSql','ZipFile','ZipArguments','ZipTestArguments')) { Add-Variable $name '' }
+foreach($name in @('Tables','BatchKeys','BatchData','TableSchema','ShapeData','MetadataData')) { Add-Variable $name (New-Object object) }
+foreach($name in @('TableName','ColumnDate','ArchiwumPath','SQLStatement','FolderFullPath','OutputFile','KeyColumns','DatabaseName','JobError','CsvHeader','ShapeSql','MetadataSql','FirstDaySql','BatchKeysXml','DeleteSql','ZipFile','ZipArguments','ZipTestArguments')) { Add-Variable $name '' }
 Add-Variable 'DeletedRows' ([long]0)
 foreach($name in @('Days','ArchiveJobId','FailedJobs')) { Add-Variable $name ([int]0) }
 Add-Variable 'BatchNumber' ([long]0)
@@ -53,8 +54,8 @@ foreach($entry in @(@('MaxRecordsPerCsv',[TypeCode]::Int32,1000),@('SevenZipPath
 }
 $connection=$package.Connections.Add('ADO.NET:System.Data.SqlClient.SqlConnection, System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089')
 $connection.Name='ArchiveDb'
-$connection.SetExpression('ConnectionString','@[$Package::ConnectionString]')
-$connection.Properties['RetainSameConnection'].SetValue($connection,$true)
+$connection.SetExpression('ConnectionString','@[$Package::ConnectionString] + ";Initial Catalog=\"" + REPLACE(@[User::DatabaseName],"\"","\"\"") + "\""')
+$connection.Properties['RetainSameConnection'].SetValue($connection,$false)
 $connection.DelayValidation=$true
 $statusConnection=$package.Connections.Add('ADO.NET:System.Data.SqlClient.SqlConnection, System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089')
 $statusConnection.Name='ArchiveJobsDb'
@@ -112,30 +113,40 @@ foreach($entry in @(@('ArchiveJobId',0),@('DatabaseName',1),@('TableName',2),@('
 Link $package $getSettings $tables
 $startJob=Add-Sql $tables 'Start archive job' 'ArchiveJobsDb' "UPDATE [Archive].[ArchiveJobs] SET ErrorMessage=NULL, LastProcessedAt=SYSDATETIME(), LastProcessedStatus=NULL WHERE Id=@Id; IF @@ROWCOUNT<>1 THROW 50001,'Archive job no longer exists.',1;"
 Bind-Input $startJob '@Id' 'User::ArchiveJobId' Int32
-$prepareJob=Add-Script $tables 'Prepare archive job' '$Package::ArchiveRoot,User::DatabaseName' 'User::ArchiwumPath,User::BatchHasRows,User::BatchNumber'
-$begin=Add-Script $tables 'BeginScript' 'User::TableName,User::ColumnDate,User::Days' 'User::KeyColumns,User::TableSchema'
+$prepareJob=Add-Script $tables 'Prepare archive job' '$Package::ArchiveRoot' 'User::ArchiwumPath,User::BatchHasRows,User::BatchNumber'
+$begin=Add-Script $tables 'BeginScript' 'User::TableName,User::ColumnDate,User::Days,$Package::MaxRecordsPerCsv,$Package::SevenZipPath' 'User::ShapeSql,User::MetadataSql,User::FirstDaySql'
 $cutoff=Add-Sql $tables 'Get cutoff date' 'ArchiveDb' 'SELECT CONVERT(datetime2(7),DATEADD(day,-@Days,CONVERT(date,GETDATE()))) AS CutoffDate;' 'SingleRow'
 Bind-Input $cutoff '@Days' 'User::Days' Int32
 Bind-Result $cutoff '0' 'User::CutoffDate'
 Job-Sql $cutoff 'Capture cutoff error'
 Link $tables $startJob $prepareJob
 Link $tables $prepareJob $begin
-Link $tables $begin $cutoff
-$firstDay=Add-Script $tables 'Find first day' 'User::TableName,User::ColumnDate,User::CutoffDate,$Package::MaxRecordsPerCsv,$Package::SevenZipPath' 'User::CurrentDateFrom'
+$shape=Add-Sql $tables 'Read table shape' 'ArchiveDb' 'User::ShapeSql' 'Rowset' $true
+Bind-Result $shape '0' 'User::ShapeData'
+Job-Sql $shape 'Capture shape error'
+$metadata=Add-Sql $tables 'Read table metadata' 'ArchiveDb' 'User::MetadataSql' 'Rowset' $true
+Bind-Result $metadata '0' 'User::MetadataData'
+Job-Sql $metadata 'Capture metadata error'
+$processMetadata=Add-Script $tables 'Process table metadata' 'User::ShapeData,User::MetadataData' 'User::KeyColumns,User::TableSchema,User::CsvHeader'
+Link $tables $begin $shape
+Link $tables $shape $metadata
+Link $tables $metadata $processMetadata
+Link $tables $processMetadata $cutoff
+$firstDay=Add-Sql $tables 'Find first day' 'ArchiveDb' 'User::FirstDaySql' 'SingleRow' $true
+Bind-Input $firstDay '@Cutoff' 'User::CutoffDate' DateTime2
+Bind-Result $firstDay '0' 'User::CurrentDateFrom'
+Job-Sql $firstDay 'Capture first day error'
 Link $tables $cutoff $firstDay
 $daysLoop=$tables.Executables.Add('STOCK:FORLOOP'); $daysLoop.Name='Loop through days'; $daysLoop.DelayValidation=$true
 $daysLoop.EvalExpression='!@[User::JobFailed] && @[User::CurrentDateFrom] < @[User::CutoffDate]'
 $daysLoop.AssignExpression='@[User::CurrentDateFrom] = DATEADD("day",1,@[User::CurrentDateFrom])'
 Link $tables $firstDay $daysLoop
-$guid=Add-Script $daysLoop 'GetGuid' 'User::CurrentDateFrom,User::ArchiwumPath,User::TableName' 'User::FolderFullPath,User::OutputFile,User::CsvHeader,User::CurrentDateTo,User::BatchHasRows,User::BatchNumber,User::DayHasFiles,User::ZipFile,User::ZipArguments,User::ZipTestArguments'
+$guid=Add-Script $daysLoop 'GetGuid' 'User::CurrentDateFrom,User::ArchiwumPath,User::TableName' 'User::FolderFullPath,User::OutputFile,User::CurrentDateTo,User::BatchHasRows,User::BatchNumber,User::DayHasFiles,User::ZipFile,User::ZipArguments,User::ZipTestArguments'
 $batches=$daysLoop.Executables.Add('STOCK:FORLOOP'); $batches.Name='Loop through CSV parts'; $batches.DelayValidation=$true
 $batches.EvalExpression='!@[User::JobFailed] && @[User::BatchHasRows]'
 Link $daysLoop $guid $batches
-$construct=Add-Script $batches 'Construct SQL' 'User::TableName,User::ColumnDate' 'User::SQLStatement'
+$construct=Add-Script $batches 'Construct SQL' 'User::TableName,User::ColumnDate,User::CurrentDateFrom,User::CurrentDateTo,$Package::MaxRecordsPerCsv' 'User::SQLStatement'
 $fetch=Add-Sql $batches 'Read archive batch' 'ArchiveDb' 'User::SQLStatement' 'Rowset' $true
-Bind-Input $fetch '@From' 'User::CurrentDateFrom' DateTime2
-Bind-Input $fetch '@To' 'User::CurrentDateTo' DateTime2
-Bind-Input $fetch '@Limit' '$Package::MaxRecordsPerCsv' Int32
 Bind-Result $fetch '0' 'User::BatchData'
 Job-Sql $fetch 'Capture batch read error'
 $export=Add-Script $batches 'Export data to CSV' 'User::BatchData,User::TableSchema,User::OutputFile,User::CutoffDate,User::TableName,User::CsvHeader,User::KeyColumns,User::FolderFullPath,User::CurrentDateFrom' 'User::BatchNumber,User::BatchHasRows,User::BatchKeys,User::DayHasFiles'
@@ -143,18 +154,13 @@ $export=Add-Script $batches 'Export data to CSV' 'User::BatchData,User::TableSch
 Link $batches $construct $fetch
 Link $batches $fetch $export
 $batches.PrecedenceConstraints[$batches.PrecedenceConstraints.Count-1].Value=[Microsoft.SqlServer.Dts.Runtime.DTSExecResult]::Completion
-$prepareDelete=Add-Script $batches 'Prepare batch delete' 'User::BatchKeys,User::TableName' 'User::PrepareKeysSql,User::DeleteSql'
+$prepareDelete=Add-Script $batches 'Prepare batch delete' 'User::BatchKeys,User::TableName' 'User::BatchKeysXml,User::DeleteSql'
 Link $batches $export $prepareDelete
-$prepareKeys=Add-Sql $batches 'Create batch key table' 'ArchiveDb' 'User::PrepareKeysSql' 'None' $true
-Job-Sql $prepareKeys 'Capture key table error'
-Link $batches $prepareDelete $prepareKeys
-$stageKeys=Add-Script $batches 'Stage batch keys' 'User::BatchKeys' ''
-Link $batches $prepareKeys $stageKeys
-$batches.PrecedenceConstraints[$batches.PrecedenceConstraints.Count-1].Value=[Microsoft.SqlServer.Dts.Runtime.DTSExecResult]::Completion
 $delete=Add-Sql $batches 'Delete exported batch' 'ArchiveDb' 'User::DeleteSql' 'SingleRow' $true
 Bind-Result $delete '0' 'User::DeletedRows'
 Job-Sql $delete 'Capture batch delete error'
-Link $batches $stageKeys $delete
+Bind-Input $delete '@Keys' 'User::BatchKeysXml' String -1
+Link $batches $prepareDelete $delete
 $checkDelete=Add-Script $batches 'Check deleted rows' 'User::BatchKeys,User::DeletedRows' ''
 Link $batches $delete $checkDelete
 $batches.PrecedenceConstraints[$batches.PrecedenceConstraints.Count-1].Value=[Microsoft.SqlServer.Dts.Runtime.DTSExecResult]::Completion
@@ -197,13 +203,18 @@ Link $package $tables $summary
 # Use the same SSIS error handling for C# and SQL tasks. Preparation resets the
 # previous job's flags, so it must run even when the preceding job failed.
 Job-Sql $prepareJob 'Capture preparation error' $false
-foreach($task in @($begin,$firstDay,$guid,$construct,$export,$prepareDelete,$stageKeys,$checkDelete,$cleanup)) {
+foreach($task in @($begin,$processMetadata,$guid,$construct,$export,$prepareDelete,$checkDelete,$cleanup)) {
     Job-Sql $task ('Capture '+$task.Name+' error')
 }
 $skeleton=Join-Path $PSScriptRoot 'package-skeleton.dtsx'
 $app.SaveToXml($skeleton,$package,$null)
 $xml=[xml](Get-Content -LiteralPath $skeleton -Raw)
 $ns=New-Object Xml.XmlNamespaceManager($xml.NameTable); $ns.AddNamespace('DTS','www.microsoft.com/SqlServer/Dts')
+# Keep parameter identities stable so SSDT does not lose cached debug references on rebuild.
+foreach($parameterName in $currentParameterIds.Keys) {
+    $parameterNode=$xml.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="'+$parameterName+'"]',$ns)
+    if($parameterNode -and $currentParameterIds[$parameterName]) { [void]$parameterNode.SetAttribute('DTSID','www.microsoft.com/SqlServer/Dts',$currentParameterIds[$parameterName]) }
+}
 $common=Get-Content -LiteralPath (Join-Path $root 'scripts\Common.cs') -Raw
 $compiler='C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\Roslyn\csc.exe'
 $public='C:\Program Files\Microsoft Visual Studio\18\Insiders\Common7\IDE\PublicAssemblies\SSIS\170'
@@ -263,9 +274,16 @@ if (!$CompatibilityTest) {
             $node.SetAttribute('Name','www.microsoft.com/SqlServer/SSIS',$parameterName)
             [void]$parameterList.AppendChild($node)
         }
-        $node.SelectSingleNode('SSIS:Properties/SSIS:Property[@SSIS:Name="ID"]',$projectNs).InnerText=[string]$package.Parameters[$parameterName].ID
+        $node.SelectSingleNode('SSIS:Properties/SSIS:Property[@SSIS:Name="ID"]',$projectNs).InnerText=$xml.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="'+$parameterName+'"]',$ns).GetAttribute('DTSID','www.microsoft.com/SqlServer/Dts')
         $node.SelectSingleNode('SSIS:Properties/SSIS:Property[@SSIS:Name="Value"]',$projectNs).InnerText=[string]$package.Parameters[$parameterName].Value
         $node.SelectSingleNode('SSIS:Properties/SSIS:Property[@SSIS:Name="DataType"]',$projectNs).InnerText=if($parameterName -eq 'MaxRecordsPerCsv') {'9'} else {'18'}
+    }
+    # Synchronize debugger/deployment metadata with the package actually written to disk.
+    $packageMetadata=$projectXml.SelectSingleNode('//SSIS:PackageMetaData/SSIS:Properties',$projectNs)
+    foreach($entry in @(@('ID','DTSID'),@('Name','ObjectName'),@('VersionGUID','VersionGUID'),@('VersionBuild','VersionBuild'),@('VersionMajor','VersionMajor'),@('VersionMinor','VersionMinor'))) {
+        $property=$packageMetadata.SelectSingleNode('SSIS:Property[@SSIS:Name="'+$entry[0]+'"]',$projectNs)
+        $value=$xml.DocumentElement.GetAttribute($entry[1],'www.microsoft.com/SqlServer/Dts')
+        if($property -and $value -ne '') { $property.InnerText=$value }
     }
     $projectXml.Save($projectFile)
 }

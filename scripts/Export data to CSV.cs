@@ -26,7 +26,7 @@
                             string name = key.Trim();
                             int ordinal = reader.GetOrdinal(name);
                             DataColumn field = batchKeys.Columns.Add(name, reader.GetFieldType(ordinal));
-                            field.ExtendedProperties["SqlDbType"] = (SqlDbType)Convert.ToInt32(schema.Rows[ordinal]["ProviderType"]);
+                            field.ExtendedProperties["SqlType"] = Convert.ToString(schema.Rows[ordinal]["SqlType"]);
                         }
                         if (data.Rows.Count > 0)
                         using (var stream = new FileStream(outputFile, FileMode.CreateNew, FileAccess.Write, FileShare.None))

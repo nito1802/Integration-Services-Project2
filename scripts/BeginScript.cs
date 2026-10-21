@@ -1,25 +1,15 @@
         public void Main()
         {
+            if (Convert.ToInt32(Dts.Variables["User::Days"].Value) <= 0) throw new ArgumentException("Days must be positive.");
+            if (Convert.ToInt32(Dts.Variables["$Package::MaxRecordsPerCsv"].Value) <= 0) throw new ArgumentException("MaxRecordsPerCsv must be positive.");
+            if (!File.Exists(Convert.ToString(Dts.Variables["$Package::SevenZipPath"].Value))) throw new FileNotFoundException("SevenZipPath does not exist.");
             string table = Convert.ToString(Dts.Variables["User::TableName"].Value);
             string column = Convert.ToString(Dts.Variables["User::ColumnDate"].Value);
-            int days = Convert.ToInt32(Dts.Variables["User::Days"].Value);
-            if (days <= 0) throw new ArgumentException("Days must be positive.");
-
-            SqlConnection connection = (SqlConnection)Dts.Connections["ArchiveDb"].AcquireConnection(Dts.Transaction);
-            try
-            {
-                using (var command = new SqlCommand("SELECT TOP (0) * FROM " + table, connection))
-                using (var reader = command.ExecuteReader(CommandBehavior.KeyInfo))
-                {
-                    Dts.Variables["User::TableSchema"].Value = reader.GetSchemaTable();
-                    var keys = new List<string>();
-                    foreach (DataRow field in reader.GetSchemaTable().Rows)
-                        if (Convert.ToBoolean(field["IsKey"])) keys.Add(Convert.ToString(field["ColumnName"]));
-                    if (keys.Count == 0) throw new InvalidOperationException("No unique key: " + table);
-                    Dts.Variables["User::KeyColumns"].Value = string.Join(", ", keys.ToArray());
-                }
-            }
-            finally { Dts.Connections["ArchiveDb"].ReleaseConnection(connection); }
-
+            Dts.Variables["User::ShapeSql"].Value = "SELECT TOP (0) * FROM " + table + ";";
+            Dts.Variables["User::FirstDaySql"].Value = "SELECT CONVERT(datetime2(7),COALESCE(CONVERT(date,MIN(" + column + ")),@Cutoff)) FROM " + table + " WHERE " + column + " < @Cutoff;";
+            Dts.Variables["User::MetadataSql"].Value =
+                "SELECT name AS ColumnName,system_type_name AS SqlType,is_part_of_unique_key AS IsKey " +
+                "FROM sys.dm_exec_describe_first_result_set(N'SELECT * FROM " + table.Replace("'","''") + "',NULL,1) " +
+                "WHERE is_hidden=0 ORDER BY column_ordinal;";
             Dts.TaskResult = (int)DTSExecResult.Success;
         }

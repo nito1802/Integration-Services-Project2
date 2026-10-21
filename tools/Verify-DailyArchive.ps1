@@ -9,10 +9,14 @@ function Verify {
     if($LASTEXITCODE -ne 0) { throw 'Daily archive verification failed' }
 }
 Fresh
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Verify-ConnectionRouting.ps1')
+if($LASTEXITCODE -ne 0) { throw 'Connection routing verification failed' }
 Verify
 Verify -TestArguments @('-Retry')
 Fresh
 Verify -TestArguments @('-SpreadDates','-MaxRecordsPerCsv','37')
+Fresh
+Verify -TestArguments @('-KeyTypes')
 foreach($mode in @('Write','Delete','Zip','ZipTest','FolderCollision','ZipCollision')) {
     Fresh
     Verify -TestArguments @('-FailureMode',$mode)
