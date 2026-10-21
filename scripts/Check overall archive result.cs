@@ -3,7 +3,7 @@
             int failed = Convert.ToInt32(Dts.Variables["User::FailedJobs"].Value);
             if (failed > 0)
             {
-                Dts.Events.FireError(0, "CSV Archive", "Archive finished with " + failed + " failed job(s). See Archive.ArchiveJobs.ErrorMessage. Successful CSV exports are retained.", "", 0);
+                Dts.Events.FireError(0, "CSV Archive", "Archive finished with " + failed + " failed job(s). See the failed job ErrorMessage in the configured jobs table. Successful CSV exports are retained.", "", 0);
                 Dts.TaskResult = (int)DTSExecResult.Failure;
             }
             else

@@ -1,4 +1,4 @@
-﻿param([switch]$InsertAfterSnapshot,[switch]$Ssis2025,[switch]$KeyTypes,[switch]$NativeProcessTasks,[switch]$Retry,[switch]$FullPackage,[switch]$SpreadDates,[ValidateSet('None','NullKey','Stage','Read','Write','Delete','Zip','ZipTest','FolderCollision','ZipCollision')][string]$FailureMode='None',[int]$MaxRecordsPerCsv=1000)
+﻿param([string]$JobsTable='Archive.ArchiveJobs',[switch]$InsertAfterSnapshot,[switch]$Ssis2025,[switch]$KeyTypes,[switch]$NativeProcessTasks,[switch]$Retry,[switch]$FullPackage,[switch]$SpreadDates,[ValidateSet('None','NullKey','Stage','Read','Write','Delete','Zip','ZipTest','FolderCollision','ZipCollision')][string]$FailureMode='None',[int]$MaxRecordsPerCsv=1000)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $config=Get-Content -LiteralPath (Get-Content -LiteralPath (Join-Path $root 'verification/latest-config.txt')) -Raw | ConvertFrom-Json
@@ -11,6 +11,7 @@ $sourceConnection=New-Object Data.SqlClient.SqlConnectionStringBuilder($config.C
 $sourceConnection['Initial Catalog']='master'
 $package.Parameters['ConnectionString'].Value=$sourceConnection.ConnectionString
 $package.Parameters['ArchiveJobsConnectionString'].Value=$config.ConnectionString
+$package.Parameters['ArchiveJobsTable'].Value=$JobsTable
 $output=Join-Path $config.RunDirectory $(if($Retry) {'retry-csv'} else {'native-csv'})
 [void](New-Item -ItemType Directory -Path $output -Force)
 $package.Parameters['ArchiveRoot'].Value=$output
@@ -55,7 +56,7 @@ if($FullPackage) {
     $stubPath=Join-Path $build 'Stub.cs'; [IO.File]::WriteAllText($stubPath,$stub)
     $files=@($stubPath)
     $common=Get-Content -LiteralPath (Join-Path $root 'scripts/Common.cs') -Raw
-    $names=@('Initialize job variables','Prepare metadata and date queries','Initialize daily archive','Prepare batch select query','Write batch to CSV','Verify exported day','Verify deleted row count','Log job result','Capture SQL error','Prepare export schema and header','Delete temporary CSV files')
+    $names=@('Prepare job queries','Initialize job variables','Prepare metadata and date queries','Initialize daily archive','Prepare batch select query','Write batch to CSV','Verify exported day','Verify deleted row count','Log job result','Capture SQL error','Prepare export schema and header','Delete temporary CSV files')
     for($i=0;$i -lt $names.Count;$i++) {
         $main=Get-Content -LiteralPath (Join-Path $root ('scripts/'+$names[$i]+'.cs')) -Raw
         if($FailureMode -eq 'Write' -and $names[$i] -eq 'Write batch to CSV') {
@@ -169,6 +170,7 @@ if($FullPackage) {
             $batchSizes[$id]=@($batchSizes[$id])+@([int]$package.Variables['User::BatchData'].Value.Tables[0].Rows.Count) | Where-Object { $null -ne $_ }
         }
     }
+    Step $package 'Prepare job queries'
     Step $package 'Load archive jobs'
     $jobs=$package.Variables['User::Tables'].Value.Tables[0].Copy()
     $tables=$package.Executables['For each archive job']
@@ -216,10 +218,12 @@ $messages | Set-Content -LiteralPath (Join-Path $config.RunDirectory 'native-err
 Write-Output "Package result: $result"
 $messages | Write-Output
 $db=New-Object Data.SqlClient.SqlConnection($config.ConnectionString)
+$jobParts=$JobsTable.Split('.')
+$jobIdentifier='['+$jobParts[0].Trim('[',']').Replace(']',']]')+'].['+$jobParts[1].Trim('[',']').Replace(']',']]')+']'
 $db.Open()
 try {
     $cmd=$db.CreateCommand()
-    $cmd.CommandText='SELECT Id,LastProcessedStatus,ErrorMessage FROM Archive.ArchiveJobs ORDER BY Id;'
+    $cmd.CommandText='SELECT Id,LastProcessedStatus,ErrorMessage FROM '+$jobIdentifier+' ORDER BY Id;'
     $table=New-Object Data.DataTable
     $table.Load($cmd.ExecuteReader())
     $table | Format-Table -AutoSize | Out-String | Write-Output
@@ -278,7 +282,7 @@ try {
         if([IO.File]::ReadAllText($collisionFile) -ne 'existing archive - do not overwrite') { throw 'Existing destination changed' }
         if(@($table.Rows | Where-Object Id -eq 1)[0].ErrorMessage -notlike '*destination already exists*') { throw 'Missing collision diagnostic' }
     }
-    $cmd.CommandText="SELECT COUNT(*) FROM Archive.ArchiveJobs WHERE LastProcessedStatus=N'Error' AND LastSuccesProcessedAt='2025-01-01';"
+    $cmd.CommandText="SELECT COUNT(*) FROM $jobIdentifier WHERE LastProcessedStatus=N'Error' AND LastSuccesProcessedAt='2025-01-01';"
     $failedExpected=if($FailureMode -eq 'None') {1} else {2}
     if($cmd.ExecuteScalar() -ne $failedExpected) { throw 'Previous success date was overwritten on failure' }
     "PASS: native SQL tasks and ZIP arguments (process task requires SSDT); mode=$FailureMode; CSV rows=$rowCount; source rows=$sourceExpected; SQL error persisted; following jobs succeeded; previous success date preserved. Scheduler/event-handler execution requires SSDT." | Tee-Object -FilePath (Join-Path $config.RunDirectory $(if($Retry) {'native-retry-result.txt'} else {'native-result.txt'}))

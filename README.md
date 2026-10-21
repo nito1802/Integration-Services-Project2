@@ -1,6 +1,6 @@
 ﻿# Archiwizacja CSV w SSIS
 
-Pakiet `Integration Services Project2/Package.dtsx` pobiera zadania z `Archive.ArchiveJobs` i przetwarza **tabele → dni → partie CSV**. Każdy CSV ma własny nagłówek i maksymalnie konfigurowalną liczbę rekordów danych. Po zakończeniu dnia powstaje ZIP zawierający jego pliki CSV.
+Pakiet `Integration Services Project2/Package.dtsx` pobiera zadania z tabeli wskazanej przez `ArchiveJobsTable` i przetwarza **tabele → dni → partie CSV**. Każdy CSV ma własny nagłówek i maksymalnie konfigurowalną liczbę rekordów danych. Po zakończeniu dnia powstaje ZIP zawierający jego pliki CSV.
 
 ## Uruchomienie i parametry
 
@@ -10,17 +10,19 @@ Otwórz `Integration Services Project2.slnx` lub projekt `.dtproj`, następnie `
 |---|---|
 | `ConnectionString` | Połączenie `ArchiveDb` do serwera danych źródłowych. |
 | `ArchiveJobsConnectionString` | Połączenie `ArchiveJobsDb` do konfiguracji i statusów. |
+| `ArchiveJobsTable` | Tabela konfiguracji jako `schemat.tabela`, domyślnie `Archive.ArchiveJobs`; np. `dbo.Archive jobs` lub `[dbo].[Archive jobs]`. |
 | `ArchiveRoot` | Katalog główny archiwum. |
 | `MaxRecordsPerCsv` | Dodatni limit rekordów danych w jednym CSV; domyślnie `1000`. Nagłówek nie wlicza się do limitu. |
 | `SevenZipPath` | Pełna ścieżka do `7z.exe`; domyślnie `C:\Program Files\7-Zip\7z.exe`. |
 
 `DatabaseName` wybiera bazę źródłową przez pełną nazwę tabeli `[baza].[schemat].[tabela]` w przygotowywanym SQL. `ArchiveDb` używa bazowego parametru `ConnectionString` i `RetainSameConnection = true`, aby wszystkie kroki widziały tę samą `#ArchiveDay`. Sesja nie zmienia bieżącej bazy między zadaniami. Nie ma `ChangeDatabase`, otwierania połączeń ani wykonywania SQL w C#. `ArchiveJobsDb` może wskazywać inny serwer. Użytkownik pakietu potrzebuje dostępu do źródeł, katalogu archiwum i 7-Zip.
 
-Schemat konfiguracji tworzy `CreateArchiveJobs.sql`, a przykład zadania znajduje się w `ArchiveJobs.example.sql`. Konfiguracja obejmuje `Id`, `DatabaseName`, `TableName`, `DateColumn`, `ArchiveOlderThanDays` oraz kolumny statusu `LastSuccesProcessedAt`, `LastProcessedAt`, `LastProcessedStatus`, `ErrorMessage`. Zachowano istniejącą pisownię `LastSuccesProcessedAt`.
+Tabelę konfiguracji tworzy `CreateArchiveJobs.sql`; na początku ustaw `@SchemaName` i `@TableName`. Skrypt wymaga istniejącego schematu i go nie tworzy. Wartości muszą odpowiadać parametrowi `ArchiveJobsTable`. Przykład zadania znajduje się w `ArchiveJobs.example.sql`. Konfiguracja obejmuje `Id`, `DatabaseName`, `TableName`, `DateColumn`, `ArchiveOlderThanDays` oraz kolumny statusu `LastSuccesProcessedAt`, `LastProcessedAt`, `LastProcessedStatus`, `ErrorMessage`. Zachowano istniejącą pisownię `LastSuccesProcessedAt`.
 
 ## Przepływ
 
 ```text
+Prepare job queries — cytowanie ArchiveJobsTable i przygotowanie trzech zapytań
 Load archive jobs
 └── For each archive job — zadania / tabele
     ├── Mark job as started
@@ -149,3 +151,7 @@ Weryfikacja wersji bez operacji bazodanowych w C#: `verification/execute-sql-onl
 Wszystkie połączenia przepływu używają zielonego warunku `Success`. Dla błędów tabeli `OnError` ustawia `JobFailed`, a `ForceExecutionResult = Success` umożliwia dojście do zapisu wyniku i kolejnej tabeli. Warunki przy ZIP pozostają bez zmian.
 
 Wyniki aktualnego przepływu z kopią dnia i DELETE po ZIP: `verification/daily-snapshot-results.md`.
+
+Parametr `ArchiveJobsTable` dotyczy pakietu SSIS. Projekty EF/Console zachowują własne mapowanie tabeli; po wybraniu innej tabeli w pakiecie trzeba dodawać zadania do tej właśnie tabeli.
+
+Test parametru tabeli i skryptu bez tworzenia schematu: `.\tools\Verify-JobsTableParameter.ps1`. Obsługiwany format to dwie części `schemat.tabela`; kropki wewnątrz samych nazw nie są obsługiwane.
