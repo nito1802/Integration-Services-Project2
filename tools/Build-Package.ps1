@@ -98,70 +98,70 @@ function Bind-Result($hostTask,$column,$variable) {
 }
 function Job-Sql($hostTask,$handlerName,$skipAfterError=$true) {
     $hostTask.FailPackageOnFailure=$false; $hostTask.FailParentOnFailure=$false; $hostTask.MaximumErrorCount=0
-    # OnError records the job failure. The scheduler can then reach SetTableStatus.
+    # OnError records the job failure. The scheduler can then reach Save job result.
     $hostTask.ForceExecutionResult=[Microsoft.SqlServer.Dts.Runtime.DTSForcedExecResult]::Success
     if($skipAfterError) { $hostTask.SetExpression('Disable','@[User::JobFailed]') }
     $handler=$hostTask.EventHandlers.Add('OnError'); $handler.MaximumErrorCount=0
     [void](Add-Script $handler $handlerName 'System::ErrorDescription' 'System::Propagate')
 }
-$getSettings=Add-Sql $package 'Get Archive Jobs' 'ArchiveJobsDb' 'SELECT Id, DatabaseName, TableName, ArchiveOlderThanDays, DateColumn FROM [Archive].[ArchiveJobs] ORDER BY Id;' 'Rowset'
+$getSettings=Add-Sql $package 'Load archive jobs' 'ArchiveJobsDb' 'SELECT Id, DatabaseName, TableName, ArchiveOlderThanDays, DateColumn FROM [Archive].[ArchiveJobs] ORDER BY Id;' 'Rowset'
 Bind-Result $getSettings '0' 'User::Tables'
-$tables=$package.Executables.Add('STOCK:FOREACHLOOP'); $tables.Name='Foreach Loop Container'; $tables.DelayValidation=$true; $tables.FailPackageOnFailure=$true
+$tables=$package.Executables.Add('STOCK:FOREACHLOOP'); $tables.Name='For each archive job'; $tables.DelayValidation=$true; $tables.FailPackageOnFailure=$true
 $tables.ForEachEnumerator=$app.ForEachEnumeratorInfos['Foreach ADO Enumerator'].CreateNew()
 $tables.ForEachEnumerator.InnerObject.DataObjectVariable='User::Tables'
 foreach($entry in @(@('ArchiveJobId',0),@('DatabaseName',1),@('TableName',2),@('Days',3),@('ColumnDate',4))) { $mapping=$tables.VariableMappings.Add(); $mapping.VariableName='User::'+$entry[0]; $mapping.ValueIndex=$entry[1] }
 Link $package $getSettings $tables
-$startJob=Add-Sql $tables 'Start archive job' 'ArchiveJobsDb' "UPDATE [Archive].[ArchiveJobs] SET ErrorMessage=NULL, LastProcessedAt=SYSDATETIME(), LastProcessedStatus=NULL WHERE Id=@Id; IF @@ROWCOUNT<>1 THROW 50001,'Archive job no longer exists.',1;"
+$startJob=Add-Sql $tables 'Mark job as started' 'ArchiveJobsDb' "UPDATE [Archive].[ArchiveJobs] SET ErrorMessage=NULL, LastProcessedAt=SYSDATETIME(), LastProcessedStatus=NULL WHERE Id=@Id; IF @@ROWCOUNT<>1 THROW 50001,'Archive job no longer exists.',1;"
 Bind-Input $startJob '@Id' 'User::ArchiveJobId' Int32
-$prepareJob=Add-Script $tables 'Prepare archive job' '$Package::ArchiveRoot' 'User::ArchiwumPath,User::BatchHasRows,User::BatchNumber'
-$begin=Add-Script $tables 'BeginScript' 'User::TableName,User::ColumnDate,User::Days,$Package::MaxRecordsPerCsv,$Package::SevenZipPath' 'User::ShapeSql,User::MetadataSql,User::FirstDaySql'
-$cutoff=Add-Sql $tables 'Get cutoff date' 'ArchiveDb' 'SELECT CONVERT(datetime2(7),DATEADD(day,-@Days,CONVERT(date,GETDATE()))) AS CutoffDate;' 'SingleRow'
+$prepareJob=Add-Script $tables 'Initialize job variables' '$Package::ArchiveRoot' 'User::ArchiwumPath,User::BatchHasRows,User::BatchNumber'
+$begin=Add-Script $tables 'Prepare metadata and date queries' 'User::TableName,User::ColumnDate,User::Days,$Package::MaxRecordsPerCsv,$Package::SevenZipPath' 'User::ShapeSql,User::MetadataSql,User::FirstDaySql'
+$cutoff=Add-Sql $tables 'Calculate retention cutoff' 'ArchiveDb' 'SELECT CONVERT(datetime2(7),DATEADD(day,-@Days,CONVERT(date,GETDATE()))) AS CutoffDate;' 'SingleRow'
 Bind-Input $cutoff '@Days' 'User::Days' Int32
 Bind-Result $cutoff '0' 'User::CutoffDate'
 Job-Sql $cutoff 'Capture cutoff error'
 Link $tables $startJob $prepareJob
 Link $tables $prepareJob $begin
-$shape=Add-Sql $tables 'Read table shape' 'ArchiveDb' 'User::ShapeSql' 'Rowset' $true
+$shape=Add-Sql $tables 'Read column definitions' 'ArchiveDb' 'User::ShapeSql' 'Rowset' $true
 Bind-Result $shape '0' 'User::ShapeData'
 Job-Sql $shape 'Capture shape error'
-$metadata=Add-Sql $tables 'Read table metadata' 'ArchiveDb' 'User::MetadataSql' 'Rowset' $true
+$metadata=Add-Sql $tables 'Read SQL types and keys' 'ArchiveDb' 'User::MetadataSql' 'Rowset' $true
 Bind-Result $metadata '0' 'User::MetadataData'
 Job-Sql $metadata 'Capture metadata error'
-$processMetadata=Add-Script $tables 'Process table metadata' 'User::ShapeData,User::MetadataData' 'User::KeyColumns,User::TableSchema,User::CsvHeader'
+$processMetadata=Add-Script $tables 'Prepare export schema and header' 'User::ShapeData,User::MetadataData' 'User::KeyColumns,User::TableSchema,User::CsvHeader'
 Link $tables $begin $shape
 Link $tables $shape $metadata
 Link $tables $metadata $processMetadata
 Link $tables $processMetadata $cutoff
-$firstDay=Add-Sql $tables 'Find first day' 'ArchiveDb' 'User::FirstDaySql' 'SingleRow' $true
+$firstDay=Add-Sql $tables 'Find first archive day' 'ArchiveDb' 'User::FirstDaySql' 'SingleRow' $true
 Bind-Input $firstDay '@Cutoff' 'User::CutoffDate' DateTime2
 Bind-Result $firstDay '0' 'User::CurrentDateFrom'
 Job-Sql $firstDay 'Capture first day error'
 Link $tables $cutoff $firstDay
-$daysLoop=$tables.Executables.Add('STOCK:FORLOOP'); $daysLoop.Name='Loop through days'; $daysLoop.DelayValidation=$true
+$daysLoop=$tables.Executables.Add('STOCK:FORLOOP'); $daysLoop.Name='For each archive day'; $daysLoop.DelayValidation=$true
 $daysLoop.EvalExpression='!@[User::JobFailed] && @[User::CurrentDateFrom] < @[User::CutoffDate]'
 $daysLoop.AssignExpression='@[User::CurrentDateFrom] = DATEADD("day",1,@[User::CurrentDateFrom])'
 Link $tables $firstDay $daysLoop
-$guid=Add-Script $daysLoop 'GetGuid' 'User::CurrentDateFrom,User::ArchiwumPath,User::TableName' 'User::FolderFullPath,User::OutputFile,User::CurrentDateTo,User::BatchHasRows,User::BatchNumber,User::DayHasFiles,User::ZipFile,User::ZipArguments,User::ZipTestArguments'
-$batches=$daysLoop.Executables.Add('STOCK:FORLOOP'); $batches.Name='Loop through CSV parts'; $batches.DelayValidation=$true
+$guid=Add-Script $daysLoop 'Initialize daily archive' 'User::CurrentDateFrom,User::ArchiwumPath,User::TableName' 'User::FolderFullPath,User::OutputFile,User::CurrentDateTo,User::BatchHasRows,User::BatchNumber,User::DayHasFiles,User::ZipFile,User::ZipArguments,User::ZipTestArguments'
+$batches=$daysLoop.Executables.Add('STOCK:FORLOOP'); $batches.Name='Process daily batches'; $batches.DelayValidation=$true
 $batches.EvalExpression='!@[User::JobFailed] && @[User::BatchHasRows]'
 Link $daysLoop $guid $batches
-$construct=Add-Script $batches 'Construct SQL' 'User::TableName,User::ColumnDate,User::CurrentDateFrom,User::CurrentDateTo,$Package::MaxRecordsPerCsv' 'User::SQLStatement'
+$construct=Add-Script $batches 'Prepare batch select query' 'User::TableName,User::ColumnDate,User::CurrentDateFrom,User::CurrentDateTo,$Package::MaxRecordsPerCsv' 'User::SQLStatement'
 $fetch=Add-Sql $batches 'Read archive batch' 'ArchiveDb' 'User::SQLStatement' 'Rowset' $true
 Bind-Result $fetch '0' 'User::BatchData'
 Job-Sql $fetch 'Capture batch read error'
-$export=Add-Script $batches 'Export data to CSV' 'User::BatchData,User::TableSchema,User::OutputFile,User::CutoffDate,User::TableName,User::CsvHeader,User::KeyColumns,User::FolderFullPath,User::CurrentDateFrom' 'User::BatchNumber,User::BatchHasRows,User::BatchKeys,User::DayHasFiles'
+$export=Add-Script $batches 'Write batch to CSV' 'User::BatchData,User::TableSchema,User::OutputFile,User::CutoffDate,User::TableName,User::CsvHeader,User::KeyColumns,User::FolderFullPath,User::CurrentDateFrom' 'User::BatchNumber,User::BatchHasRows,User::BatchKeys,User::DayHasFiles'
 
 Link $batches $construct $fetch
 Link $batches $fetch $export
 $batches.PrecedenceConstraints[$batches.PrecedenceConstraints.Count-1].Value=[Microsoft.SqlServer.Dts.Runtime.DTSExecResult]::Completion
-$prepareDelete=Add-Script $batches 'Prepare batch delete' 'User::BatchKeys,User::TableName' 'User::BatchKeysXml,User::DeleteSql'
+$prepareDelete=Add-Script $batches 'Prepare delete query and keys' 'User::BatchKeys,User::TableName' 'User::BatchKeysXml,User::DeleteSql'
 Link $batches $export $prepareDelete
 $delete=Add-Sql $batches 'Delete exported batch' 'ArchiveDb' 'User::DeleteSql' 'SingleRow' $true
 Bind-Result $delete '0' 'User::DeletedRows'
 Job-Sql $delete 'Capture batch delete error'
 Bind-Input $delete '@Keys' 'User::BatchKeysXml' String -1
 Link $batches $prepareDelete $delete
-$checkDelete=Add-Script $batches 'Check deleted rows' 'User::BatchKeys,User::DeletedRows' ''
+$checkDelete=Add-Script $batches 'Verify deleted row count' 'User::BatchKeys,User::DeletedRows' ''
 Link $batches $delete $checkDelete
 $batches.PrecedenceConstraints[$batches.PrecedenceConstraints.Count-1].Value=[Microsoft.SqlServer.Dts.Runtime.DTSExecResult]::Completion
 function Add-ZipProcess($name,$argumentsVariable) {
@@ -178,12 +178,12 @@ function Add-ZipProcess($name,$argumentsVariable) {
     return $hostTask
 }
 $zip=Add-ZipProcess 'Create daily ZIP' 'ZipArguments'
-$testZip=Add-ZipProcess 'Test daily ZIP' 'ZipTestArguments'
-$cleanup=Add-Script $daysLoop 'Clean archived CSV files' 'User::FolderFullPath,User::DayHasFiles' ''
+$testZip=Add-ZipProcess 'Verify ZIP integrity' 'ZipTestArguments'
+$cleanup=Add-Script $daysLoop 'Delete temporary CSV files' 'User::FolderFullPath,User::DayHasFiles' ''
 Link $daysLoop $batches $zip
 Link $daysLoop $zip $testZip
 Link $daysLoop $testZip $cleanup
-$setStatus=Add-Sql $tables 'SetTableStatus' 'ArchiveJobsDb' @'
+$setStatus=Add-Sql $tables 'Save job result' 'ArchiveJobsDb' @'
 DECLARE @Now datetime2=SYSDATETIME();
 UPDATE [Archive].[ArchiveJobs]
 SET LastProcessedAt=@Now, LastProcessedStatus=CASE WHEN @Failed=1 THEN N'Error' ELSE N'Success' END,
@@ -196,9 +196,9 @@ Bind-Input $setStatus '@Id' 'User::ArchiveJobId' Int32
 Bind-Input $setStatus '@Failed' 'User::JobFailed' Boolean
 Bind-Input $setStatus '@Error' 'User::JobError' String
 Link $tables $daysLoop $setStatus
-$report=Add-Script $tables 'Report archive job' '' ''
+$report=Add-Script $tables 'Log job result' '' ''
 Link $tables $setStatus $report
-$summary=Add-Script $package 'Archive summary' '' ''
+$summary=Add-Script $package 'Check overall archive result' '' ''
 Link $package $tables $summary
 # Use the same SSIS error handling for C# and SQL tasks. Preparation resets the
 # previous job's flags, so it must run even when the preceding job failed.

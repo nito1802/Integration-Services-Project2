@@ -21,31 +21,31 @@ Schemat konfiguracji tworzy `CreateArchiveJobs.sql`, a przykład zadania znajduj
 ## Przepływ
 
 ```text
-Get Archive Jobs
-└── Foreach Loop Container — zadania / tabele
-    ├── Start archive job
-    ├── Prepare archive job
-    ├── BeginScript — walidacja i przygotowanie treści SQL
-    ├── Read table shape — Execute SQL Task, pusty wynik z typami CLR
-    ├── Read table metadata — Execute SQL Task, systemowy opis wyniku SELECT
-    ├── Process table metadata — C#, przetwarzanie pobranych wyników
-    ├── Get cutoff date
-    ├── Find first day — Execute SQL Task, MIN daty kwalifikujących się danych
-    ├── Loop through days
-    │   ├── GetGuid — katalog roboczy, nagłówek, granice dnia
-    │   ├── Loop through CSV parts
-    │   │   ├── Construct SQL
+Load archive jobs
+└── For each archive job — zadania / tabele
+    ├── Mark job as started
+    ├── Initialize job variables
+    ├── Prepare metadata and date queries — walidacja i przygotowanie treści SQL
+    ├── Read column definitions — Execute SQL Task, pusty wynik z typami CLR
+    ├── Read SQL types and keys — Execute SQL Task, systemowy opis wyniku SELECT
+    ├── Prepare export schema and header — C#, przetwarzanie pobranych wyników
+    ├── Calculate retention cutoff
+    ├── Find first archive day — Execute SQL Task, MIN daty kwalifikujących się danych
+    ├── For each archive day
+    │   ├── Initialize daily archive — katalog roboczy, nagłówek, granice dnia
+    │   ├── Process daily batches
+    │   │   ├── Prepare batch select query
     │   │   ├── Read archive batch
-    │   │   ├── Export data to CSV — nowy CSV z nagłówkiem
-    │   │   ├── Prepare batch delete — C#, SQL i parametr XML kluczy
+    │   │   ├── Write batch to CSV — nowy CSV z nagłówkiem
+    │   │   ├── Prepare delete query and keys — C#, SQL i parametr XML kluczy
     │   │   ├── Delete exported batch — Execute SQL Task, tabela kluczy i DELETE
-    │   │   └── Check deleted rows
+    │   │   └── Verify deleted row count
     │   ├── Create daily ZIP — Execute Process Task
-    │   ├── Test daily ZIP — Execute Process Task
-    │   └── Clean archived CSV files
-    ├── SetTableStatus
-    └── Report archive job
-Archive summary
+    │   ├── Verify ZIP integrity — Execute Process Task
+    │   └── Delete temporary CSV files
+    ├── Save job result
+    └── Log job result
+Check overall archive result
 ```
 
 Granica retencji jest ustalana raz na zadanie według daty serwera SQL:
@@ -82,7 +82,7 @@ Rok i dzień wynikają z daty danych. Przed rozpoczęciem eksportu dnia pakiet s
 
 **ZIP jest tworzony przez bloczek Execute Process Task, konfigurowany w Execute Process Task Editor.** Script Task przygotowuje tylko ścieżki i argumenty, nie uruchamia procesu ani kompresji.
 
-| Właściwość | Create daily ZIP | Test daily ZIP |
+| Właściwość | Create daily ZIP | Verify ZIP integrity |
 |---|---|---|
 | `Executable` (expression) | `@[$Package::SevenZipPath]` | `@[$Package::SevenZipPath]` |
 | `Arguments` (expression) | `@[User::ZipArguments]` | `@[User::ZipTestArguments]` |
@@ -107,7 +107,7 @@ Metadane pochodzą z krótkiego zapytania do `sys.dm_exec_describe_first_result_
 
 Nazwy tabel i kolumn daty pochodzą z zaufanej konfiguracji i są wstawiane do SQL bez cytowania; parametry zadań Single row / None są wiązane. Zadania Full result set otrzymują gotowe zapytania bez zewnętrznych parametrów; literał nazwy tabeli w zapytaniu metadanych ma podwojone apostrofy, a daty i limit powstają wyłącznie z typowanych wartości. Zakładamy kolumnę daty `datetime2`. Kolejność wierszy wewnątrz dnia nie jest gwarantowana.
 
-Zdarzenia `OnError` zapisują `JobFailed` i `JobError` oraz zatrzymują propagację. Wymuszony wynik zadania pozwala dojść do `SetTableStatus`, lecz nie oznacza sukcesu archiwizacji. Po błędzie kolejne operacje są pomijane, a obie pętle kończą się. Status `Error` zachowuje poprzednie `LastSuccesProcessedAt`; `Success` ustawia datę ostatniego sukcesu. Kolejne zadania są przetwarzane, a `Archive summary` kończy pakiet błędem, jeśli którekolwiek zadanie się nie udało. Błąd odczytu konfiguracji lub zapisu statusu zatrzymuje pakiet.
+Zdarzenia `OnError` zapisują `JobFailed` i `JobError` oraz zatrzymują propagację. Wymuszony wynik zadania pozwala dojść do `Save job result`, lecz nie oznacza sukcesu archiwizacji. Po błędzie kolejne operacje są pomijane, a obie pętle kończą się. Status `Error` zachowuje poprzednie `LastSuccesProcessedAt`; `Success` ustawia datę ostatniego sukcesu. Kolejne zadania są przetwarzane, a `Check overall archive result` kończy pakiet błędem, jeśli którekolwiek zadanie się nie udało. Błąd odczytu konfiguracji lub zapisu statusu zatrzymuje pakiet.
 
 ## Budowanie i weryfikacja
 

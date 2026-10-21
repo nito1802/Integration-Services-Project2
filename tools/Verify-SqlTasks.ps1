@@ -52,10 +52,10 @@ if($FullPackage) {
     $stubPath=Join-Path $build 'Stub.cs'; [IO.File]::WriteAllText($stubPath,$stub)
     $files=@($stubPath)
     $common=Get-Content -LiteralPath (Join-Path $root 'scripts/Common.cs') -Raw
-    $names=@('Prepare archive job','BeginScript','GetGuid','Construct SQL','Export data to CSV','Prepare batch delete','Check deleted rows','Report archive job','Capture SQL error','Process table metadata','Clean archived CSV files')
+    $names=@('Initialize job variables','Prepare metadata and date queries','Initialize daily archive','Prepare batch select query','Write batch to CSV','Prepare delete query and keys','Verify deleted row count','Log job result','Capture SQL error','Prepare export schema and header','Delete temporary CSV files')
     for($i=0;$i -lt $names.Count;$i++) {
         $main=Get-Content -LiteralPath (Join-Path $root ('scripts/'+$names[$i]+'.cs')) -Raw
-        if($FailureMode -eq 'Write' -and $names[$i] -eq 'Export data to CSV') {
+        if($FailureMode -eq 'Write' -and $names[$i] -eq 'Write batch to CSV') {
             $main=$main.Replace('writer.WriteLine();','writer.WriteLine(); if (Convert.ToString(Dts.Variables["User::TableName"].Value) == "dbo.Orders") throw new IOException("Injected write failure.");')
         }
         $file=Join-Path $build ('Step'+$i+'.cs')
@@ -69,7 +69,7 @@ if($FullPackage) {
     function Step($container,$name) {
         $task=$container.Executables[$name]
         if($task.GetExpression('Disable') -and $package.Variables['User::JobFailed'].Value) { return }
-        if($name -in @('Create daily ZIP','Test daily ZIP') -and !$package.Variables['User::DayHasFiles'].Value) { return }
+        if($name -in @('Create daily ZIP','Verify ZIP integrity') -and !$package.Variables['User::DayHasFiles'].Value) { return }
         $index=[Array]::IndexOf($names,$name)
         if($index -ge 0) {
             $probe.Variables.Clear()
@@ -89,12 +89,12 @@ if($FullPackage) {
             foreach($variable in $package.Variables) { if($variable.Namespace -eq 'User') { $variable.Value=$probe.Variables[$variable.QualifiedName].Value } }
             return
         }
-        if($name -in @('Create daily ZIP','Test daily ZIP')) {
+        if($name -in @('Create daily ZIP','Verify ZIP integrity')) {
             # Exercise the real Execute Process Task. Inject failure via unsupported 7z command.
             $variable=if($name -eq 'Create daily ZIP') {'ZipArguments'} else {'ZipTestArguments'}
             $task.InnerObject.Executable=[string]$package.Parameters['SevenZipPath'].Value
             $task.InnerObject.Arguments=[string]$package.Variables['User::'+$variable].Value
-            if($package.Variables['User::ArchiveJobId'].Value -eq 1 -and (($FailureMode -eq 'Zip' -and $name -eq 'Create daily ZIP') -or ($FailureMode -eq 'ZipTest' -and $name -eq 'Test daily ZIP'))) {
+            if($package.Variables['User::ArchiveJobId'].Value -eq 1 -and (($FailureMode -eq 'Zip' -and $name -eq 'Create daily ZIP') -or ($FailureMode -eq 'ZipTest' -and $name -eq 'Verify ZIP integrity'))) {
                 $package.Variables['User::'+$variable].Value='invalid-command'
                 $task.InnerObject.Arguments='invalid-command'
             }
@@ -122,7 +122,7 @@ if($FullPackage) {
         $result=$task.Execute($package.Connections,$task.Variables,$null,$null,$null)
         $errors=@($package.Errors | Select-Object -Skip $before | ForEach-Object Description)
         if($result -ne 'Success' -or $errors.Count -gt 0) {
-            if($name -in @('Get cutoff date','Read archive batch','Read table shape','Read table metadata','Find first day','Delete exported batch','Create daily ZIP','Test daily ZIP')) {
+            if($name -in @('Calculate retention cutoff','Read archive batch','Read column definitions','Read SQL types and keys','Find first archive day','Delete exported batch','Create daily ZIP','Verify ZIP integrity')) {
                 # TaskHost.Execute does not dispatch the package scheduler's event handlers.
                 $package.Variables['User::JobFailed'].Value=$true
                 $package.Variables['User::JobError'].Value=$errors -join [Environment]::NewLine
@@ -133,16 +133,16 @@ if($FullPackage) {
             $batchSizes[$id]=@($batchSizes[$id])+@([int]$package.Variables['User::BatchData'].Value.Tables[0].Rows.Count) | Where-Object { $null -ne $_ }
         }
     }
-    Step $package 'Get Archive Jobs'
+    Step $package 'Load archive jobs'
     $jobs=$package.Variables['User::Tables'].Value.Tables[0].Copy()
-    $tables=$package.Executables['Foreach Loop Container']
-    $daily=$tables.Executables['Loop through days']
-    $batches=$daily.Executables['Loop through CSV parts']
+    $tables=$package.Executables['For each archive job']
+    $daily=$tables.Executables['For each archive day']
+    $batches=$daily.Executables['Process daily batches']
     foreach($job in $jobs.Rows) {
         foreach($entry in @(@('ArchiveJobId','Id'),@('DatabaseName','DatabaseName'),@('TableName','TableName'),@('Days','ArchiveOlderThanDays'),@('ColumnDate','DateColumn'))) {
             $package.Variables['User::'+$entry[0]].Value=$job[$entry[1]]
         }
-        foreach($name in @('Start archive job','Prepare archive job','BeginScript','Read table shape','Read table metadata','Process table metadata','Get cutoff date','Find first day')) { Step $tables $name }
+        foreach($name in @('Mark job as started','Initialize job variables','Prepare metadata and date queries','Read column definitions','Read SQL types and keys','Prepare export schema and header','Calculate retention cutoff','Find first archive day')) { Step $tables $name }
         while(!$package.Variables['User::JobFailed'].Value -and $package.Variables['User::CurrentDateFrom'].Value -lt $package.Variables['User::CutoffDate'].Value) {
             if($package.Variables['User::ArchiveJobId'].Value -eq 1 -and $FailureMode -in @('FolderCollision','ZipCollision')) {
                 $day=([datetime]$package.Variables['User::CurrentDateFrom'].Value).ToString('yyyy_MM_dd')
@@ -155,14 +155,14 @@ if($FullPackage) {
                 } else { $collisionFile=$collisionFolder+'.zip' }
                 [IO.File]::WriteAllText($collisionFile,'existing archive - do not overwrite')
             }
-            Step $daily 'GetGuid'
+            Step $daily 'Initialize daily archive'
             while(!$package.Variables['User::JobFailed'].Value -and $package.Variables['User::BatchHasRows'].Value) {
-                foreach($name in @('Construct SQL','Read archive batch','Export data to CSV','Prepare batch delete','Delete exported batch','Check deleted rows')) { Step $batches $name }
+                foreach($name in @('Prepare batch select query','Read archive batch','Write batch to CSV','Prepare delete query and keys','Delete exported batch','Verify deleted row count')) { Step $batches $name }
             }
-            foreach($name in @('Create daily ZIP','Test daily ZIP','Clean archived CSV files')) { Step $daily $name }
+            foreach($name in @('Create daily ZIP','Verify ZIP integrity','Delete temporary CSV files')) { Step $daily $name }
             $package.Variables['User::CurrentDateFrom'].Value=([datetime]$package.Variables['User::CurrentDateFrom'].Value).AddDays(1)
         }
-        foreach($name in @('SetTableStatus','Report archive job')) { Step $tables $name }
+        foreach($name in @('Save job result','Log job result')) { Step $tables $name }
     }
     $result='Individual native tasks completed (scheduler not exercised)'
 }

@@ -26,34 +26,34 @@ function Place($id,$x,$y,$width=210,$height=46,$container=$false) {
     }
 }
 # Coordinates are relative to the containing graph/panel.
-Place 'Package\Get Archive Jobs' 32 24
-Place 'Package\Foreach Loop Container' 32 120 1100 1170 $true
-Place 'Package\Archive summary' 32 1340
-$jobs='Package\Foreach Loop Container'
-Place "$jobs\Start archive job" 28 24
-Place "$jobs\Prepare archive job" 294 24
-Place "$jobs\BeginScript" 560 24
-Place "$jobs\Read table shape" 826 24
-Place "$jobs\Read table metadata" 826 140
-Place "$jobs\Process table metadata" 560 140
-Place "$jobs\Get cutoff date" 294 140
-Place "$jobs\Find first day" 294 260
-Place "$jobs\Loop through days" 28 410 1030 580 $true
-$daily="$jobs\Loop through days"
-Place "$daily\GetGuid" 24 24
-Place "$daily\Loop through CSV parts" 24 110 950 280 $true
+Place 'Package\Load archive jobs' 32 24
+Place 'Package\For each archive job' 32 120 1100 1170 $true
+Place 'Package\Check overall archive result' 32 1340
+$jobs='Package\For each archive job'
+Place "$jobs\Mark job as started" 28 24
+Place "$jobs\Initialize job variables" 294 24
+Place "$jobs\Prepare metadata and date queries" 560 24
+Place "$jobs\Read column definitions" 826 24
+Place "$jobs\Read SQL types and keys" 826 140
+Place "$jobs\Prepare export schema and header" 560 140
+Place "$jobs\Calculate retention cutoff" 294 140
+Place "$jobs\Find first archive day" 294 260
+Place "$jobs\For each archive day" 28 410 1030 580 $true
+$daily="$jobs\For each archive day"
+Place "$daily\Initialize daily archive" 24 24
+Place "$daily\Process daily batches" 24 110 950 280 $true
 Place "$daily\Create daily ZIP" 24 440
-Place "$daily\Test daily ZIP" 340 440
-Place "$daily\Clean archived CSV files" 656 440
-Place "$jobs\SetTableStatus" 294 1040
-Place "$jobs\Report archive job" 560 1040
-$batch="$daily\Loop through CSV parts"
-Place "$batch\Construct SQL" 24 24 180
+Place "$daily\Verify ZIP integrity" 340 440
+Place "$daily\Delete temporary CSV files" 656 440
+Place "$jobs\Save job result" 294 1040
+Place "$jobs\Log job result" 560 1040
+$batch="$daily\Process daily batches"
+Place "$batch\Prepare batch select query" 24 24 180
 Place "$batch\Read archive batch" 236 24 180
-Place "$batch\Export data to CSV" 448 24 180
-Place "$batch\Prepare batch delete" 660 24 180
+Place "$batch\Write batch to CSV" 448 24 180
+Place "$batch\Prepare delete query and keys" 660 24 180
 Place "$batch\Delete exported batch" 236 156 180
-Place "$batch\Check deleted rows" 24 156 180
+Place "$batch\Verify deleted row count" 24 156 180
 foreach($constraint in $xml.SelectNodes('//DTS:PrecedenceConstraint',$ns)) {
     $from=$positions[$constraint.GetAttribute('From',$ns.LookupNamespace('DTS'))]
     $to=$positions[$constraint.GetAttribute('To',$ns.LookupNamespace('DTS'))]

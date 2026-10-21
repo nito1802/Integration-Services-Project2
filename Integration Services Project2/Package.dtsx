@@ -209,7 +209,7 @@
     </DTS:Variable>
   </DTS:Variables>
   <DTS:Executables>
-    <DTS:Executable DTS:refId="Package\Archive summary" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{C127D266-3B22-4B41-8044-C65D1175192A}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Archive summary" DTS:ThreadHint="0">
+    <DTS:Executable DTS:refId="Package\Check overall archive result" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{C127D266-3B22-4B41-8044-C65D1175192A}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Check overall archive result" DTS:ThreadHint="0">
       <DTS:Variables />
       <DTS:ObjectData>
         <ScriptProject Name="ST_e327ae6fcbd342a09222fefa457e9dd9" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="User::TableName" ReadWriteVariables="User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -610,7 +610,7 @@ namespace ST_e327ae6fcbd342a09222fefa457e9dd9.Properties {
         </ScriptProject>
       </DTS:ObjectData>
     </DTS:Executable>
-    <DTS:Executable DTS:refId="Package\Foreach Loop Container" DTS:CreationName="STOCK:FOREACHLOOP" DTS:DelayValidation="True" DTS:DTSID="{66759F07-C057-4C7F-9291-27C3705232C6}" DTS:ExecutableType="STOCK:FOREACHLOOP" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Foreach Loop Container">
+    <DTS:Executable DTS:refId="Package\For each archive job" DTS:CreationName="STOCK:FOREACHLOOP" DTS:DelayValidation="True" DTS:DTSID="{66759F07-C057-4C7F-9291-27C3705232C6}" DTS:ExecutableType="STOCK:FOREACHLOOP" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="For each archive job">
       <DTS:ForEachEnumerator DTS:CreationName="Microsoft.ForEachADOEnumerator" DTS:DTSID="{A7BC1609-262C-4560-B744-6AE1EF48F62A}" DTS:ObjectName="{A7BC1609-262C-4560-B744-6AE1EF48F62A}">
         <DTS:ObjectData>
           <FEEADO EnumType="EnumerateRowsInFirstTable" VarName="User::Tables" />
@@ -618,18 +618,18 @@ namespace ST_e327ae6fcbd342a09222fefa457e9dd9.Properties {
       </DTS:ForEachEnumerator>
       <DTS:Variables />
       <DTS:Executables>
-        <DTS:Executable DTS:refId="Package\Foreach Loop Container\BeginScript" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{98AF5B50-EF01-45CE-9B93-7E2308E2DFE4}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="BeginScript" DTS:ThreadHint="0">
+        <DTS:Executable DTS:refId="Package\For each archive job\Prepare metadata and date queries" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{98AF5B50-EF01-45CE-9B93-7E2308E2DFE4}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Prepare metadata and date queries" DTS:ThreadHint="0">
           <DTS:Variables />
           <DTS:PropertyExpression DTS:Name="Disable">@[User::JobFailed]</DTS:PropertyExpression>
           <DTS:EventHandlers>
-            <DTS:EventHandler DTS:refId="Package\Foreach Loop Container\BeginScript.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{A5073BF3-C708-43E2-B26E-E68F4EA0F9D7}" DTS:EventID="1768710773" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
+            <DTS:EventHandler DTS:refId="Package\For each archive job\Prepare metadata and date queries.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{A5073BF3-C708-43E2-B26E-E68F4EA0F9D7}" DTS:EventID="1768710773" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
               <DTS:Variables>
                 <DTS:Variable DTS:CreationName="" DTS:Description="The propagate property of the event" DTS:DTSID="{E078C030-52E9-4D7F-9CD8-0D5B0F156A13}" DTS:IncludeInDebugDump="6789" DTS:Namespace="System" DTS:ObjectName="Propagate">
                   <DTS:VariableValue DTS:DataType="11">-1</DTS:VariableValue>
                 </DTS:Variable>
               </DTS:Variables>
               <DTS:Executables>
-                <DTS:Executable DTS:refId="Package\Foreach Loop Container\BeginScript.EventHandlers[OnError]\Capture BeginScript error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{40BC4C89-6A4F-41BA-B41F-B16EE9F27FE0}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture BeginScript error">
+                <DTS:Executable DTS:refId="Package\For each archive job\Prepare metadata and date queries.EventHandlers[OnError]\Capture Prepare metadata and date queries error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{40BC4C89-6A4F-41BA-B41F-B16EE9F27FE0}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Prepare metadata and date queries error">
                   <DTS:Variables />
                   <DTS:ObjectData>
                     <ScriptProject Name="ST_5070e122a3894eec9b5d7e01bcc1b0ca" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="System::ErrorDescription,User::TableName" ReadWriteVariables="System::Propagate,User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -1424,18 +1424,18 @@ namespace ST_ec2d739dad304e83a32f1f599a989095.Properties {
             </ScriptProject>
           </DTS:ObjectData>
         </DTS:Executable>
-        <DTS:Executable DTS:refId="Package\Foreach Loop Container\Find first day" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{0F6FAE06-D2DB-474A-AC8F-15C9E5A2AA30}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Find first day" DTS:ThreadHint="0">
+        <DTS:Executable DTS:refId="Package\For each archive job\Find first archive day" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{0F6FAE06-D2DB-474A-AC8F-15C9E5A2AA30}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Find first archive day" DTS:ThreadHint="0">
           <DTS:Variables />
           <DTS:PropertyExpression DTS:Name="Disable">@[User::JobFailed]</DTS:PropertyExpression>
           <DTS:EventHandlers>
-            <DTS:EventHandler DTS:refId="Package\Foreach Loop Container\Find first day.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{C10A7D82-46A7-4BDC-9BCD-69D853AF9416}" DTS:EventID="930159118" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
+            <DTS:EventHandler DTS:refId="Package\For each archive job\Find first archive day.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{C10A7D82-46A7-4BDC-9BCD-69D853AF9416}" DTS:EventID="930159118" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
               <DTS:Variables>
                 <DTS:Variable DTS:CreationName="" DTS:Description="The propagate property of the event" DTS:DTSID="{721329D5-9213-44E9-9B98-C52E93DA87CB}" DTS:IncludeInDebugDump="6789" DTS:Namespace="System" DTS:ObjectName="Propagate">
                   <DTS:VariableValue DTS:DataType="11">-1</DTS:VariableValue>
                 </DTS:Variable>
               </DTS:Variables>
               <DTS:Executables>
-                <DTS:Executable DTS:refId="Package\Foreach Loop Container\Find first day.EventHandlers[OnError]\Capture first day error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{A150BF26-0B38-4CC8-BFB6-AF4229602CC8}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture first day error">
+                <DTS:Executable DTS:refId="Package\For each archive job\Find first archive day.EventHandlers[OnError]\Capture first day error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{A150BF26-0B38-4CC8-BFB6-AF4229602CC8}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture first day error">
                   <DTS:Variables />
                   <DTS:ObjectData>
                     <ScriptProject Name="ST_51afa9950ede4328b0581c8d9c076726" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="System::ErrorDescription,User::TableName" ReadWriteVariables="System::Propagate,User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -1838,18 +1838,18 @@ namespace ST_51afa9950ede4328b0581c8d9c076726.Properties {
             </SQLTask:SqlTaskData>
           </DTS:ObjectData>
         </DTS:Executable>
-        <DTS:Executable DTS:refId="Package\Foreach Loop Container\Get cutoff date" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{DDE6AB88-A960-4F68-96A3-306D12CD339C}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Get cutoff date" DTS:ThreadHint="0">
+        <DTS:Executable DTS:refId="Package\For each archive job\Calculate retention cutoff" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{DDE6AB88-A960-4F68-96A3-306D12CD339C}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Calculate retention cutoff" DTS:ThreadHint="0">
           <DTS:Variables />
           <DTS:PropertyExpression DTS:Name="Disable">@[User::JobFailed]</DTS:PropertyExpression>
           <DTS:EventHandlers>
-            <DTS:EventHandler DTS:refId="Package\Foreach Loop Container\Get cutoff date.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{B16F1B50-6A9A-4288-A23C-0D92B8E99861}" DTS:EventID="930159118" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
+            <DTS:EventHandler DTS:refId="Package\For each archive job\Calculate retention cutoff.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{B16F1B50-6A9A-4288-A23C-0D92B8E99861}" DTS:EventID="930159118" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
               <DTS:Variables>
                 <DTS:Variable DTS:CreationName="" DTS:Description="The propagate property of the event" DTS:DTSID="{4F62B76A-0C10-427E-A03D-8EA851FC6E79}" DTS:IncludeInDebugDump="6789" DTS:Namespace="System" DTS:ObjectName="Propagate">
                   <DTS:VariableValue DTS:DataType="11">-1</DTS:VariableValue>
                 </DTS:Variable>
               </DTS:Variables>
               <DTS:Executables>
-                <DTS:Executable DTS:refId="Package\Foreach Loop Container\Get cutoff date.EventHandlers[OnError]\Capture cutoff error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{FC6CC949-45E6-48FC-8B8E-AE4C25BBE64F}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture cutoff error">
+                <DTS:Executable DTS:refId="Package\For each archive job\Calculate retention cutoff.EventHandlers[OnError]\Capture cutoff error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{FC6CC949-45E6-48FC-8B8E-AE4C25BBE64F}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture cutoff error">
                   <DTS:Variables />
                   <DTS:ObjectData>
                     <ScriptProject Name="ST_44aa288cf721425d900384bcd3efc5f7" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="System::ErrorDescription,User::TableName" ReadWriteVariables="System::Propagate,User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -2252,21 +2252,21 @@ namespace ST_44aa288cf721425d900384bcd3efc5f7.Properties {
             </SQLTask:SqlTaskData>
           </DTS:ObjectData>
         </DTS:Executable>
-        <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days" DTS:AssignExpression="@[User::CurrentDateFrom] = DATEADD(&quot;day&quot;,1,@[User::CurrentDateFrom])" DTS:CreationName="STOCK:FORLOOP" DTS:DelayValidation="True" DTS:DTSID="{CD618355-E0EE-43FC-B4F3-588B53A9642C}" DTS:EvalExpression="!@[User::JobFailed] &amp;&amp; @[User::CurrentDateFrom] &lt; @[User::CutoffDate]" DTS:ExecutableType="STOCK:FORLOOP" DTS:LocaleID="-1" DTS:MaxConcurrent="1" DTS:ObjectName="Loop through days">
+        <DTS:Executable DTS:refId="Package\For each archive job\For each archive day" DTS:AssignExpression="@[User::CurrentDateFrom] = DATEADD(&quot;day&quot;,1,@[User::CurrentDateFrom])" DTS:CreationName="STOCK:FORLOOP" DTS:DelayValidation="True" DTS:DTSID="{CD618355-E0EE-43FC-B4F3-588B53A9642C}" DTS:EvalExpression="!@[User::JobFailed] &amp;&amp; @[User::CurrentDateFrom] &lt; @[User::CutoffDate]" DTS:ExecutableType="STOCK:FORLOOP" DTS:LocaleID="-1" DTS:MaxConcurrent="1" DTS:ObjectName="For each archive day">
           <DTS:Variables />
           <DTS:Executables>
-            <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Clean archived CSV files" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{D9C7712A-3A6D-48A9-BBCA-2F4529237F56}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Clean archived CSV files" DTS:ThreadHint="0">
+            <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Delete temporary CSV files" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{D9C7712A-3A6D-48A9-BBCA-2F4529237F56}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Delete temporary CSV files" DTS:ThreadHint="0">
               <DTS:Variables />
               <DTS:PropertyExpression DTS:Name="Disable">@[User::JobFailed]</DTS:PropertyExpression>
               <DTS:EventHandlers>
-                <DTS:EventHandler DTS:refId="Package\Foreach Loop Container\Loop through days\Clean archived CSV files.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{B0B291F2-794D-4F29-AD68-013CF5B55DFD}" DTS:EventID="0" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
+                <DTS:EventHandler DTS:refId="Package\For each archive job\For each archive day\Delete temporary CSV files.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{B0B291F2-794D-4F29-AD68-013CF5B55DFD}" DTS:EventID="0" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
                   <DTS:Variables>
                     <DTS:Variable DTS:CreationName="" DTS:Description="The propagate property of the event" DTS:DTSID="{BD5F22AD-AA5E-4F7B-82E2-0E54FFDB4CC2}" DTS:IncludeInDebugDump="6789" DTS:Namespace="System" DTS:ObjectName="Propagate">
                       <DTS:VariableValue DTS:DataType="11">-1</DTS:VariableValue>
                     </DTS:Variable>
                   </DTS:Variables>
                   <DTS:Executables>
-                    <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Clean archived CSV files.EventHandlers[OnError]\Capture Clean archived CSV files error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{F554DA98-8BD4-4681-A647-D8CECE38A191}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Clean archived CSV files error">
+                    <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Delete temporary CSV files.EventHandlers[OnError]\Capture Delete temporary CSV files error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{F554DA98-8BD4-4681-A647-D8CECE38A191}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Delete temporary CSV files error">
                       <DTS:Variables />
                       <DTS:ObjectData>
                         <ScriptProject Name="ST_9ccf6fe059af465eb672bf418e1b8dd9" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="System::ErrorDescription,User::TableName" ReadWriteVariables="System::Propagate,User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -3056,20 +3056,20 @@ namespace ST_87d763520b014a9986a750693f84ab6f.Properties {
                 </ScriptProject>
               </DTS:ObjectData>
             </DTS:Executable>
-            <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Create daily ZIP" DTS:CreationName="Microsoft.ExecuteProcess" DTS:DelayValidation="True" DTS:Disabled="True" DTS:DTSID="{79FD704B-6368-4DFD-8529-782EC309920B}" DTS:ExecutableType="Microsoft.ExecuteProcess" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Create daily ZIP" DTS:TaskContact="Execute Process Task;Microsoft Corporation; SQL Server 2016; Â© 2015 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1" DTS:ThreadHint="0">
+            <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Create daily ZIP" DTS:CreationName="Microsoft.ExecuteProcess" DTS:DelayValidation="True" DTS:Disabled="True" DTS:DTSID="{79FD704B-6368-4DFD-8529-782EC309920B}" DTS:ExecutableType="Microsoft.ExecuteProcess" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Create daily ZIP" DTS:TaskContact="Execute Process Task;Microsoft Corporation; SQL Server 2016; Â© 2015 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1" DTS:ThreadHint="0">
               <DTS:Variables />
               <DTS:PropertyExpression DTS:Name="Arguments">@[User::ZipArguments]</DTS:PropertyExpression>
               <DTS:PropertyExpression DTS:Name="Disable">@[User::JobFailed] || !@[User::DayHasFiles]</DTS:PropertyExpression>
               <DTS:PropertyExpression DTS:Name="Executable">@[$Package::SevenZipPath]</DTS:PropertyExpression>
               <DTS:EventHandlers>
-                <DTS:EventHandler DTS:refId="Package\Foreach Loop Container\Loop through days\Create daily ZIP.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{FDC7B577-41BA-45E0-B479-37EE7BCFB713}" DTS:EventID="1768710773" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
+                <DTS:EventHandler DTS:refId="Package\For each archive job\For each archive day\Create daily ZIP.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{FDC7B577-41BA-45E0-B479-37EE7BCFB713}" DTS:EventID="1768710773" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
                   <DTS:Variables>
                     <DTS:Variable DTS:CreationName="" DTS:Description="The propagate property of the event" DTS:DTSID="{C41B5E86-0BAA-4055-99E2-0BB3FE694E27}" DTS:IncludeInDebugDump="6789" DTS:Namespace="System" DTS:ObjectName="Propagate">
                       <DTS:VariableValue DTS:DataType="11">-1</DTS:VariableValue>
                     </DTS:Variable>
                   </DTS:Variables>
                   <DTS:Executables>
-                    <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Create daily ZIP.EventHandlers[OnError]\Capture Create daily ZIP error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{A07B9EB7-5510-40C1-887A-93DF939B4C4E}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Create daily ZIP error">
+                    <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Create daily ZIP.EventHandlers[OnError]\Capture Create daily ZIP error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{A07B9EB7-5510-40C1-887A-93DF939B4C4E}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Create daily ZIP error">
                       <DTS:Variables />
                       <DTS:ObjectData>
                         <ScriptProject Name="ST_904c1843d223401e844c2fb631f2f82e" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="System::ErrorDescription,User::TableName" ReadWriteVariables="System::Propagate,User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -3469,18 +3469,18 @@ namespace ST_904c1843d223401e844c2fb631f2f82e.Properties {
                 <ExecuteProcessData Executable="C:\Program Files\7-Zip\7z.exe" TimeOut="600" />
               </DTS:ObjectData>
             </DTS:Executable>
-            <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\GetGuid" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{E70A9BEF-DBBE-42DD-B777-0C969A814327}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="GetGuid" DTS:ThreadHint="0">
+            <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Initialize daily archive" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{E70A9BEF-DBBE-42DD-B777-0C969A814327}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Initialize daily archive" DTS:ThreadHint="0">
               <DTS:Variables />
               <DTS:PropertyExpression DTS:Name="Disable">@[User::JobFailed]</DTS:PropertyExpression>
               <DTS:EventHandlers>
-                <DTS:EventHandler DTS:refId="Package\Foreach Loop Container\Loop through days\GetGuid.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{8C49A316-8100-44C3-BD11-5345A572106B}" DTS:EventID="0" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
+                <DTS:EventHandler DTS:refId="Package\For each archive job\For each archive day\Initialize daily archive.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{8C49A316-8100-44C3-BD11-5345A572106B}" DTS:EventID="0" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
                   <DTS:Variables>
                     <DTS:Variable DTS:CreationName="" DTS:Description="The propagate property of the event" DTS:DTSID="{E221AFC6-2461-4B68-873A-3CCFC4E960EA}" DTS:IncludeInDebugDump="6789" DTS:Namespace="System" DTS:ObjectName="Propagate">
                       <DTS:VariableValue DTS:DataType="11">-1</DTS:VariableValue>
                     </DTS:Variable>
                   </DTS:Variables>
                   <DTS:Executables>
-                    <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\GetGuid.EventHandlers[OnError]\Capture GetGuid error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{6687C5FA-3220-4767-89EE-AEF1D8DA8622}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture GetGuid error">
+                    <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Initialize daily archive.EventHandlers[OnError]\Capture Initialize daily archive error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{6687C5FA-3220-4767-89EE-AEF1D8DA8622}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Initialize daily archive error">
                       <DTS:Variables />
                       <DTS:ObjectData>
                         <ScriptProject Name="ST_62e70fe61a004caf9c01eb362c479989" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="System::ErrorDescription,User::TableName" ReadWriteVariables="System::Propagate,User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -4285,21 +4285,21 @@ namespace ST_c6940e0e89564bff93d57c5095600141.Properties {
                 </ScriptProject>
               </DTS:ObjectData>
             </DTS:Executable>
-            <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts" DTS:CreationName="STOCK:FORLOOP" DTS:DelayValidation="True" DTS:DTSID="{277B904B-74A4-4DB0-A62E-9BD7EA32D23E}" DTS:EvalExpression="!@[User::JobFailed] &amp;&amp; @[User::BatchHasRows]" DTS:ExecutableType="STOCK:FORLOOP" DTS:LocaleID="-1" DTS:MaxConcurrent="1" DTS:ObjectName="Loop through CSV parts">
+            <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Process daily batches" DTS:CreationName="STOCK:FORLOOP" DTS:DelayValidation="True" DTS:DTSID="{277B904B-74A4-4DB0-A62E-9BD7EA32D23E}" DTS:EvalExpression="!@[User::JobFailed] &amp;&amp; @[User::BatchHasRows]" DTS:ExecutableType="STOCK:FORLOOP" DTS:LocaleID="-1" DTS:MaxConcurrent="1" DTS:ObjectName="Process daily batches">
               <DTS:Variables />
               <DTS:Executables>
-                <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Check deleted rows" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{B509E0A1-ECEE-44CF-96A4-59829675DBDF}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Check deleted rows" DTS:ThreadHint="0">
+                <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Verify deleted row count" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{B509E0A1-ECEE-44CF-96A4-59829675DBDF}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Verify deleted row count" DTS:ThreadHint="0">
                   <DTS:Variables />
                   <DTS:PropertyExpression DTS:Name="Disable">@[User::JobFailed]</DTS:PropertyExpression>
                   <DTS:EventHandlers>
-                    <DTS:EventHandler DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Check deleted rows.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{36F5E8DD-AB52-44D0-8F96-F12BC92F411C}" DTS:EventID="0" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
+                    <DTS:EventHandler DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Verify deleted row count.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{36F5E8DD-AB52-44D0-8F96-F12BC92F411C}" DTS:EventID="0" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
                       <DTS:Variables>
                         <DTS:Variable DTS:CreationName="" DTS:Description="The propagate property of the event" DTS:DTSID="{53426422-BABF-4035-BD13-06E5467B652C}" DTS:IncludeInDebugDump="6789" DTS:Namespace="System" DTS:ObjectName="Propagate">
                           <DTS:VariableValue DTS:DataType="11">-1</DTS:VariableValue>
                         </DTS:Variable>
                       </DTS:Variables>
                       <DTS:Executables>
-                        <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Check deleted rows.EventHandlers[OnError]\Capture Check deleted rows error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{A42224CC-D550-4788-8013-E8E5FEEC6378}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Check deleted rows error">
+                        <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Verify deleted row count.EventHandlers[OnError]\Capture Verify deleted row count error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{A42224CC-D550-4788-8013-E8E5FEEC6378}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Verify deleted row count error">
                           <DTS:Variables />
                           <DTS:ObjectData>
                             <ScriptProject Name="ST_bfb66b02f3aa47249a9d8425f71c11aa" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="System::ErrorDescription,User::TableName" ReadWriteVariables="System::Propagate,User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -5085,18 +5085,18 @@ namespace ST_e828fbd2eeeb4b45b5d978c7db36a533.Properties {
                     </ScriptProject>
                   </DTS:ObjectData>
                 </DTS:Executable>
-                <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Construct SQL" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{464EA65B-89EB-46EA-818B-4A1C948F2757}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Construct SQL" DTS:ThreadHint="0">
+                <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Prepare batch select query" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{464EA65B-89EB-46EA-818B-4A1C948F2757}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Prepare batch select query" DTS:ThreadHint="0">
                   <DTS:Variables />
                   <DTS:PropertyExpression DTS:Name="Disable">@[User::JobFailed]</DTS:PropertyExpression>
                   <DTS:EventHandlers>
-                    <DTS:EventHandler DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Construct SQL.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{A10D9CB3-A5C4-4764-A38D-71320C6DDE92}" DTS:EventID="0" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
+                    <DTS:EventHandler DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Prepare batch select query.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{A10D9CB3-A5C4-4764-A38D-71320C6DDE92}" DTS:EventID="0" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
                       <DTS:Variables>
                         <DTS:Variable DTS:CreationName="" DTS:Description="The propagate property of the event" DTS:DTSID="{E4F1C43A-0249-440B-85C0-AB56CA9C9336}" DTS:IncludeInDebugDump="6789" DTS:Namespace="System" DTS:ObjectName="Propagate">
                           <DTS:VariableValue DTS:DataType="11">-1</DTS:VariableValue>
                         </DTS:Variable>
                       </DTS:Variables>
                       <DTS:Executables>
-                        <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Construct SQL.EventHandlers[OnError]\Capture Construct SQL error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{B53E46D4-0DD2-4FBE-BAB6-2055CED0DA0A}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Construct SQL error">
+                        <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Prepare batch select query.EventHandlers[OnError]\Capture Prepare batch select query error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{B53E46D4-0DD2-4FBE-BAB6-2055CED0DA0A}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Prepare batch select query error">
                           <DTS:Variables />
                           <DTS:ObjectData>
                             <ScriptProject Name="ST_e45a181923174320ae1f68cc27b31af0" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="System::ErrorDescription,User::TableName" ReadWriteVariables="System::Propagate,User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -5889,18 +5889,18 @@ namespace ST_6413b205f0d34055b3de8517f74cda24.Properties {
                     </ScriptProject>
                   </DTS:ObjectData>
                 </DTS:Executable>
-                <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Delete exported batch" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{3C40D4F2-2EDE-44B0-8F88-16C37F0146B8}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Delete exported batch" DTS:ThreadHint="0">
+                <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Delete exported batch" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{3C40D4F2-2EDE-44B0-8F88-16C37F0146B8}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Delete exported batch" DTS:ThreadHint="0">
                   <DTS:Variables />
                   <DTS:PropertyExpression DTS:Name="Disable">@[User::JobFailed]</DTS:PropertyExpression>
                   <DTS:EventHandlers>
-                    <DTS:EventHandler DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Delete exported batch.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{65B39087-DEC4-41BD-8189-79C73C45A4A5}" DTS:EventID="251698396" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
+                    <DTS:EventHandler DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Delete exported batch.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{65B39087-DEC4-41BD-8189-79C73C45A4A5}" DTS:EventID="251698396" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
                       <DTS:Variables>
                         <DTS:Variable DTS:CreationName="" DTS:Description="The propagate property of the event" DTS:DTSID="{E3ED2EA4-76EA-4BC7-A797-B4F6B53BC1ED}" DTS:IncludeInDebugDump="6789" DTS:Namespace="System" DTS:ObjectName="Propagate">
                           <DTS:VariableValue DTS:DataType="11">-1</DTS:VariableValue>
                         </DTS:Variable>
                       </DTS:Variables>
                       <DTS:Executables>
-                        <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Delete exported batch.EventHandlers[OnError]\Capture batch delete error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{EFF82963-F681-473F-8E5D-F5BD02E21A09}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture batch delete error">
+                        <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Delete exported batch.EventHandlers[OnError]\Capture batch delete error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{EFF82963-F681-473F-8E5D-F5BD02E21A09}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture batch delete error">
                           <DTS:Variables />
                           <DTS:ObjectData>
                             <ScriptProject Name="ST_cfb891529ee444f491c7cab07798db54" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="System::ErrorDescription,User::TableName" ReadWriteVariables="System::Propagate,User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -6303,18 +6303,18 @@ namespace ST_cfb891529ee444f491c7cab07798db54.Properties {
                     </SQLTask:SqlTaskData>
                   </DTS:ObjectData>
                 </DTS:Executable>
-                <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Export data to CSV" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{D6AEE677-E7D3-4544-80A8-EB781CCEF814}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Export data to CSV" DTS:ThreadHint="0">
+                <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Write batch to CSV" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{D6AEE677-E7D3-4544-80A8-EB781CCEF814}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Write batch to CSV" DTS:ThreadHint="0">
                   <DTS:Variables />
                   <DTS:PropertyExpression DTS:Name="Disable">@[User::JobFailed]</DTS:PropertyExpression>
                   <DTS:EventHandlers>
-                    <DTS:EventHandler DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Export data to CSV.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{2B914E50-F9B6-407A-BFEF-4E7F29D9022B}" DTS:EventID="0" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
+                    <DTS:EventHandler DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Write batch to CSV.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{2B914E50-F9B6-407A-BFEF-4E7F29D9022B}" DTS:EventID="0" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
                       <DTS:Variables>
                         <DTS:Variable DTS:CreationName="" DTS:Description="The propagate property of the event" DTS:DTSID="{AC825653-1350-47C6-9D30-631C1588C4CA}" DTS:IncludeInDebugDump="6789" DTS:Namespace="System" DTS:ObjectName="Propagate">
                           <DTS:VariableValue DTS:DataType="11">-1</DTS:VariableValue>
                         </DTS:Variable>
                       </DTS:Variables>
                       <DTS:Executables>
-                        <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Export data to CSV.EventHandlers[OnError]\Capture Export data to CSV error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{D884887B-249D-4F0D-84BE-F7F8972F6CC5}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Export data to CSV error">
+                        <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Write batch to CSV.EventHandlers[OnError]\Capture Write batch to CSV error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{D884887B-249D-4F0D-84BE-F7F8972F6CC5}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Write batch to CSV error">
                           <DTS:Variables />
                           <DTS:ObjectData>
                             <ScriptProject Name="ST_af56a1581c6b4a8e9584365b5abba7d4" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="System::ErrorDescription,User::TableName" ReadWriteVariables="System::Propagate,User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -7169,18 +7169,18 @@ namespace ST_6ff3f8fc8b184e59a8c9b4940d1f693c.Properties {
                     </ScriptProject>
                   </DTS:ObjectData>
                 </DTS:Executable>
-                <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Prepare batch delete" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{9955887A-A4F6-4836-9889-A4A6F936191D}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Prepare batch delete" DTS:ThreadHint="0">
+                <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Prepare delete query and keys" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{9955887A-A4F6-4836-9889-A4A6F936191D}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Prepare delete query and keys" DTS:ThreadHint="0">
                   <DTS:Variables />
                   <DTS:PropertyExpression DTS:Name="Disable">@[User::JobFailed]</DTS:PropertyExpression>
                   <DTS:EventHandlers>
-                    <DTS:EventHandler DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Prepare batch delete.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{96F906FB-D2CE-48F1-BD1D-B388A382D870}" DTS:EventID="0" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
+                    <DTS:EventHandler DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Prepare delete query and keys.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{96F906FB-D2CE-48F1-BD1D-B388A382D870}" DTS:EventID="0" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
                       <DTS:Variables>
                         <DTS:Variable DTS:CreationName="" DTS:Description="The propagate property of the event" DTS:DTSID="{2AB415FC-4C6F-476B-9F9E-F46F8D145EA9}" DTS:IncludeInDebugDump="6789" DTS:Namespace="System" DTS:ObjectName="Propagate">
                           <DTS:VariableValue DTS:DataType="11">-1</DTS:VariableValue>
                         </DTS:Variable>
                       </DTS:Variables>
                       <DTS:Executables>
-                        <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Prepare batch delete.EventHandlers[OnError]\Capture Prepare batch delete error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{9BE25B50-37FA-483B-B74E-A5E0398615DA}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Prepare batch delete error">
+                        <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Prepare delete query and keys.EventHandlers[OnError]\Capture Prepare delete query and keys error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{9BE25B50-37FA-483B-B74E-A5E0398615DA}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Prepare delete query and keys error">
                           <DTS:Variables />
                           <DTS:ObjectData>
                             <ScriptProject Name="ST_90e0aee0fe6f4cdd8e3cccb3252c9b46" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="System::ErrorDescription,User::TableName" ReadWriteVariables="System::Propagate,User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -8009,18 +8009,18 @@ namespace ST_1d7dca4a118b46ed88bcc42e050eee8b.Properties {
                     </ScriptProject>
                   </DTS:ObjectData>
                 </DTS:Executable>
-                <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Read archive batch" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{4F492B8D-187B-4A42-9291-CBA6319BC9BB}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Read archive batch" DTS:ThreadHint="0">
+                <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Read archive batch" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{4F492B8D-187B-4A42-9291-CBA6319BC9BB}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Read archive batch" DTS:ThreadHint="0">
                   <DTS:Variables />
                   <DTS:PropertyExpression DTS:Name="Disable">@[User::JobFailed]</DTS:PropertyExpression>
                   <DTS:EventHandlers>
-                    <DTS:EventHandler DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Read archive batch.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{FFD03E43-49FE-4A3A-9BB0-0806A7C55714}" DTS:EventID="930159118" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
+                    <DTS:EventHandler DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Read archive batch.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{FFD03E43-49FE-4A3A-9BB0-0806A7C55714}" DTS:EventID="930159118" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
                       <DTS:Variables>
                         <DTS:Variable DTS:CreationName="" DTS:Description="The propagate property of the event" DTS:DTSID="{02C3B8AD-6345-46E1-8BD9-1DF60C85620F}" DTS:IncludeInDebugDump="6789" DTS:Namespace="System" DTS:ObjectName="Propagate">
                           <DTS:VariableValue DTS:DataType="11">-1</DTS:VariableValue>
                         </DTS:Variable>
                       </DTS:Variables>
                       <DTS:Executables>
-                        <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Read archive batch.EventHandlers[OnError]\Capture batch read error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{8BB5FC80-B275-4DD1-A1EC-3315BBEF781F}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture batch read error">
+                        <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Process daily batches\Read archive batch.EventHandlers[OnError]\Capture batch read error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{8BB5FC80-B275-4DD1-A1EC-3315BBEF781F}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture batch read error">
                           <DTS:Variables />
                           <DTS:ObjectData>
                             <ScriptProject Name="ST_1bdf287a88a34c4c89846fc04d4a29a4" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="System::ErrorDescription,User::TableName" ReadWriteVariables="System::Propagate,User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -8424,27 +8424,27 @@ namespace ST_1bdf287a88a34c4c89846fc04d4a29a4.Properties {
                 </DTS:Executable>
               </DTS:Executables>
               <DTS:PrecedenceConstraints>
-                <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts.PrecedenceConstraints[{4D894417-6F95-48E3-90F6-029D562355A7\}]" DTS:CreationName="" DTS:DTSID="{4D894417-6F95-48E3-90F6-029D562355A7}" DTS:From="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Prepare batch delete" DTS:LogicalAnd="True" DTS:ObjectName="{4D894417-6F95-48E3-90F6-029D562355A7}" DTS:To="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Delete exported batch" />
-                <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts.PrecedenceConstraints[{5F1863CC-22B6-46D4-9929-AC1F502CED9B\}]" DTS:CreationName="" DTS:DTSID="{5F1863CC-22B6-46D4-9929-AC1F502CED9B}" DTS:From="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Delete exported batch" DTS:LogicalAnd="True" DTS:ObjectName="{5F1863CC-22B6-46D4-9929-AC1F502CED9B}" DTS:To="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Check deleted rows" DTS:Value="2" />
-                <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts.PrecedenceConstraints[{BC9BC047-2AF3-425E-AA18-30FA4A4C7B69\}]" DTS:CreationName="" DTS:DTSID="{BC9BC047-2AF3-425E-AA18-30FA4A4C7B69}" DTS:From="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Export data to CSV" DTS:LogicalAnd="True" DTS:ObjectName="{BC9BC047-2AF3-425E-AA18-30FA4A4C7B69}" DTS:To="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Prepare batch delete" />
-                <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts.PrecedenceConstraints[{EF72F9ED-727B-4846-8D3E-CDDAEC4356EB\}]" DTS:CreationName="" DTS:DTSID="{EF72F9ED-727B-4846-8D3E-CDDAEC4356EB}" DTS:From="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Read archive batch" DTS:LogicalAnd="True" DTS:ObjectName="{EF72F9ED-727B-4846-8D3E-CDDAEC4356EB}" DTS:To="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Export data to CSV" DTS:Value="2" />
-                <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container\Loop through days\Loop through CSV parts.PrecedenceConstraints[{FC9DECF8-F27B-4852-A751-801EA684A2F7\}]" DTS:CreationName="" DTS:DTSID="{FC9DECF8-F27B-4852-A751-801EA684A2F7}" DTS:From="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Construct SQL" DTS:LogicalAnd="True" DTS:ObjectName="{FC9DECF8-F27B-4852-A751-801EA684A2F7}" DTS:To="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Read archive batch" />
+                <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job\For each archive day\Process daily batches.PrecedenceConstraints[{4D894417-6F95-48E3-90F6-029D562355A7\}]" DTS:CreationName="" DTS:DTSID="{4D894417-6F95-48E3-90F6-029D562355A7}" DTS:From="Package\For each archive job\For each archive day\Process daily batches\Prepare delete query and keys" DTS:LogicalAnd="True" DTS:ObjectName="{4D894417-6F95-48E3-90F6-029D562355A7}" DTS:To="Package\For each archive job\For each archive day\Process daily batches\Delete exported batch" />
+                <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job\For each archive day\Process daily batches.PrecedenceConstraints[{5F1863CC-22B6-46D4-9929-AC1F502CED9B\}]" DTS:CreationName="" DTS:DTSID="{5F1863CC-22B6-46D4-9929-AC1F502CED9B}" DTS:From="Package\For each archive job\For each archive day\Process daily batches\Delete exported batch" DTS:LogicalAnd="True" DTS:ObjectName="{5F1863CC-22B6-46D4-9929-AC1F502CED9B}" DTS:To="Package\For each archive job\For each archive day\Process daily batches\Verify deleted row count" DTS:Value="2" />
+                <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job\For each archive day\Process daily batches.PrecedenceConstraints[{BC9BC047-2AF3-425E-AA18-30FA4A4C7B69\}]" DTS:CreationName="" DTS:DTSID="{BC9BC047-2AF3-425E-AA18-30FA4A4C7B69}" DTS:From="Package\For each archive job\For each archive day\Process daily batches\Write batch to CSV" DTS:LogicalAnd="True" DTS:ObjectName="{BC9BC047-2AF3-425E-AA18-30FA4A4C7B69}" DTS:To="Package\For each archive job\For each archive day\Process daily batches\Prepare delete query and keys" />
+                <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job\For each archive day\Process daily batches.PrecedenceConstraints[{EF72F9ED-727B-4846-8D3E-CDDAEC4356EB\}]" DTS:CreationName="" DTS:DTSID="{EF72F9ED-727B-4846-8D3E-CDDAEC4356EB}" DTS:From="Package\For each archive job\For each archive day\Process daily batches\Read archive batch" DTS:LogicalAnd="True" DTS:ObjectName="{EF72F9ED-727B-4846-8D3E-CDDAEC4356EB}" DTS:To="Package\For each archive job\For each archive day\Process daily batches\Write batch to CSV" DTS:Value="2" />
+                <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job\For each archive day\Process daily batches.PrecedenceConstraints[{FC9DECF8-F27B-4852-A751-801EA684A2F7\}]" DTS:CreationName="" DTS:DTSID="{FC9DECF8-F27B-4852-A751-801EA684A2F7}" DTS:From="Package\For each archive job\For each archive day\Process daily batches\Prepare batch select query" DTS:LogicalAnd="True" DTS:ObjectName="{FC9DECF8-F27B-4852-A751-801EA684A2F7}" DTS:To="Package\For each archive job\For each archive day\Process daily batches\Read archive batch" />
               </DTS:PrecedenceConstraints>
             </DTS:Executable>
-            <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Test daily ZIP" DTS:CreationName="Microsoft.ExecuteProcess" DTS:DelayValidation="True" DTS:Disabled="True" DTS:DTSID="{E1D0C932-B115-495C-B026-4FFDDD09932C}" DTS:ExecutableType="Microsoft.ExecuteProcess" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Test daily ZIP" DTS:TaskContact="Execute Process Task;Microsoft Corporation; SQL Server 2016; Â© 2015 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1" DTS:ThreadHint="0">
+            <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Verify ZIP integrity" DTS:CreationName="Microsoft.ExecuteProcess" DTS:DelayValidation="True" DTS:Disabled="True" DTS:DTSID="{E1D0C932-B115-495C-B026-4FFDDD09932C}" DTS:ExecutableType="Microsoft.ExecuteProcess" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Verify ZIP integrity" DTS:TaskContact="Execute Process Task;Microsoft Corporation; SQL Server 2016; Â© 2015 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1" DTS:ThreadHint="0">
               <DTS:Variables />
               <DTS:PropertyExpression DTS:Name="Arguments">@[User::ZipTestArguments]</DTS:PropertyExpression>
               <DTS:PropertyExpression DTS:Name="Disable">@[User::JobFailed] || !@[User::DayHasFiles]</DTS:PropertyExpression>
               <DTS:PropertyExpression DTS:Name="Executable">@[$Package::SevenZipPath]</DTS:PropertyExpression>
               <DTS:EventHandlers>
-                <DTS:EventHandler DTS:refId="Package\Foreach Loop Container\Loop through days\Test daily ZIP.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{09E139F2-1521-4191-ACB3-5A1248614C55}" DTS:EventID="0" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
+                <DTS:EventHandler DTS:refId="Package\For each archive job\For each archive day\Verify ZIP integrity.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{09E139F2-1521-4191-ACB3-5A1248614C55}" DTS:EventID="0" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
                   <DTS:Variables>
                     <DTS:Variable DTS:CreationName="" DTS:Description="The propagate property of the event" DTS:DTSID="{0C59638F-EA3C-4E6A-B314-C1EBC495F618}" DTS:IncludeInDebugDump="6789" DTS:Namespace="System" DTS:ObjectName="Propagate">
                       <DTS:VariableValue DTS:DataType="11">-1</DTS:VariableValue>
                     </DTS:Variable>
                   </DTS:Variables>
                   <DTS:Executables>
-                    <DTS:Executable DTS:refId="Package\Foreach Loop Container\Loop through days\Test daily ZIP.EventHandlers[OnError]\Capture Test daily ZIP error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{85830FEA-8DFD-448D-A297-007EC649AA11}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Test daily ZIP error">
+                    <DTS:Executable DTS:refId="Package\For each archive job\For each archive day\Verify ZIP integrity.EventHandlers[OnError]\Capture Verify ZIP integrity error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{85830FEA-8DFD-448D-A297-007EC649AA11}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Verify ZIP integrity error">
                       <DTS:Variables />
                       <DTS:ObjectData>
                         <ScriptProject Name="ST_2ae8b58f76d64065b354f5972410b713" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="System::ErrorDescription,User::TableName" ReadWriteVariables="System::Propagate,User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -8846,23 +8846,23 @@ namespace ST_2ae8b58f76d64065b354f5972410b713.Properties {
             </DTS:Executable>
           </DTS:Executables>
           <DTS:PrecedenceConstraints>
-            <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container\Loop through days.PrecedenceConstraints[{2A7C79A2-B1D5-402B-AAE7-5845A455EA75\}]" DTS:CreationName="" DTS:DTSID="{2A7C79A2-B1D5-402B-AAE7-5845A455EA75}" DTS:From="Package\Foreach Loop Container\Loop through days\Loop through CSV parts" DTS:LogicalAnd="True" DTS:ObjectName="{2A7C79A2-B1D5-402B-AAE7-5845A455EA75}" DTS:To="Package\Foreach Loop Container\Loop through days\Create daily ZIP" />
-            <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container\Loop through days.PrecedenceConstraints[{3CA8820D-A3DF-4AB0-89DE-78B274B760D2\}]" DTS:CreationName="" DTS:DTSID="{3CA8820D-A3DF-4AB0-89DE-78B274B760D2}" DTS:From="Package\Foreach Loop Container\Loop through days\GetGuid" DTS:LogicalAnd="True" DTS:ObjectName="{3CA8820D-A3DF-4AB0-89DE-78B274B760D2}" DTS:To="Package\Foreach Loop Container\Loop through days\Loop through CSV parts" />
-            <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container\Loop through days.PrecedenceConstraints[{6405EBA2-4706-4C0C-BD84-EC8560014DA0\}]" DTS:CreationName="" DTS:DTSID="{6405EBA2-4706-4C0C-BD84-EC8560014DA0}" DTS:From="Package\Foreach Loop Container\Loop through days\Create daily ZIP" DTS:LogicalAnd="True" DTS:ObjectName="{6405EBA2-4706-4C0C-BD84-EC8560014DA0}" DTS:To="Package\Foreach Loop Container\Loop through days\Test daily ZIP" />
-            <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container\Loop through days.PrecedenceConstraints[{7E708134-53EF-4C2F-A1AD-29F8A8292884\}]" DTS:CreationName="" DTS:DTSID="{7E708134-53EF-4C2F-A1AD-29F8A8292884}" DTS:From="Package\Foreach Loop Container\Loop through days\Test daily ZIP" DTS:LogicalAnd="True" DTS:ObjectName="{7E708134-53EF-4C2F-A1AD-29F8A8292884}" DTS:To="Package\Foreach Loop Container\Loop through days\Clean archived CSV files" />
+            <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job\For each archive day.PrecedenceConstraints[{2A7C79A2-B1D5-402B-AAE7-5845A455EA75\}]" DTS:CreationName="" DTS:DTSID="{2A7C79A2-B1D5-402B-AAE7-5845A455EA75}" DTS:From="Package\For each archive job\For each archive day\Process daily batches" DTS:LogicalAnd="True" DTS:ObjectName="{2A7C79A2-B1D5-402B-AAE7-5845A455EA75}" DTS:To="Package\For each archive job\For each archive day\Create daily ZIP" />
+            <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job\For each archive day.PrecedenceConstraints[{3CA8820D-A3DF-4AB0-89DE-78B274B760D2\}]" DTS:CreationName="" DTS:DTSID="{3CA8820D-A3DF-4AB0-89DE-78B274B760D2}" DTS:From="Package\For each archive job\For each archive day\Initialize daily archive" DTS:LogicalAnd="True" DTS:ObjectName="{3CA8820D-A3DF-4AB0-89DE-78B274B760D2}" DTS:To="Package\For each archive job\For each archive day\Process daily batches" />
+            <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job\For each archive day.PrecedenceConstraints[{6405EBA2-4706-4C0C-BD84-EC8560014DA0\}]" DTS:CreationName="" DTS:DTSID="{6405EBA2-4706-4C0C-BD84-EC8560014DA0}" DTS:From="Package\For each archive job\For each archive day\Create daily ZIP" DTS:LogicalAnd="True" DTS:ObjectName="{6405EBA2-4706-4C0C-BD84-EC8560014DA0}" DTS:To="Package\For each archive job\For each archive day\Verify ZIP integrity" />
+            <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job\For each archive day.PrecedenceConstraints[{7E708134-53EF-4C2F-A1AD-29F8A8292884\}]" DTS:CreationName="" DTS:DTSID="{7E708134-53EF-4C2F-A1AD-29F8A8292884}" DTS:From="Package\For each archive job\For each archive day\Verify ZIP integrity" DTS:LogicalAnd="True" DTS:ObjectName="{7E708134-53EF-4C2F-A1AD-29F8A8292884}" DTS:To="Package\For each archive job\For each archive day\Delete temporary CSV files" />
           </DTS:PrecedenceConstraints>
         </DTS:Executable>
-        <DTS:Executable DTS:refId="Package\Foreach Loop Container\Prepare archive job" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{3A5BC104-FE1E-4144-90A1-10C73B2C8178}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Prepare archive job" DTS:ThreadHint="0">
+        <DTS:Executable DTS:refId="Package\For each archive job\Initialize job variables" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{3A5BC104-FE1E-4144-90A1-10C73B2C8178}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Initialize job variables" DTS:ThreadHint="0">
           <DTS:Variables />
           <DTS:EventHandlers>
-            <DTS:EventHandler DTS:refId="Package\Foreach Loop Container\Prepare archive job.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{FBE93D74-A616-4AA0-B15E-407E2833EF2C}" DTS:EventID="930159118" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
+            <DTS:EventHandler DTS:refId="Package\For each archive job\Initialize job variables.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{FBE93D74-A616-4AA0-B15E-407E2833EF2C}" DTS:EventID="930159118" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
               <DTS:Variables>
                 <DTS:Variable DTS:CreationName="" DTS:Description="The propagate property of the event" DTS:DTSID="{730DEE01-48B1-497E-9A1D-E5932D349FEB}" DTS:IncludeInDebugDump="6789" DTS:Namespace="System" DTS:ObjectName="Propagate">
                   <DTS:VariableValue DTS:DataType="11">-1</DTS:VariableValue>
                 </DTS:Variable>
               </DTS:Variables>
               <DTS:Executables>
-                <DTS:Executable DTS:refId="Package\Foreach Loop Container\Prepare archive job.EventHandlers[OnError]\Capture preparation error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{6EC9F59F-A95B-4F1F-A753-6F328C142625}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture preparation error">
+                <DTS:Executable DTS:refId="Package\For each archive job\Initialize job variables.EventHandlers[OnError]\Capture preparation error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{6EC9F59F-A95B-4F1F-A753-6F328C142625}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture preparation error">
                   <DTS:Variables />
                   <DTS:ObjectData>
                     <ScriptProject Name="ST_f3c5498d6f8147a89f7b4ff1998db4f4" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="System::ErrorDescription,User::TableName" ReadWriteVariables="System::Propagate,User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -9653,18 +9653,18 @@ namespace ST_11ff917755c943cfa193239023ced529.Properties {
             </ScriptProject>
           </DTS:ObjectData>
         </DTS:Executable>
-        <DTS:Executable DTS:refId="Package\Foreach Loop Container\Process table metadata" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{B7A99B67-2E02-4C1A-9D32-548E7CD5E3A4}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Process table metadata" DTS:ThreadHint="0">
+        <DTS:Executable DTS:refId="Package\For each archive job\Prepare export schema and header" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{B7A99B67-2E02-4C1A-9D32-548E7CD5E3A4}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Prepare export schema and header" DTS:ThreadHint="0">
           <DTS:Variables />
           <DTS:PropertyExpression DTS:Name="Disable">@[User::JobFailed]</DTS:PropertyExpression>
           <DTS:EventHandlers>
-            <DTS:EventHandler DTS:refId="Package\Foreach Loop Container\Process table metadata.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{7F02C974-147A-46DD-AA9A-2652B92C20B8}" DTS:EventID="0" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
+            <DTS:EventHandler DTS:refId="Package\For each archive job\Prepare export schema and header.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{7F02C974-147A-46DD-AA9A-2652B92C20B8}" DTS:EventID="0" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
               <DTS:Variables>
                 <DTS:Variable DTS:CreationName="" DTS:Description="The propagate property of the event" DTS:DTSID="{24DCE21D-09A0-49D7-BCE2-7E11C5465FF6}" DTS:IncludeInDebugDump="6789" DTS:Namespace="System" DTS:ObjectName="Propagate">
                   <DTS:VariableValue DTS:DataType="11">-1</DTS:VariableValue>
                 </DTS:Variable>
               </DTS:Variables>
               <DTS:Executables>
-                <DTS:Executable DTS:refId="Package\Foreach Loop Container\Process table metadata.EventHandlers[OnError]\Capture Process table metadata error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{A173E116-A733-4BF0-9AD2-8B0007664B2E}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Process table metadata error">
+                <DTS:Executable DTS:refId="Package\For each archive job\Prepare export schema and header.EventHandlers[OnError]\Capture Prepare export schema and header error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{A173E116-A733-4BF0-9AD2-8B0007664B2E}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture Prepare export schema and header error">
                   <DTS:Variables />
                   <DTS:ObjectData>
                     <ScriptProject Name="ST_5168b7f4e6c345b3ae2ba534656f192a" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="System::ErrorDescription,User::TableName" ReadWriteVariables="System::Propagate,User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -10472,18 +10472,18 @@ namespace ST_a6b2a1f291d3453cb6868a5831ad7a2f.Properties {
             </ScriptProject>
           </DTS:ObjectData>
         </DTS:Executable>
-        <DTS:Executable DTS:refId="Package\Foreach Loop Container\Read table metadata" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{8FA440A6-2A2D-4A56-8285-AB444B2C260B}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Read table metadata" DTS:ThreadHint="0">
+        <DTS:Executable DTS:refId="Package\For each archive job\Read SQL types and keys" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{8FA440A6-2A2D-4A56-8285-AB444B2C260B}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Read SQL types and keys" DTS:ThreadHint="0">
           <DTS:Variables />
           <DTS:PropertyExpression DTS:Name="Disable">@[User::JobFailed]</DTS:PropertyExpression>
           <DTS:EventHandlers>
-            <DTS:EventHandler DTS:refId="Package\Foreach Loop Container\Read table metadata.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{7149CA92-A21F-4F9A-89BF-3A211C7EE72E}" DTS:EventID="930159118" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
+            <DTS:EventHandler DTS:refId="Package\For each archive job\Read SQL types and keys.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{7149CA92-A21F-4F9A-89BF-3A211C7EE72E}" DTS:EventID="930159118" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
               <DTS:Variables>
                 <DTS:Variable DTS:CreationName="" DTS:Description="The propagate property of the event" DTS:DTSID="{8529996C-8BF6-4F59-8352-A9876DC014E1}" DTS:IncludeInDebugDump="6789" DTS:Namespace="System" DTS:ObjectName="Propagate">
                   <DTS:VariableValue DTS:DataType="11">-1</DTS:VariableValue>
                 </DTS:Variable>
               </DTS:Variables>
               <DTS:Executables>
-                <DTS:Executable DTS:refId="Package\Foreach Loop Container\Read table metadata.EventHandlers[OnError]\Capture metadata error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{82B7E6C6-A28B-4AF1-9F3E-7478D603F66A}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture metadata error">
+                <DTS:Executable DTS:refId="Package\For each archive job\Read SQL types and keys.EventHandlers[OnError]\Capture metadata error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{82B7E6C6-A28B-4AF1-9F3E-7478D603F66A}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture metadata error">
                   <DTS:Variables />
                   <DTS:ObjectData>
                     <ScriptProject Name="ST_f50d084c270545b686e691aa3c8b5357" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="System::ErrorDescription,User::TableName" ReadWriteVariables="System::Propagate,User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -10885,18 +10885,18 @@ namespace ST_f50d084c270545b686e691aa3c8b5357.Properties {
             </SQLTask:SqlTaskData>
           </DTS:ObjectData>
         </DTS:Executable>
-        <DTS:Executable DTS:refId="Package\Foreach Loop Container\Read table shape" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{718884A3-2A5A-4414-B8C3-5962B9B47749}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Read table shape" DTS:ThreadHint="0">
+        <DTS:Executable DTS:refId="Package\For each archive job\Read column definitions" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{718884A3-2A5A-4414-B8C3-5962B9B47749}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ForceExecutionResult="0" DTS:LocaleID="-1" DTS:MaxErrorCount="0" DTS:ObjectName="Read column definitions" DTS:ThreadHint="0">
           <DTS:Variables />
           <DTS:PropertyExpression DTS:Name="Disable">@[User::JobFailed]</DTS:PropertyExpression>
           <DTS:EventHandlers>
-            <DTS:EventHandler DTS:refId="Package\Foreach Loop Container\Read table shape.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{16101615-3EE3-47E1-A2D4-F0DB5108776B}" DTS:EventID="930159118" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
+            <DTS:EventHandler DTS:refId="Package\For each archive job\Read column definitions.EventHandlers[OnError]" DTS:CreationName="OnError" DTS:DTSID="{16101615-3EE3-47E1-A2D4-F0DB5108776B}" DTS:EventID="930159118" DTS:EventName="OnError" DTS:LocaleID="-1" DTS:MaxErrorCount="0">
               <DTS:Variables>
                 <DTS:Variable DTS:CreationName="" DTS:Description="The propagate property of the event" DTS:DTSID="{CFE30C10-9532-4980-8575-A9F15A068B17}" DTS:IncludeInDebugDump="6789" DTS:Namespace="System" DTS:ObjectName="Propagate">
                   <DTS:VariableValue DTS:DataType="11">-1</DTS:VariableValue>
                 </DTS:Variable>
               </DTS:Variables>
               <DTS:Executables>
-                <DTS:Executable DTS:refId="Package\Foreach Loop Container\Read table shape.EventHandlers[OnError]\Capture shape error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{474E8ABD-9A69-4F42-BB45-BFF28E6713F2}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture shape error">
+                <DTS:Executable DTS:refId="Package\For each archive job\Read column definitions.EventHandlers[OnError]\Capture shape error" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{474E8ABD-9A69-4F42-BB45-BFF28E6713F2}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Capture shape error">
                   <DTS:Variables />
                   <DTS:ObjectData>
                     <ScriptProject Name="ST_ae6a4b5be40246228bbcd7b250d64d38" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="System::ErrorDescription,User::TableName" ReadWriteVariables="System::Propagate,User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -11298,7 +11298,7 @@ namespace ST_ae6a4b5be40246228bbcd7b250d64d38.Properties {
             </SQLTask:SqlTaskData>
           </DTS:ObjectData>
         </DTS:Executable>
-        <DTS:Executable DTS:refId="Package\Foreach Loop Container\Report archive job" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{7967DDC8-BCFD-47B2-9A69-3B458E75AD93}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Report archive job" DTS:ThreadHint="0">
+        <DTS:Executable DTS:refId="Package\For each archive job\Log job result" DTS:CreationName="Microsoft.ScriptTask" DTS:DelayValidation="True" DTS:DTSID="{7967DDC8-BCFD-47B2-9A69-3B458E75AD93}" DTS:ExecutableType="Microsoft.ScriptTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Log job result" DTS:ThreadHint="0">
           <DTS:Variables />
           <DTS:ObjectData>
             <ScriptProject Name="ST_402dee574c50436ab5fa69fd758e0332" VSTAMajorVersion="17" VSTAMinorVersion="0" Language="CSharp" ReadOnlyVariables="User::TableName" ReadWriteVariables="User::JobActive,User::JobFailed,User::JobError,User::FailedJobs,User::ArchiveJobId,User::OutputFile">
@@ -11693,7 +11693,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
             </ScriptProject>
           </DTS:ObjectData>
         </DTS:Executable>
-        <DTS:Executable DTS:refId="Package\Foreach Loop Container\SetTableStatus" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{BF8AF7E4-861C-40EE-B415-902B91119A77}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="SetTableStatus" DTS:ThreadHint="0">
+        <DTS:Executable DTS:refId="Package\For each archive job\Save job result" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{BF8AF7E4-861C-40EE-B415-902B91119A77}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Save job result" DTS:ThreadHint="0">
           <DTS:Variables />
           <DTS:ObjectData>
             <SQLTask:SqlTaskData SQLTask:Connection="{903B4AD0-B8C3-4454-9033-B44E05535462}" SQLTask:TimeOut="300" SQLTask:SqlStatementSource="DECLARE @Now datetime2=SYSDATETIME();&#xA;UPDATE [Archive].[ArchiveJobs]&#xA;SET LastProcessedAt=@Now, LastProcessedStatus=CASE WHEN @Failed=1 THEN N'Error' ELSE N'Success' END,&#xA;    ErrorMessage=CASE WHEN @Failed=1 THEN @Error ELSE NULL END,&#xA;    LastSuccesProcessedAt=CASE WHEN @Failed=0 THEN @Now ELSE LastSuccesProcessedAt END&#xA;WHERE Id=@Id;&#xA;IF @@ROWCOUNT&lt;&gt;1 THROW 50001,'Archive job no longer exists.',1;" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask">
@@ -11703,7 +11703,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
             </SQLTask:SqlTaskData>
           </DTS:ObjectData>
         </DTS:Executable>
-        <DTS:Executable DTS:refId="Package\Foreach Loop Container\Start archive job" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{6F06EA4D-3F7F-4B99-8935-D9A0F8F48611}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Start archive job" DTS:ThreadHint="0">
+        <DTS:Executable DTS:refId="Package\For each archive job\Mark job as started" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{6F06EA4D-3F7F-4B99-8935-D9A0F8F48611}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Mark job as started" DTS:ThreadHint="0">
           <DTS:Variables />
           <DTS:ObjectData>
             <SQLTask:SqlTaskData SQLTask:Connection="{903B4AD0-B8C3-4454-9033-B44E05535462}" SQLTask:TimeOut="300" SQLTask:SqlStatementSource="UPDATE [Archive].[ArchiveJobs] SET ErrorMessage=NULL, LastProcessedAt=SYSDATETIME(), LastProcessedStatus=NULL WHERE Id=@Id; IF @@ROWCOUNT&lt;&gt;1 THROW 50001,'Archive job no longer exists.',1;" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask">
@@ -11713,16 +11713,16 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
         </DTS:Executable>
       </DTS:Executables>
       <DTS:PrecedenceConstraints>
-        <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container.PrecedenceConstraints[{00B4C673-DC42-483C-85F1-B426D5040BB6\}]" DTS:CreationName="" DTS:DTSID="{00B4C673-DC42-483C-85F1-B426D5040BB6}" DTS:From="Package\Foreach Loop Container\BeginScript" DTS:LogicalAnd="True" DTS:ObjectName="{00B4C673-DC42-483C-85F1-B426D5040BB6}" DTS:To="Package\Foreach Loop Container\Read table shape" />
-        <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container.PrecedenceConstraints[{25D273DF-BDCE-4FEB-ABCE-E281CEA1C770\}]" DTS:CreationName="" DTS:DTSID="{25D273DF-BDCE-4FEB-ABCE-E281CEA1C770}" DTS:From="Package\Foreach Loop Container\Start archive job" DTS:LogicalAnd="True" DTS:ObjectName="{25D273DF-BDCE-4FEB-ABCE-E281CEA1C770}" DTS:To="Package\Foreach Loop Container\Prepare archive job" />
-        <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container.PrecedenceConstraints[{34F5B715-45B0-48E8-BB6C-E3A2449C2DAC\}]" DTS:CreationName="" DTS:DTSID="{34F5B715-45B0-48E8-BB6C-E3A2449C2DAC}" DTS:From="Package\Foreach Loop Container\Get cutoff date" DTS:LogicalAnd="True" DTS:ObjectName="{34F5B715-45B0-48E8-BB6C-E3A2449C2DAC}" DTS:To="Package\Foreach Loop Container\Find first day" />
-        <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container.PrecedenceConstraints[{3710299F-9972-448C-809D-2713C8B5419A\}]" DTS:CreationName="" DTS:DTSID="{3710299F-9972-448C-809D-2713C8B5419A}" DTS:From="Package\Foreach Loop Container\Process table metadata" DTS:LogicalAnd="True" DTS:ObjectName="{3710299F-9972-448C-809D-2713C8B5419A}" DTS:To="Package\Foreach Loop Container\Get cutoff date" />
-        <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container.PrecedenceConstraints[{45379B96-D18E-4F65-A086-3CB24B753274\}]" DTS:CreationName="" DTS:DTSID="{45379B96-D18E-4F65-A086-3CB24B753274}" DTS:From="Package\Foreach Loop Container\Loop through days" DTS:LogicalAnd="True" DTS:ObjectName="{45379B96-D18E-4F65-A086-3CB24B753274}" DTS:To="Package\Foreach Loop Container\SetTableStatus" />
-        <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container.PrecedenceConstraints[{940D1116-3333-4787-AF2D-5E4007295959\}]" DTS:CreationName="" DTS:DTSID="{940D1116-3333-4787-AF2D-5E4007295959}" DTS:From="Package\Foreach Loop Container\Prepare archive job" DTS:LogicalAnd="True" DTS:ObjectName="{940D1116-3333-4787-AF2D-5E4007295959}" DTS:To="Package\Foreach Loop Container\BeginScript" />
-        <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container.PrecedenceConstraints[{A95A6E53-15B5-48BF-9BA8-451F134BBEE0\}]" DTS:CreationName="" DTS:DTSID="{A95A6E53-15B5-48BF-9BA8-451F134BBEE0}" DTS:From="Package\Foreach Loop Container\SetTableStatus" DTS:LogicalAnd="True" DTS:ObjectName="{A95A6E53-15B5-48BF-9BA8-451F134BBEE0}" DTS:To="Package\Foreach Loop Container\Report archive job" />
-        <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container.PrecedenceConstraints[{B57B892C-5E4D-4A0F-856A-66A9B22FA017\}]" DTS:CreationName="" DTS:DTSID="{B57B892C-5E4D-4A0F-856A-66A9B22FA017}" DTS:From="Package\Foreach Loop Container\Find first day" DTS:LogicalAnd="True" DTS:ObjectName="{B57B892C-5E4D-4A0F-856A-66A9B22FA017}" DTS:To="Package\Foreach Loop Container\Loop through days" />
-        <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container.PrecedenceConstraints[{B75CA5CD-B50E-4AF8-B5C7-D6CD10A9E68F\}]" DTS:CreationName="" DTS:DTSID="{B75CA5CD-B50E-4AF8-B5C7-D6CD10A9E68F}" DTS:From="Package\Foreach Loop Container\Read table metadata" DTS:LogicalAnd="True" DTS:ObjectName="{B75CA5CD-B50E-4AF8-B5C7-D6CD10A9E68F}" DTS:To="Package\Foreach Loop Container\Process table metadata" />
-        <DTS:PrecedenceConstraint DTS:refId="Package\Foreach Loop Container.PrecedenceConstraints[{FED653DB-0409-4D69-B5E0-A878792879FB\}]" DTS:CreationName="" DTS:DTSID="{FED653DB-0409-4D69-B5E0-A878792879FB}" DTS:From="Package\Foreach Loop Container\Read table shape" DTS:LogicalAnd="True" DTS:ObjectName="{FED653DB-0409-4D69-B5E0-A878792879FB}" DTS:To="Package\Foreach Loop Container\Read table metadata" />
+        <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job.PrecedenceConstraints[{00B4C673-DC42-483C-85F1-B426D5040BB6\}]" DTS:CreationName="" DTS:DTSID="{00B4C673-DC42-483C-85F1-B426D5040BB6}" DTS:From="Package\For each archive job\Prepare metadata and date queries" DTS:LogicalAnd="True" DTS:ObjectName="{00B4C673-DC42-483C-85F1-B426D5040BB6}" DTS:To="Package\For each archive job\Read column definitions" />
+        <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job.PrecedenceConstraints[{25D273DF-BDCE-4FEB-ABCE-E281CEA1C770\}]" DTS:CreationName="" DTS:DTSID="{25D273DF-BDCE-4FEB-ABCE-E281CEA1C770}" DTS:From="Package\For each archive job\Mark job as started" DTS:LogicalAnd="True" DTS:ObjectName="{25D273DF-BDCE-4FEB-ABCE-E281CEA1C770}" DTS:To="Package\For each archive job\Initialize job variables" />
+        <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job.PrecedenceConstraints[{34F5B715-45B0-48E8-BB6C-E3A2449C2DAC\}]" DTS:CreationName="" DTS:DTSID="{34F5B715-45B0-48E8-BB6C-E3A2449C2DAC}" DTS:From="Package\For each archive job\Calculate retention cutoff" DTS:LogicalAnd="True" DTS:ObjectName="{34F5B715-45B0-48E8-BB6C-E3A2449C2DAC}" DTS:To="Package\For each archive job\Find first archive day" />
+        <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job.PrecedenceConstraints[{3710299F-9972-448C-809D-2713C8B5419A\}]" DTS:CreationName="" DTS:DTSID="{3710299F-9972-448C-809D-2713C8B5419A}" DTS:From="Package\For each archive job\Prepare export schema and header" DTS:LogicalAnd="True" DTS:ObjectName="{3710299F-9972-448C-809D-2713C8B5419A}" DTS:To="Package\For each archive job\Calculate retention cutoff" />
+        <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job.PrecedenceConstraints[{45379B96-D18E-4F65-A086-3CB24B753274\}]" DTS:CreationName="" DTS:DTSID="{45379B96-D18E-4F65-A086-3CB24B753274}" DTS:From="Package\For each archive job\For each archive day" DTS:LogicalAnd="True" DTS:ObjectName="{45379B96-D18E-4F65-A086-3CB24B753274}" DTS:To="Package\For each archive job\Save job result" />
+        <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job.PrecedenceConstraints[{940D1116-3333-4787-AF2D-5E4007295959\}]" DTS:CreationName="" DTS:DTSID="{940D1116-3333-4787-AF2D-5E4007295959}" DTS:From="Package\For each archive job\Initialize job variables" DTS:LogicalAnd="True" DTS:ObjectName="{940D1116-3333-4787-AF2D-5E4007295959}" DTS:To="Package\For each archive job\Prepare metadata and date queries" />
+        <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job.PrecedenceConstraints[{A95A6E53-15B5-48BF-9BA8-451F134BBEE0\}]" DTS:CreationName="" DTS:DTSID="{A95A6E53-15B5-48BF-9BA8-451F134BBEE0}" DTS:From="Package\For each archive job\Save job result" DTS:LogicalAnd="True" DTS:ObjectName="{A95A6E53-15B5-48BF-9BA8-451F134BBEE0}" DTS:To="Package\For each archive job\Log job result" />
+        <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job.PrecedenceConstraints[{B57B892C-5E4D-4A0F-856A-66A9B22FA017\}]" DTS:CreationName="" DTS:DTSID="{B57B892C-5E4D-4A0F-856A-66A9B22FA017}" DTS:From="Package\For each archive job\Find first archive day" DTS:LogicalAnd="True" DTS:ObjectName="{B57B892C-5E4D-4A0F-856A-66A9B22FA017}" DTS:To="Package\For each archive job\For each archive day" />
+        <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job.PrecedenceConstraints[{B75CA5CD-B50E-4AF8-B5C7-D6CD10A9E68F\}]" DTS:CreationName="" DTS:DTSID="{B75CA5CD-B50E-4AF8-B5C7-D6CD10A9E68F}" DTS:From="Package\For each archive job\Read SQL types and keys" DTS:LogicalAnd="True" DTS:ObjectName="{B75CA5CD-B50E-4AF8-B5C7-D6CD10A9E68F}" DTS:To="Package\For each archive job\Prepare export schema and header" />
+        <DTS:PrecedenceConstraint DTS:refId="Package\For each archive job.PrecedenceConstraints[{FED653DB-0409-4D69-B5E0-A878792879FB\}]" DTS:CreationName="" DTS:DTSID="{FED653DB-0409-4D69-B5E0-A878792879FB}" DTS:From="Package\For each archive job\Read column definitions" DTS:LogicalAnd="True" DTS:ObjectName="{FED653DB-0409-4D69-B5E0-A878792879FB}" DTS:To="Package\For each archive job\Read SQL types and keys" />
       </DTS:PrecedenceConstraints>
       <DTS:ForEachVariableMappings>
         <DTS:ForEachVariableMapping DTS:CreationName="" DTS:DTSID="{D670185B-353F-4D58-A8A2-3AA9F9F4FB8E}" DTS:ObjectName="{D670185B-353F-4D58-A8A2-3AA9F9F4FB8E}" DTS:ValueIndex="0" DTS:VariableName="User::ArchiveJobId" />
@@ -11732,7 +11732,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
         <DTS:ForEachVariableMapping DTS:CreationName="" DTS:DTSID="{D5BE61DC-619F-4A85-BAD0-29CAB05AB5A0}" DTS:ObjectName="{D5BE61DC-619F-4A85-BAD0-29CAB05AB5A0}" DTS:ValueIndex="4" DTS:VariableName="User::ColumnDate" />
       </DTS:ForEachVariableMappings>
     </DTS:Executable>
-    <DTS:Executable DTS:refId="Package\Get Archive Jobs" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{1917620A-4E27-4296-A8C6-D30DE5B42321}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Get Archive Jobs" DTS:ThreadHint="0">
+    <DTS:Executable DTS:refId="Package\Load archive jobs" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DelayValidation="True" DTS:DTSID="{1917620A-4E27-4296-A8C6-D30DE5B42321}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:FailPackageOnFailure="True" DTS:LocaleID="-1" DTS:ObjectName="Load archive jobs" DTS:ThreadHint="0">
       <DTS:Variables />
       <DTS:ObjectData>
         <SQLTask:SqlTaskData SQLTask:Connection="{903B4AD0-B8C3-4454-9033-B44E05535462}" SQLTask:TimeOut="300" SQLTask:SqlStatementSource="SELECT Id, DatabaseName, TableName, ArchiveOlderThanDays, DateColumn FROM [Archive].[ArchiveJobs] ORDER BY Id;" SQLTask:ResultType="ResultSetType_Rowset" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask">
@@ -11742,39 +11742,39 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
     </DTS:Executable>
   </DTS:Executables>
   <DTS:PrecedenceConstraints>
-    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[{9D938DBE-89D4-4733-A342-29FB04D186D0\}]" DTS:CreationName="" DTS:DTSID="{9D938DBE-89D4-4733-A342-29FB04D186D0}" DTS:From="Package\Foreach Loop Container" DTS:LogicalAnd="True" DTS:ObjectName="{9D938DBE-89D4-4733-A342-29FB04D186D0}" DTS:To="Package\Archive summary" />
-    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[{D85EE62C-7E0A-42C8-BC6A-F25352E49DEE\}]" DTS:CreationName="" DTS:DTSID="{D85EE62C-7E0A-42C8-BC6A-F25352E49DEE}" DTS:From="Package\Get Archive Jobs" DTS:LogicalAnd="True" DTS:ObjectName="{D85EE62C-7E0A-42C8-BC6A-F25352E49DEE}" DTS:To="Package\Foreach Loop Container" />
+    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[{9D938DBE-89D4-4733-A342-29FB04D186D0\}]" DTS:CreationName="" DTS:DTSID="{9D938DBE-89D4-4733-A342-29FB04D186D0}" DTS:From="Package\For each archive job" DTS:LogicalAnd="True" DTS:ObjectName="{9D938DBE-89D4-4733-A342-29FB04D186D0}" DTS:To="Package\Check overall archive result" />
+    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[{D85EE62C-7E0A-42C8-BC6A-F25352E49DEE\}]" DTS:CreationName="" DTS:DTSID="{D85EE62C-7E0A-42C8-BC6A-F25352E49DEE}" DTS:From="Package\Load archive jobs" DTS:LogicalAnd="True" DTS:ObjectName="{D85EE62C-7E0A-42C8-BC6A-F25352E49DEE}" DTS:To="Package\For each archive job" />
   </DTS:PrecedenceConstraints>
 <DTS:DesignTimeProperties><![CDATA[<Objects Version="8">
   <Package design-time-name="Package">
     <LayoutInfo>
       <GraphLayout xmlns="clr-namespace:Microsoft.SqlServer.IntegrationServices.Designer.Model.Serialization;assembly=Microsoft.SqlServer.IntegrationServices.Graph" xmlns:mssgle="clr-namespace:Microsoft.SqlServer.Graph.LayoutEngine;assembly=Microsoft.SqlServer.Graph" xmlns:assembly="http://schemas.microsoft.com/winfx/2006/xaml">
-        <NodeLayout Id="Package\Get Archive Jobs" TopLeft="32,24" Size="210,46" />
-        <ContainerLayout Id="Package\Foreach Loop Container" TopLeft="32,120" Size="1100,1170" HeaderHeight="43" IsExpanded="True" PanelSize="1100,1127" />
-        <NodeLayout Id="Package\Archive summary" TopLeft="32,1340" Size="210,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\Start archive job" TopLeft="28,24" Size="210,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\Prepare archive job" TopLeft="294,24" Size="210,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\BeginScript" TopLeft="560,24" Size="210,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\Read table shape" TopLeft="826,24" Size="210,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\Read table metadata" TopLeft="826,140" Size="210,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\Process table metadata" TopLeft="560,140" Size="210,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\Get cutoff date" TopLeft="294,140" Size="210,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\Find first day" TopLeft="294,260" Size="210,46" />
-        <ContainerLayout Id="Package\Foreach Loop Container\Loop through days" TopLeft="28,410" Size="1030,580" HeaderHeight="43" IsExpanded="True" PanelSize="1030,537" />
-        <NodeLayout Id="Package\Foreach Loop Container\Loop through days\GetGuid" TopLeft="24,24" Size="210,46" />
-        <ContainerLayout Id="Package\Foreach Loop Container\Loop through days\Loop through CSV parts" TopLeft="24,110" Size="950,280" HeaderHeight="43" IsExpanded="True" PanelSize="950,237" />
-        <NodeLayout Id="Package\Foreach Loop Container\Loop through days\Create daily ZIP" TopLeft="24,440" Size="210,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\Loop through days\Test daily ZIP" TopLeft="340,440" Size="210,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\Loop through days\Clean archived CSV files" TopLeft="656,440" Size="210,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\SetTableStatus" TopLeft="294,1040" Size="210,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\Report archive job" TopLeft="560,1040" Size="210,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Construct SQL" TopLeft="24,24" Size="180,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Read archive batch" TopLeft="236,24" Size="180,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Export data to CSV" TopLeft="448,24" Size="180,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Prepare batch delete" TopLeft="660,24" Size="180,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Delete exported batch" TopLeft="236,156" Size="180,46" />
-        <NodeLayout Id="Package\Foreach Loop Container\Loop through days\Loop through CSV parts\Check deleted rows" TopLeft="24,156" Size="180,46" />
-        <EdgeLayout Id="Package\Foreach Loop Container\Loop through days\Loop through CSV parts.PrecedenceConstraints[{4D894417-6F95-48E3-90F6-029D562355A7\}]" TopLeft="750,70">
+        <NodeLayout Id="Package\Load archive jobs" TopLeft="32,24" Size="210,46" />
+        <ContainerLayout Id="Package\For each archive job" TopLeft="32,120" Size="1100,1170" HeaderHeight="43" IsExpanded="True" PanelSize="1100,1127" />
+        <NodeLayout Id="Package\Check overall archive result" TopLeft="32,1340" Size="210,46" />
+        <NodeLayout Id="Package\For each archive job\Mark job as started" TopLeft="28,24" Size="210,46" />
+        <NodeLayout Id="Package\For each archive job\Initialize job variables" TopLeft="294,24" Size="210,46" />
+        <NodeLayout Id="Package\For each archive job\Prepare metadata and date queries" TopLeft="560,24" Size="210,46" />
+        <NodeLayout Id="Package\For each archive job\Read column definitions" TopLeft="826,24" Size="210,46" />
+        <NodeLayout Id="Package\For each archive job\Read SQL types and keys" TopLeft="826,140" Size="210,46" />
+        <NodeLayout Id="Package\For each archive job\Prepare export schema and header" TopLeft="560,140" Size="210,46" />
+        <NodeLayout Id="Package\For each archive job\Calculate retention cutoff" TopLeft="294,140" Size="210,46" />
+        <NodeLayout Id="Package\For each archive job\Find first archive day" TopLeft="294,260" Size="210,46" />
+        <ContainerLayout Id="Package\For each archive job\For each archive day" TopLeft="28,410" Size="1030,580" HeaderHeight="43" IsExpanded="True" PanelSize="1030,537" />
+        <NodeLayout Id="Package\For each archive job\For each archive day\Initialize daily archive" TopLeft="24,24" Size="210,46" />
+        <ContainerLayout Id="Package\For each archive job\For each archive day\Process daily batches" TopLeft="24,110" Size="950,280" HeaderHeight="43" IsExpanded="True" PanelSize="950,237" />
+        <NodeLayout Id="Package\For each archive job\For each archive day\Create daily ZIP" TopLeft="24,440" Size="210,46" />
+        <NodeLayout Id="Package\For each archive job\For each archive day\Verify ZIP integrity" TopLeft="340,440" Size="210,46" />
+        <NodeLayout Id="Package\For each archive job\For each archive day\Delete temporary CSV files" TopLeft="656,440" Size="210,46" />
+        <NodeLayout Id="Package\For each archive job\Save job result" TopLeft="294,1040" Size="210,46" />
+        <NodeLayout Id="Package\For each archive job\Log job result" TopLeft="560,1040" Size="210,46" />
+        <NodeLayout Id="Package\For each archive job\For each archive day\Process daily batches\Prepare batch select query" TopLeft="24,24" Size="180,46" />
+        <NodeLayout Id="Package\For each archive job\For each archive day\Process daily batches\Read archive batch" TopLeft="236,24" Size="180,46" />
+        <NodeLayout Id="Package\For each archive job\For each archive day\Process daily batches\Write batch to CSV" TopLeft="448,24" Size="180,46" />
+        <NodeLayout Id="Package\For each archive job\For each archive day\Process daily batches\Prepare delete query and keys" TopLeft="660,24" Size="180,46" />
+        <NodeLayout Id="Package\For each archive job\For each archive day\Process daily batches\Delete exported batch" TopLeft="236,156" Size="180,46" />
+        <NodeLayout Id="Package\For each archive job\For each archive day\Process daily batches\Verify deleted row count" TopLeft="24,156" Size="180,46" />
+        <EdgeLayout Id="Package\For each archive job\For each archive day\Process daily batches.PrecedenceConstraints[{4D894417-6F95-48E3-90F6-029D562355A7\}]" TopLeft="750,70">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="-424,86" Start="0,0" End="-424,78.5">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="0,43" /><mssgle:LineSegment End="-424,43" /><mssgle:LineSegment End="-424,78.5" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11782,7 +11782,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container\Loop through days\Loop through CSV parts.PrecedenceConstraints[{5F1863CC-22B6-46D4-9929-AC1F502CED9B\}]" TopLeft="236,179">
+        <EdgeLayout Id="Package\For each archive job\For each archive day\Process daily batches.PrecedenceConstraints[{5F1863CC-22B6-46D4-9929-AC1F502CED9B\}]" TopLeft="236,179">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="-32,0" Start="0,0" End="-24.5,0">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="-24.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11790,7 +11790,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container\Loop through days\Loop through CSV parts.PrecedenceConstraints[{BC9BC047-2AF3-425E-AA18-30FA4A4C7B69\}]" TopLeft="628,47">
+        <EdgeLayout Id="Package\For each archive job\For each archive day\Process daily batches.PrecedenceConstraints[{BC9BC047-2AF3-425E-AA18-30FA4A4C7B69\}]" TopLeft="628,47">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="32,0" Start="0,0" End="24.5,0">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="24.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11798,7 +11798,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container\Loop through days\Loop through CSV parts.PrecedenceConstraints[{EF72F9ED-727B-4846-8D3E-CDDAEC4356EB\}]" TopLeft="416,47">
+        <EdgeLayout Id="Package\For each archive job\For each archive day\Process daily batches.PrecedenceConstraints[{EF72F9ED-727B-4846-8D3E-CDDAEC4356EB\}]" TopLeft="416,47">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="32,0" Start="0,0" End="24.5,0">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="24.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11806,7 +11806,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container\Loop through days\Loop through CSV parts.PrecedenceConstraints[{FC9DECF8-F27B-4852-A751-801EA684A2F7\}]" TopLeft="204,47">
+        <EdgeLayout Id="Package\For each archive job\For each archive day\Process daily batches.PrecedenceConstraints[{FC9DECF8-F27B-4852-A751-801EA684A2F7\}]" TopLeft="204,47">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="32,0" Start="0,0" End="24.5,0">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="24.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11814,7 +11814,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container\Loop through days.PrecedenceConstraints[{2A7C79A2-B1D5-402B-AAE7-5845A455EA75\}]" TopLeft="499,390">
+        <EdgeLayout Id="Package\For each archive job\For each archive day.PrecedenceConstraints[{2A7C79A2-B1D5-402B-AAE7-5845A455EA75\}]" TopLeft="499,390">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="-370,50" Start="0,0" End="-370,42.5">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="0,25" /><mssgle:LineSegment End="-370,25" /><mssgle:LineSegment End="-370,42.5" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11822,7 +11822,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container\Loop through days.PrecedenceConstraints[{3CA8820D-A3DF-4AB0-89DE-78B274B760D2\}]" TopLeft="129,70">
+        <EdgeLayout Id="Package\For each archive job\For each archive day.PrecedenceConstraints[{3CA8820D-A3DF-4AB0-89DE-78B274B760D2\}]" TopLeft="129,70">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="370,40" Start="0,0" End="370,32.5">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="0,20" /><mssgle:LineSegment End="370,20" /><mssgle:LineSegment End="370,32.5" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11830,7 +11830,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container\Loop through days.PrecedenceConstraints[{6405EBA2-4706-4C0C-BD84-EC8560014DA0\}]" TopLeft="234,463">
+        <EdgeLayout Id="Package\For each archive job\For each archive day.PrecedenceConstraints[{6405EBA2-4706-4C0C-BD84-EC8560014DA0\}]" TopLeft="234,463">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="106,0" Start="0,0" End="98.5,0">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="98.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11838,7 +11838,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container\Loop through days.PrecedenceConstraints[{7E708134-53EF-4C2F-A1AD-29F8A8292884\}]" TopLeft="550,463">
+        <EdgeLayout Id="Package\For each archive job\For each archive day.PrecedenceConstraints[{7E708134-53EF-4C2F-A1AD-29F8A8292884\}]" TopLeft="550,463">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="106,0" Start="0,0" End="98.5,0">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="98.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11846,7 +11846,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container.PrecedenceConstraints[{00B4C673-DC42-483C-85F1-B426D5040BB6\}]" TopLeft="770,47">
+        <EdgeLayout Id="Package\For each archive job.PrecedenceConstraints[{00B4C673-DC42-483C-85F1-B426D5040BB6\}]" TopLeft="770,47">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="56,0" Start="0,0" End="48.5,0">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="48.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11854,7 +11854,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container.PrecedenceConstraints[{25D273DF-BDCE-4FEB-ABCE-E281CEA1C770\}]" TopLeft="238,47">
+        <EdgeLayout Id="Package\For each archive job.PrecedenceConstraints[{25D273DF-BDCE-4FEB-ABCE-E281CEA1C770\}]" TopLeft="238,47">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="56,0" Start="0,0" End="48.5,0">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="48.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11862,7 +11862,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container.PrecedenceConstraints[{34F5B715-45B0-48E8-BB6C-E3A2449C2DAC\}]" TopLeft="399,186">
+        <EdgeLayout Id="Package\For each archive job.PrecedenceConstraints[{34F5B715-45B0-48E8-BB6C-E3A2449C2DAC\}]" TopLeft="399,186">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="0,74" Start="0,0" End="0,66.5">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="0,37" /><mssgle:LineSegment End="0,37" /><mssgle:LineSegment End="0,66.5" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11870,7 +11870,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container.PrecedenceConstraints[{3710299F-9972-448C-809D-2713C8B5419A\}]" TopLeft="560,163">
+        <EdgeLayout Id="Package\For each archive job.PrecedenceConstraints[{3710299F-9972-448C-809D-2713C8B5419A\}]" TopLeft="560,163">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="-56,0" Start="0,0" End="-48.5,0">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="-48.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11878,7 +11878,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container.PrecedenceConstraints[{45379B96-D18E-4F65-A086-3CB24B753274\}]" TopLeft="543,990">
+        <EdgeLayout Id="Package\For each archive job.PrecedenceConstraints[{45379B96-D18E-4F65-A086-3CB24B753274\}]" TopLeft="543,990">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="-144,50" Start="0,0" End="-144,42.5">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="0,25" /><mssgle:LineSegment End="-144,25" /><mssgle:LineSegment End="-144,42.5" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11886,7 +11886,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container.PrecedenceConstraints[{940D1116-3333-4787-AF2D-5E4007295959\}]" TopLeft="504,47">
+        <EdgeLayout Id="Package\For each archive job.PrecedenceConstraints[{940D1116-3333-4787-AF2D-5E4007295959\}]" TopLeft="504,47">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="56,0" Start="0,0" End="48.5,0">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="48.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11894,7 +11894,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container.PrecedenceConstraints[{A95A6E53-15B5-48BF-9BA8-451F134BBEE0\}]" TopLeft="504,1063">
+        <EdgeLayout Id="Package\For each archive job.PrecedenceConstraints[{A95A6E53-15B5-48BF-9BA8-451F134BBEE0\}]" TopLeft="504,1063">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="56,0" Start="0,0" End="48.5,0">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="48.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11902,7 +11902,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container.PrecedenceConstraints[{B57B892C-5E4D-4A0F-856A-66A9B22FA017\}]" TopLeft="399,306">
+        <EdgeLayout Id="Package\For each archive job.PrecedenceConstraints[{B57B892C-5E4D-4A0F-856A-66A9B22FA017\}]" TopLeft="399,306">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="144,104" Start="0,0" End="144,96.5">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="0,52" /><mssgle:LineSegment End="144,52" /><mssgle:LineSegment End="144,96.5" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11910,7 +11910,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container.PrecedenceConstraints[{B75CA5CD-B50E-4AF8-B5C7-D6CD10A9E68F\}]" TopLeft="826,163">
+        <EdgeLayout Id="Package\For each archive job.PrecedenceConstraints[{B75CA5CD-B50E-4AF8-B5C7-D6CD10A9E68F\}]" TopLeft="826,163">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="-56,0" Start="0,0" End="-48.5,0">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="-48.5,0" /></mssgle:SegmentCollection></mssgle:Curve.Segments>
@@ -11918,7 +11918,7 @@ namespace ST_402dee574c50436ab5fa69fd758e0332.Properties {
           </EdgeLayout.Curve>
           <EdgeLayout.Labels><EdgeLabelCollection /></EdgeLayout.Labels>
         </EdgeLayout>
-        <EdgeLayout Id="Package\Foreach Loop Container.PrecedenceConstraints[{FED653DB-0409-4D69-B5E0-A878792879FB\}]" TopLeft="931,70">
+        <EdgeLayout Id="Package\For each archive job.PrecedenceConstraints[{FED653DB-0409-4D69-B5E0-A878792879FB\}]" TopLeft="931,70">
           <EdgeLayout.Curve>
             <mssgle:Curve StartConnector="{assembly:Null}" EndConnector="0,70" Start="0,0" End="0,62.5">
               <mssgle:Curve.Segments><mssgle:SegmentCollection><mssgle:LineSegment End="0,35" /><mssgle:LineSegment End="0,35" /><mssgle:LineSegment End="0,62.5" /></mssgle:SegmentCollection></mssgle:Curve.Segments>

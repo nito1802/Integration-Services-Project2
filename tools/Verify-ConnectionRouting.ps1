@@ -7,7 +7,7 @@ $app=New-Object Microsoft.SqlServer.Dts.Runtime.Application
 $package=$app.LoadPackage((Join-Path $PSScriptRoot 'compatibility-test.dtsx'),$null)
 $package.Parameters['ConnectionString'].Value=$config.ConnectionString
 foreach($connection in $package.Connections) { $connection.ConnectionString=$config.ConnectionString }
-$hostTask=$package.Executables['Foreach Loop Container'].Executables['Read table shape']
+$hostTask=$package.Executables['For each archive job'].Executables['Read column definitions']
 $package.Variables['User::ShapeSql'].Value='SELECT DB_NAME() AS DatabaseName;'
 foreach($database in @('master','tempdb',$config.Database,'master')) {
     $package.Variables['User::DatabaseName'].Value=$database
