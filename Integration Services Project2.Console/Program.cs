@@ -9,6 +9,20 @@ Console.OutputEncoding = System.Text.Encoding.UTF8;
 
 try
 {
+    //if (args.Length == 1 && args[0].Equals("seed-events", StringComparison.OrdinalIgnoreCase))
+    //{
+    //    await new EventTestDataCreator().AddAsync();
+    //    return 0;
+    //}
+
+    await new EventTestDataCreator().AddAsync();
+
+    if (args.Length > 0)
+    {
+        Console.Error.WriteLine("Użycie: bez argumentów (dodanie zadań) lub seed-events (50000 zdarzeń testowych).");
+        return 1;
+    }
+
     var services = new ServiceCollection();
     services.AddDbContext<ArchiveJobsDbContext>(options =>
         options.UseSqlServer(DatabaseConfiguration.GetConnectionString(),
