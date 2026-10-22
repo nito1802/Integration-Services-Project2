@@ -9,6 +9,12 @@ Console.OutputEncoding = System.Text.Encoding.UTF8;
 
 try
 {
+    if (args.Length == 1 && args[0].Equals("seed-fk-tables", StringComparison.OrdinalIgnoreCase))
+    {
+        await new ForeignKeyTestDataCreator().SeedAsync();
+        return 0;
+    }
+
     //if (args.Length == 1 && args[0].Equals("seed-events", StringComparison.OrdinalIgnoreCase))
     //{
     //    await new EventTestDataCreator().AddAsync();

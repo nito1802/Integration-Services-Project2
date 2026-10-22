@@ -1,5 +1,32 @@
 # Integration Services Project2.Console
 
+## Tabele testowe z kluczami obcymi
+
+`ForeignKeyTestDataCreator.SeedAsync()` tworzy cztery tabele w bazie `nito_superDb` i odtwarza ich dane:
+
+```powershell
+dotnet run --project "Integration Services Project2.Console" -- seed-fk-tables
+```
+
+Każda tabela ma 1000 rekordów: 2025-01-01–2025-01-10, po 100 dziennie.
+Każde dziecko wskazuje jednego rodzica z tego samego dnia. Oba FK mają `ON DELETE NO ACTION`.
+Zadania w `Archive.ArchiveJobs` otrzymują nowe Id w kolejności:
+
+1. `ArchiveFkTest.GoodChild`
+2. `ArchiveFkTest.GoodParent`
+3. `ArchiveFkTest.BadParent`
+4. `ArchiveFkTest.BadChild`
+
+Retencja wynosi 30 dni. Pierwsza para powinna przejść archiwizację i usuwanie.
+Przy drugim rodzicu usunięcie zablokuje FK; późniejsze zadanie dziecka może się udać,
+więc błąd rodzica należy sprawdzić podczas pierwszego uruchomienia pakietu.
+Eksport rodzica może już powstać przed błędem usuwania.
+
+Uruchamiaj seed przy zatrzymanym pakiecie. Ponowienie usuwa i odtwarza dane wyłącznie
+w tych czterech tabelach oraz zastępuje wyłącznie ich cztery zadania (resetując statusy).
+Pozostałe tabele i zadania pozostają bez zmian. Seed wykonuje się w jednej transakcji.
+Korzysta z połączenia aplikacji, z bazą docelową ustawioną jawnie na `nito_superDb`.
+
 ## Dane testowe SmartHome.Events
 
 ```powershell
