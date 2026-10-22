@@ -74,21 +74,7 @@
                     <SSIS:Property SSIS:Name="IncludeInDebugDump">0</SSIS:Property>
                     <SSIS:Property SSIS:Name="Required">0</SSIS:Property>
                     <SSIS:Property SSIS:Name="Sensitive">0</SSIS:Property>
-                    <SSIS:Property SSIS:Name="Value">Data Source=mssql3.webio.pl,2401;Database=nito_superDb;Uid=nito_user_db;Password=SEbu4b!scxEug38;TrustServerCertificate=True</SSIS:Property>
-                    <SSIS:Property SSIS:Name="DataType">18</SSIS:Property>
-                  </SSIS:Properties>
-                </SSIS:Parameter>
-                <SSIS:Parameter SSIS:Name="ArchiveJobsConnectionString">
-                  <SSIS:Properties>
-                    <SSIS:Property SSIS:Name="ID">{7D81E017-2867-4D7D-91F6-1ABFC0C54539}</SSIS:Property>
-                    <SSIS:Property SSIS:Name="CreationName">
-                    </SSIS:Property>
-                    <SSIS:Property SSIS:Name="Description">
-                    </SSIS:Property>
-                    <SSIS:Property SSIS:Name="IncludeInDebugDump">0</SSIS:Property>
-                    <SSIS:Property SSIS:Name="Required">0</SSIS:Property>
-                    <SSIS:Property SSIS:Name="Sensitive">0</SSIS:Property>
-                    <SSIS:Property SSIS:Name="Value">Data Source=mssql3.webio.pl,2401;Database=nito_superDb;Uid=nito_user_db;Password=SEbu4b!scxEug38;TrustServerCertificate=True</SSIS:Property>
+                    <SSIS:Property SSIS:Name="Value">Data Source=mssql3.webio.pl,2401;User ID=nito_user_db;Password=SEbu4b!scxEug38;TrustServerCertificate=True</SSIS:Property>
                     <SSIS:Property SSIS:Name="DataType">18</SSIS:Property>
                   </SSIS:Properties>
                 </SSIS:Parameter>
@@ -130,7 +116,7 @@
                     <SSIS:Property SSIS:Name="IncludeInDebugDump">0</SSIS:Property>
                     <SSIS:Property SSIS:Name="Required">0</SSIS:Property>
                     <SSIS:Property SSIS:Name="Sensitive">0</SSIS:Property>
-                    <SSIS:Property SSIS:Name="Value">Archive.ArchiveJobs</SSIS:Property>
+                    <SSIS:Property SSIS:Name="Value">nito_superDb.Archive.ArchiveJobs</SSIS:Property>
                     <SSIS:Property SSIS:Name="DataType">18</SSIS:Property>
                   </SSIS:Properties>
                 </SSIS:Parameter>

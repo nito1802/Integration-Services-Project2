@@ -1,4 +1,4 @@
-﻿param([switch]$CompatibilityTest)
+param([switch]$CompatibilityTest)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $project=Join-Path $root 'Integration Services Project2'
@@ -10,7 +10,7 @@ $currentNs=New-Object Xml.XmlNamespaceManager($current.NameTable)
 $currentNs.AddNamespace('DTS','www.microsoft.com/SqlServer/Dts')
 $currentValues=@{}
 $currentParameterIds=@{}
-foreach($name in @('ConnectionString','ArchiveJobsConnectionString','ArchiveJobsTable','ArchiveRoot','MaxRecordsPerCsv','SevenZipPath')) {
+foreach($name in @('ConnectionString','ArchiveJobsTable','ArchiveRoot','MaxRecordsPerCsv','SevenZipPath')) {
     $valueNode=$current.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="'+$name+'"]/DTS:Property[@DTS:Name="ParameterValue"]',$currentNs)
     if($valueNode) { $currentValues[$name]=$valueNode.InnerText; $currentParameterIds[$name]=$valueNode.ParentNode.GetAttribute('DTSID','www.microsoft.com/SqlServer/Dts') }
 }
@@ -45,9 +45,6 @@ foreach($obsolete in @('TableName','DateColumn','OlderThanDays','OutputFile')) {
 $p=$package.Parameters.Add('ArchiveRoot',[TypeCode]::String); $p.Value=$archiveRoot
 if($currentValues.ContainsKey('ConnectionString')) { $package.Parameters['ConnectionString'].Value=$currentValues['ConnectionString'] }
 if($currentValues.ContainsKey('ArchiveRoot')) { $package.Parameters['ArchiveRoot'].Value=$currentValues['ArchiveRoot'] }
-$p=$package.Parameters.Add('ArchiveJobsConnectionString',[TypeCode]::String)
-$p.Value=if($currentValues.ContainsKey('ArchiveJobsConnectionString')) { $currentValues['ArchiveJobsConnectionString'] } else { $package.Parameters['ConnectionString'].Value }
-$p.Description='Connection to the database containing the configured ArchiveJobsTable (job configuration and processing status).'
 foreach($entry in @(@('ArchiveJobsTable',[TypeCode]::String,'Archive.ArchiveJobs'),@('MaxRecordsPerCsv',[TypeCode]::Int32,1000),@('SevenZipPath',[TypeCode]::String,'C:\Program Files\7-Zip\7z.exe'))) {
     $p=$package.Parameters.Add($entry[0],$entry[1]); $p.Value=$entry[2]
     if($currentValues.ContainsKey($entry[0])) { $p.Value=[Convert]::ChangeType($currentValues[$entry[0]],$entry[1]) }
@@ -59,7 +56,7 @@ $connection.Properties['RetainSameConnection'].SetValue($connection,$true)
 $connection.DelayValidation=$true
 $statusConnection=$package.Connections.Add('ADO.NET:System.Data.SqlClient.SqlConnection, System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089')
 $statusConnection.Name='ArchiveJobsDb'
-$statusConnection.SetExpression('ConnectionString','@[$Package::ArchiveJobsConnectionString]')
+$statusConnection.SetExpression('ConnectionString','@[$Package::ConnectionString]')
 $statusConnection.Properties['RetainSameConnection'].SetValue($statusConnection,$true)
 $statusConnection.DelayValidation=$true
 function Link($container,$from,$to,$expression='') {
@@ -263,12 +260,12 @@ if (!$CompatibilityTest) {
     $projectNs=New-Object Xml.XmlNamespaceManager($projectXml.NameTable)
     $projectNs.AddNamespace('SSIS','www.microsoft.com/SqlServer/SSIS')
     foreach($parameterNode in @($projectXml.SelectNodes('//SSIS:PackageMetaData/SSIS:Parameters/SSIS:Parameter',$projectNs))) {
-        if($parameterNode.GetAttribute('Name','www.microsoft.com/SqlServer/SSIS') -notin @('ConnectionString','ArchiveJobsConnectionString','ArchiveJobsTable','ArchiveRoot','MaxRecordsPerCsv','SevenZipPath')) {
+        if($parameterNode.GetAttribute('Name','www.microsoft.com/SqlServer/SSIS') -notin @('ConnectionString','ArchiveJobsTable','ArchiveRoot','MaxRecordsPerCsv','SevenZipPath')) {
             [void]$parameterNode.ParentNode.RemoveChild($parameterNode)
         }
     }
     $parameterList=$projectXml.SelectSingleNode('//SSIS:PackageMetaData/SSIS:Parameters',$projectNs)
-    foreach($parameterName in @('ConnectionString','ArchiveJobsConnectionString','ArchiveJobsTable','ArchiveRoot','MaxRecordsPerCsv','SevenZipPath')) {
+    foreach($parameterName in @('ConnectionString','ArchiveJobsTable','ArchiveRoot','MaxRecordsPerCsv','SevenZipPath')) {
         $node=$parameterList.SelectSingleNode('SSIS:Parameter[@SSIS:Name="'+$parameterName+'"]',$projectNs)
         if(!$node) {
             $node=$parameterList.SelectSingleNode('SSIS:Parameter[@SSIS:Name="ConnectionString"]',$projectNs).CloneNode($true)

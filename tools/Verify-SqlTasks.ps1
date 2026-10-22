@@ -1,4 +1,4 @@
-﻿param([string]$JobsTable='Archive.ArchiveJobs',[switch]$InsertAfterSnapshot,[switch]$Ssis2025,[switch]$KeyTypes,[switch]$NativeProcessTasks,[switch]$Retry,[switch]$FullPackage,[switch]$SpreadDates,[ValidateSet('None','NullKey','Stage','Read','Write','Delete','Zip','ZipTest','FolderCollision','ZipCollision')][string]$FailureMode='None',[int]$MaxRecordsPerCsv=1000)
+param([string]$JobsTable='Archive.ArchiveJobs',[switch]$InsertAfterSnapshot,[switch]$Ssis2025,[switch]$KeyTypes,[switch]$NativeProcessTasks,[switch]$Retry,[switch]$FullPackage,[switch]$SpreadDates,[ValidateSet('None','NullKey','Stage','Read','Write','Delete','Zip','ZipTest','FolderCollision','ZipCollision')][string]$FailureMode='None',[int]$MaxRecordsPerCsv=1000)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $config=Get-Content -LiteralPath (Get-Content -LiteralPath (Join-Path $root 'verification/latest-config.txt')) -Raw | ConvertFrom-Json
@@ -7,10 +7,7 @@ if($Ssis2025) { [void][Reflection.Assembly]::LoadFrom('C:/Program Files/Microsof
 $app=New-Object Microsoft.SqlServer.Dts.Runtime.Application
 $packagePath=if($Ssis2025) { Join-Path $root 'Integration Services Project2/Package.dtsx' } else { Join-Path $PSScriptRoot 'compatibility-test.dtsx' }
 $package=$app.LoadPackage($packagePath,$null)
-$sourceConnection=New-Object Data.SqlClient.SqlConnectionStringBuilder($config.ConnectionString)
-$sourceConnection['Initial Catalog']='master'
-$package.Parameters['ConnectionString'].Value=$sourceConnection.ConnectionString
-$package.Parameters['ArchiveJobsConnectionString'].Value=$config.ConnectionString
+$package.Parameters['ConnectionString'].Value=$config.ConnectionString
 $package.Parameters['ArchiveJobsTable'].Value=$JobsTable
 $output=Join-Path $config.RunDirectory $(if($Retry) {'retry-csv'} else {'native-csv'})
 [void](New-Item -ItemType Directory -Path $output -Force)

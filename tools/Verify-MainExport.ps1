@@ -8,7 +8,7 @@ function Quote($name) { '['+$name.Replace(']',']]')+']' }
 function RowKey($values) { ConvertTo-Json -InputObject @($values) -Compress }
 $folder=Join-Path (Parameter 'ArchiveRoot') ([datetime]::Now.ToString('yyyy-MM-dd'))
 $connection=New-Object Data.SqlClient.SqlConnection((Parameter 'ConnectionString'))
-$jobsConnection=New-Object Data.SqlClient.SqlConnection((Parameter 'ArchiveJobsConnectionString'))
+$jobsConnection=New-Object Data.SqlClient.SqlConnection((Parameter 'ConnectionString'))
 $results=New-Object 'System.Collections.Generic.List[string]'
 try {
     $connection.Open()

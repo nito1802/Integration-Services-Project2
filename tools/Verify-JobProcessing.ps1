@@ -3,8 +3,7 @@ $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $config=Get-Content -LiteralPath (Get-Content -LiteralPath (Join-Path $root 'verification\latest-config.txt')) -Raw | ConvertFrom-Json
 if($config.Database -notmatch '^CodexArchiveFlow_[a-f0-9]{32}$') { throw 'Expected isolated LocalDB test' }
-$jobsConnectionString=if($config.ArchiveJobsConnectionString) { $config.ArchiveJobsConnectionString } else { $config.ConnectionString }
-$connection=New-Object Data.SqlClient.SqlConnection($jobsConnectionString)
+$connection=New-Object Data.SqlClient.SqlConnection($config.ConnectionString)
 try {
     $connection.Open()
     $command=$connection.CreateCommand()

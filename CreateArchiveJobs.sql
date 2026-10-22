@@ -1,4 +1,4 @@
-﻿-- Uruchom w bazie konfiguracji wskazanej przez ArchiveJobsConnectionString.
+-- Uruchom w bazie konfiguracji wskazanej przez ConnectionString.
 -- Tworzy aktualna strukture bez migracji EF i bez przykladowych zadan.
 -- Istniejaca tabela pozostaje bez zmian; skrypt nie aktualizuje starszej struktury.
 -- ArchiveJobStatus jest enumem C#, a nie osobna tabela:
