@@ -1,12 +1,23 @@
-        public void Main()
+        private static string ArchivePathName(string name)
         {
-            string day = Convert.ToDateTime(Dts.Variables["User::CurrentDateFrom"].Value).ToString("yyyy_MM_dd", CultureInfo.InvariantCulture);
             var safeName = new StringBuilder();
-            foreach (char c in Convert.ToString(Dts.Variables["User::TableName"].Value, CultureInfo.InvariantCulture))
+            foreach (char c in name)
                 if (c == '~' || Array.IndexOf(Path.GetInvalidFileNameChars(), c) >= 0)
                     safeName.Append("~" + ((int)c).ToString("X4", CultureInfo.InvariantCulture));
                 else safeName.Append(c);
-            string folder = Path.Combine(Path.GetFullPath(Convert.ToString(Dts.Variables["User::ArchiwumPath"].Value, CultureInfo.InvariantCulture)), safeName.ToString(), Convert.ToDateTime(Dts.Variables["User::CurrentDateFrom"].Value).ToString("yyyy"), day);
+            return safeName.ToString();
+        }
+
+        public void Main()
+        {
+            DateTime date = Convert.ToDateTime(Dts.Variables["User::CurrentDateFrom"].Value);
+            string day = date.ToString("yyyy_MM_dd", CultureInfo.InvariantCulture);
+            string[] months = { "styczen", "luty", "marzec", "kwiecien", "maj", "czerwiec",
+                "lipiec", "sierpien", "wrzesien", "pazdziernik", "listopad", "grudzien" };
+            string safeName = ArchivePathName(Convert.ToString(Dts.Variables["User::TableName"].Value, CultureInfo.InvariantCulture));
+            string database = ArchivePathName(Convert.ToString(Dts.Variables["User::DatabaseName"].Value, CultureInfo.InvariantCulture));
+            string folder = Path.Combine(Path.GetFullPath(Convert.ToString(Dts.Variables["User::ArchiwumPath"].Value, CultureInfo.InvariantCulture)), database,
+                safeName, date.ToString("yyyy", CultureInfo.InvariantCulture), months[date.Month - 1], day);
             string zip = folder + ".zip";
             if (Directory.Exists(folder) || File.Exists(folder) || File.Exists(zip) || Directory.Exists(zip))
                 throw new IOException("Archive destination already exists. Existing files must be reviewed before retrying. Folder=" + folder + "; ZIP=" + zip);

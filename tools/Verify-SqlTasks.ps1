@@ -182,7 +182,9 @@ if($FullPackage) {
             if($package.Variables['User::ArchiveJobId'].Value -eq 1 -and $FailureMode -in @('FolderCollision','ZipCollision')) {
                 $day=([datetime]$package.Variables['User::CurrentDateFrom'].Value).ToString('yyyy_MM_dd')
                 $year=([datetime]$package.Variables['User::CurrentDateFrom'].Value).ToString('yyyy')
-                $collisionFolder=Join-Path (Join-Path (Join-Path $output 'dbo.Orders') $year) $day
+                $months=@('styczen','luty','marzec','kwiecien','maj','czerwiec','lipiec','sierpien','wrzesien','pazdziernik','listopad','grudzien')
+                $month=$months[([datetime]$package.Variables['User::CurrentDateFrom'].Value).Month-1]
+                $collisionFolder=Join-Path $output "$($config.Database)/dbo.Orders/$year/$month/$day"
                 [void](New-Item -ItemType Directory -Path (Split-Path $collisionFolder -Parent) -Force)
                 if($FailureMode -eq 'FolderCollision') {
                     [void](New-Item -ItemType Directory -Path $collisionFolder)

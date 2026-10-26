@@ -85,15 +85,17 @@ Przykład dla 2500 rekordów jednego dnia przy limicie 1000:
 
 ```text
 ArchiveRoot/
-  dbo.Orders/
-    2026/
-      2026_10_01.zip
-        2026_10_01_part1.csv   # 1000 rekordów + nagłówek
-        2026_10_01_part2.csv   # 1000 rekordów + nagłówek
-        2026_10_01_part3.csv   #  500 rekordów + nagłówek
+  nito_superDb/
+    dbo.Orders/
+      2026/
+        pazdziernik/
+          2026_10_01.zip
+            2026_10_01_part1.csv   # 1000 rekordów + nagłówek
+            2026_10_01_part2.csv   # 1000 rekordów + nagłówek
+            2026_10_01_part3.csv   #  500 rekordów + nagłówek
 ```
 
-Rok i dzień wynikają z daty danych. Przed rozpoczęciem eksportu dnia pakiet sprawdza, czy istnieje już jego ZIP albo katalog roboczy. Kolizja kończy zadanie błędem przed odczytem partii i usuwaniem danych; istniejące pliki pozostają bez zmian. Wymagane jest ręczne sprawdzenie wcześniejszych plików przed ponowieniem. Robocze CSV znajdują się obok ZIP, w katalogu `2026_10_01`. Nazwa katalogu tabeli koduje niedozwolone znaki jako `~XXXX`.
+Baza pochodzi z `DatabaseName` zadania. Rok, miesiąc i dzień wynikają z daty danych; miesiące mają polskie nazwy bez znaków diakrytycznych (`styczen`, `luty`, `marzec`, `kwiecien`, `maj`, `czerwiec`, `lipiec`, `sierpien`, `wrzesien`, `pazdziernik`, `listopad`, `grudzien`). Przed rozpoczęciem eksportu dnia pakiet sprawdza, czy istnieje już jego ZIP albo katalog roboczy. Kolizja kończy zadanie błędem przed odczytem partii i usuwaniem danych; istniejące pliki pozostają bez zmian. Wymagane jest ręczne sprawdzenie wcześniejszych plików przed ponowieniem. Robocze CSV znajdują się obok ZIP, w katalogu `2026_10_01`. Nazwy katalogów bazy i tabeli kodują niedozwolone znaki jako `~XXXX`. Istniejące archiwa w poprzednim układzie nie są przenoszone.
 
 **ZIP jest tworzony przez bloczek Execute Process Task, konfigurowany w Execute Process Task Editor.** Script Task przygotowuje tylko ścieżki i argumenty, nie uruchamia procesu ani kompresji.
 

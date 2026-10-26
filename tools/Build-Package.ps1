@@ -140,7 +140,7 @@ $daysLoop=$tables.Executables.Add('STOCK:FORLOOP'); $daysLoop.Name='For each arc
 $daysLoop.EvalExpression='!@[User::JobFailed] && @[User::CurrentDateFrom] < @[User::CutoffDate]'
 $daysLoop.AssignExpression='@[User::CurrentDateFrom] = DATEADD("day",1,@[User::CurrentDateFrom])'
 Link $tables $firstDay $daysLoop
-$guid=Add-Script $daysLoop 'Initialize daily archive' 'User::CurrentDateFrom,User::ArchiwumPath,User::TableName,User::QualifiedTableName,User::ColumnDate,User::KeyColumns' 'User::FolderFullPath,User::OutputFile,User::CurrentDateTo,User::BatchHasRows,User::BatchNumber,User::DayHasFiles,User::ZipFile,User::ZipArguments,User::ZipTestArguments,User::DayRows,User::DayExportedRows,User::StageDaySql,User::DeleteSql'
+$guid=Add-Script $daysLoop 'Initialize daily archive' 'User::CurrentDateFrom,User::ArchiwumPath,User::DatabaseName,User::TableName,User::QualifiedTableName,User::ColumnDate,User::KeyColumns' 'User::FolderFullPath,User::OutputFile,User::CurrentDateTo,User::BatchHasRows,User::BatchNumber,User::DayHasFiles,User::ZipFile,User::ZipArguments,User::ZipTestArguments,User::DayRows,User::DayExportedRows,User::StageDaySql,User::DeleteSql'
 $stageDay=Add-Sql $daysLoop 'Stage archive day' 'ArchiveDb' 'User::StageDaySql' 'SingleRow' $true
 Bind-Result $stageDay '0' 'User::DayRows'
 Job-Sql $stageDay 'Capture day staging error'
