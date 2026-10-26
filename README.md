@@ -9,13 +9,13 @@ Otwórz `Integration Services Project2.slnx` lub projekt `.dtproj`, następnie `
 | Parametr pakietu | Znaczenie |
 |---|---|
 | `ConnectionString` | Wspólne połączenie dla danych źródłowych oraz konfiguracji i statusów (`ArchiveDb` i `ArchiveJobsDb`). |
-| `ArchiveJobsTable` | Tabela konfiguracji jako `schemat.tabela`, np. `Archive.ArchiveJobs`, w domyślnej bazie logowania podanej przez `ConnectionString`. |
+| `ArchiveJobsTable` | Tabela konfiguracji jako `baza.schemat.tabela`, np. `nito_superDb.Archive.ArchiveJobs`. Obsługiwane jest też `schemat.tabela` w domyślnej bazie logowania. |
 | `ArchiveRoot` | Katalog główny archiwum. |
 | `MaxRecordsPerCsv` | Dodatni limit rekordów danych w jednym CSV; domyślnie `1000`. Nagłówek nie wlicza się do limitu. |
 
 `DatabaseName` wybiera bazę źródłową przez pełną nazwę tabeli `[baza].[schemat].[tabela]` w przygotowywanym SQL. `ArchiveDb` używa bazowego parametru `ConnectionString` i `RetainSameConnection = true`, aby wszystkie kroki widziały tę samą `#ArchiveDay`. Sesja nie zmienia bieżącej bazy między zadaniami. Nie ma `ChangeDatabase`, otwierania połączeń ani wykonywania SQL w C#. `ArchiveJobsDb` korzysta z tego samego parametru `ConnectionString`; bazę tabeli konfiguracji i statusów wskazuje `ArchiveJobsTable`. `ConnectionString` nie zawiera `Database` / `Initial Catalog`; bazy źródłowe wskazuje `DatabaseName` w zadaniach. Użytkownik pakietu potrzebuje dostępu do źródeł, katalogu archiwum i 7-Zip.
 
-Tabelę konfiguracji tworzy `CreateArchiveJobs.sql`; na początku ustaw `@SchemaName` i `@TableName`. Skrypt wymaga istniejącego schematu i go nie tworzy. Ustaw `ArchiveJobsTable` jako `schemat.tabela` (np. `Archive.ArchiveJobs`), bez nazwy bazy. Przykład zadania znajduje się w `ArchiveJobs.example.sql`. Konfiguracja obejmuje `Id`, `DatabaseName`, `TableName`, `DateColumn`, `ArchiveOlderThanDays` oraz kolumny statusu `LastSuccesProcessedAt`, `LastProcessedAt`, `LastProcessedStatus`, `ErrorMessage`. Zachowano istniejącą pisownię `LastSuccesProcessedAt`.
+Tabelę konfiguracji tworzy `CreateArchiveJobs.sql`; na początku ustaw `@SchemaName` i `@TableName`. Skrypt wymaga istniejącego schematu i go nie tworzy. Ustaw `ArchiveJobsTable` jako `baza.schemat.tabela` (np. `nito_superDb.Archive.ArchiveJobs`). Przykład zadania znajduje się w `ArchiveJobs.example.sql`. Konfiguracja obejmuje `Id`, `DatabaseName`, `TableName`, `DateColumn`, `ArchiveOlderThanDays` oraz kolumny statusu `LastSuccesProcessedAt`, `LastProcessedAt`, `LastProcessedStatus`, `ErrorMessage`. Zachowano istniejącą pisownię `LastSuccesProcessedAt`.
 
 ## Przepływ
 
@@ -154,4 +154,4 @@ Wyniki aktualnego przepływu z kopią dnia i DELETE po ZIP: `verification/daily-
 
 Parametr `ArchiveJobsTable` dotyczy pakietu SSIS. Projekty EF/Console zachowują własne mapowanie tabeli; po wybraniu innej tabeli w pakiecie trzeba dodawać zadania do tej właśnie tabeli.
 
-Test parametru tabeli i skryptu bez tworzenia schematu: `.\tools\Verify-JobsTableParameter.ps1`. Obsługiwany format to dwie części `schemat.tabela`; kropki wewnątrz samych nazw nie są obsługiwane.
+Test parametru tabeli i skryptu bez tworzenia schematu: `.\tools\Verify-JobsTableParameter.ps1`. Obsługiwane formaty to `schemat.tabela` oraz `baza.schemat.tabela`; kropki wewnątrz samych nazw nie są obsługiwane.

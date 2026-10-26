@@ -45,7 +45,7 @@ foreach($obsolete in @('TableName','DateColumn','OlderThanDays','OutputFile','Se
 $p=$package.Parameters.Add('ArchiveRoot',[TypeCode]::String); $p.Value=$archiveRoot
 if($currentValues.ContainsKey('ConnectionString')) { $package.Parameters['ConnectionString'].Value=$currentValues['ConnectionString'] }
 if($currentValues.ContainsKey('ArchiveRoot')) { $package.Parameters['ArchiveRoot'].Value=$currentValues['ArchiveRoot'] }
-foreach($entry in @(@('ArchiveJobsTable',[TypeCode]::String,'Archive.ArchiveJobs'),@('MaxRecordsPerCsv',[TypeCode]::Int32,1000))) {
+foreach($entry in @(@('ArchiveJobsTable',[TypeCode]::String,'nito_superDb.Archive.ArchiveJobs'),@('MaxRecordsPerCsv',[TypeCode]::Int32,1000))) {
     $p=$package.Parameters.Add($entry[0],$entry[1]); $p.Value=$entry[2]
     if($currentValues.ContainsKey($entry[0])) { $p.Value=[Convert]::ChangeType($currentValues[$entry[0]],$entry[1]) }
 }
