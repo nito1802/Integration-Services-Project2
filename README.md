@@ -9,14 +9,13 @@ Otwórz `Integration Services Project2.slnx` lub projekt `.dtproj`, następnie `
 | Parametr pakietu | Znaczenie |
 |---|---|
 | `ConnectionString` | Wspólne połączenie dla danych źródłowych oraz konfiguracji i statusów (`ArchiveDb` i `ArchiveJobsDb`). |
-| `ArchiveJobsTable` | Tabela konfiguracji jako `baza.schemat.tabela`, np. `nito_superDb.Archive.ArchiveJobs`. Obsługiwana jest też postać `schemat.tabela` w domyślnej bazie logowania. |
+| `ArchiveJobsTable` | Tabela konfiguracji jako `schemat.tabela`, np. `Archive.ArchiveJobs`, w domyślnej bazie logowania podanej przez `ConnectionString`. |
 | `ArchiveRoot` | Katalog główny archiwum. |
 | `MaxRecordsPerCsv` | Dodatni limit rekordów danych w jednym CSV; domyślnie `1000`. Nagłówek nie wlicza się do limitu. |
-| `SevenZipPath` | Pełna ścieżka do `7z.exe`; domyślnie `C:\Program Files\7-Zip\7z.exe`. |
 
 `DatabaseName` wybiera bazę źródłową przez pełną nazwę tabeli `[baza].[schemat].[tabela]` w przygotowywanym SQL. `ArchiveDb` używa bazowego parametru `ConnectionString` i `RetainSameConnection = true`, aby wszystkie kroki widziały tę samą `#ArchiveDay`. Sesja nie zmienia bieżącej bazy między zadaniami. Nie ma `ChangeDatabase`, otwierania połączeń ani wykonywania SQL w C#. `ArchiveJobsDb` korzysta z tego samego parametru `ConnectionString`; bazę tabeli konfiguracji i statusów wskazuje `ArchiveJobsTable`. `ConnectionString` nie zawiera `Database` / `Initial Catalog`; bazy źródłowe wskazuje `DatabaseName` w zadaniach. Użytkownik pakietu potrzebuje dostępu do źródeł, katalogu archiwum i 7-Zip.
 
-Tabelę konfiguracji tworzy `CreateArchiveJobs.sql`; na początku ustaw `@SchemaName` i `@TableName`. Skrypt wymaga istniejącego schematu i go nie tworzy. Wartości muszą odpowiadać parametrowi `ArchiveJobsTable`. Przykład zadania znajduje się w `ArchiveJobs.example.sql`. Konfiguracja obejmuje `Id`, `DatabaseName`, `TableName`, `DateColumn`, `ArchiveOlderThanDays` oraz kolumny statusu `LastSuccesProcessedAt`, `LastProcessedAt`, `LastProcessedStatus`, `ErrorMessage`. Zachowano istniejącą pisownię `LastSuccesProcessedAt`.
+Tabelę konfiguracji tworzy `CreateArchiveJobs.sql`; na początku ustaw `@SchemaName` i `@TableName`. Skrypt wymaga istniejącego schematu i go nie tworzy. Ustaw `ArchiveJobsTable` jako `schemat.tabela` (np. `Archive.ArchiveJobs`), bez nazwy bazy. Przykład zadania znajduje się w `ArchiveJobs.example.sql`. Konfiguracja obejmuje `Id`, `DatabaseName`, `TableName`, `DateColumn`, `ArchiveOlderThanDays` oraz kolumny statusu `LastSuccesProcessedAt`, `LastProcessedAt`, `LastProcessedStatus`, `ErrorMessage`. Zachowano istniejącą pisownię `LastSuccesProcessedAt`.
 
 ## Przepływ
 
@@ -101,7 +100,7 @@ Baza pochodzi z `DatabaseName` zadania. Rok, miesiąc i dzień wynikają z daty 
 
 | Właściwość | Create daily ZIP | Verify ZIP integrity |
 |---|---|---|
-| `Executable` (expression) | `@[$Package::SevenZipPath]` | `@[$Package::SevenZipPath]` |
+| `Executable` | `C:\Program Files\7-Zip\7z.exe` | `C:\Program Files\7-Zip\7z.exe` |
 | `Arguments` (expression) | `@[User::ZipArguments]` | `@[User::ZipTestArguments]` |
 | Polecenie 7-Zip | `a -tzip -y "plik.zip" "katalog\*.csv"` | `t -tzip "plik.zip"` |
 | `SuccessValue` | `0` | `0` |

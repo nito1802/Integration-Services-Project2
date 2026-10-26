@@ -120,7 +120,7 @@ if($FullPackage) {
             } finally { $dbCheck.Dispose() }
             # Exercise the real Execute Process Task. Inject failure via unsupported 7z command.
             $variable=if($name -eq 'Create daily ZIP') {'ZipArguments'} else {'ZipTestArguments'}
-            $task.InnerObject.Executable=[string]$package.Parameters['SevenZipPath'].Value
+            $task.InnerObject.Executable='C:\Program Files\7-Zip\7z.exe'
             $task.InnerObject.Arguments=[string]$package.Variables['User::'+$variable].Value
             if($package.Variables['User::ArchiveJobId'].Value -eq 1 -and (($FailureMode -eq 'Zip' -and $name -eq 'Create daily ZIP') -or ($FailureMode -eq 'ZipTest' -and $name -eq 'Verify ZIP integrity'))) {
                 $package.Variables['User::'+$variable].Value='invalid-command'

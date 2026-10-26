@@ -10,7 +10,7 @@ $currentNs=New-Object Xml.XmlNamespaceManager($current.NameTable)
 $currentNs.AddNamespace('DTS','www.microsoft.com/SqlServer/Dts')
 $currentValues=@{}
 $currentParameterIds=@{}
-foreach($name in @('ConnectionString','ArchiveJobsTable','ArchiveRoot','MaxRecordsPerCsv','SevenZipPath')) {
+foreach($name in @('ConnectionString','ArchiveJobsTable','ArchiveRoot','MaxRecordsPerCsv')) {
     $valueNode=$current.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="'+$name+'"]/DTS:Property[@DTS:Name="ParameterValue"]',$currentNs)
     if($valueNode) { $currentValues[$name]=$valueNode.InnerText; $currentParameterIds[$name]=$valueNode.ParentNode.GetAttribute('DTSID','www.microsoft.com/SqlServer/Dts') }
 }
@@ -41,11 +41,11 @@ Add-Variable 'DayHasFiles' $false
 Add-Variable 'CutoffDate' ([datetime]'2000-01-01')
 foreach($name in @('JobActive','JobFailed','BatchHasRows')) { Add-Variable $name $false }
 $archiveRoot=[IO.Path]::GetDirectoryName([string]$package.Parameters['OutputFile'].Value)
-foreach($obsolete in @('TableName','DateColumn','OlderThanDays','OutputFile')) { [void]$package.Parameters.Remove($obsolete) }
+foreach($obsolete in @('TableName','DateColumn','OlderThanDays','OutputFile','SevenZipPath')) { [void]$package.Parameters.Remove($obsolete) }
 $p=$package.Parameters.Add('ArchiveRoot',[TypeCode]::String); $p.Value=$archiveRoot
 if($currentValues.ContainsKey('ConnectionString')) { $package.Parameters['ConnectionString'].Value=$currentValues['ConnectionString'] }
 if($currentValues.ContainsKey('ArchiveRoot')) { $package.Parameters['ArchiveRoot'].Value=$currentValues['ArchiveRoot'] }
-foreach($entry in @(@('ArchiveJobsTable',[TypeCode]::String,'Archive.ArchiveJobs'),@('MaxRecordsPerCsv',[TypeCode]::Int32,1000),@('SevenZipPath',[TypeCode]::String,'C:\Program Files\7-Zip\7z.exe'))) {
+foreach($entry in @(@('ArchiveJobsTable',[TypeCode]::String,'Archive.ArchiveJobs'),@('MaxRecordsPerCsv',[TypeCode]::Int32,1000))) {
     $p=$package.Parameters.Add($entry[0],$entry[1]); $p.Value=$entry[2]
     if($currentValues.ContainsKey($entry[0])) { $p.Value=[Convert]::ChangeType($currentValues[$entry[0]],$entry[1]) }
 }
@@ -113,7 +113,7 @@ Link $package $getSettings $tables
 $startJob=Add-Sql $tables 'Mark job as started' 'ArchiveJobsDb' 'User::JobStartSql' 'None' $true
 Bind-Input $startJob '@Id' 'User::ArchiveJobId' Int32
 $prepareJob=Add-Script $tables 'Initialize job variables' '$Package::ArchiveRoot' 'User::ArchiwumPath,User::BatchHasRows,User::BatchNumber'
-$begin=Add-Script $tables 'Prepare metadata and date queries' 'User::TableName,User::DatabaseName,User::ColumnDate,User::Days,$Package::MaxRecordsPerCsv,$Package::SevenZipPath' 'User::ShapeSql,User::MetadataSql,User::FirstDaySql,User::QualifiedTableName'
+$begin=Add-Script $tables 'Prepare metadata and date queries' 'User::TableName,User::DatabaseName,User::ColumnDate,User::Days,$Package::MaxRecordsPerCsv' 'User::ShapeSql,User::MetadataSql,User::FirstDaySql,User::QualifiedTableName'
 $cutoff=Add-Sql $tables 'Calculate retention cutoff' 'ArchiveDb' 'SELECT CONVERT(datetime2(7),DATEADD(day,-@Days,CONVERT(date,GETDATE()))) AS CutoffDate;' 'SingleRow'
 Bind-Input $cutoff '@Days' 'User::Days' Int32
 Bind-Result $cutoff '0' 'User::CutoffDate'
@@ -161,10 +161,9 @@ function Add-ZipProcess($name,$argumentsVariable) {
     $hostTask=$daysLoop.Executables.Add('STOCK:ExecuteProcessTask'); $hostTask.Name=$name; $hostTask.DelayValidation=$true
     $task=$hostTask.InnerObject
     $task.RequireFullFileName=$true
-    $task.Executable=[string]$package.Parameters['SevenZipPath'].Value
+    $task.Executable='C:\Program Files\7-Zip\7z.exe'
     $task.FailTaskIfReturnCodeIsNotSuccessValue=$true; $task.SuccessValue=0
     $task.TimeOut=600; $task.TerminateProcessAfterTimeOut=$true
-    $hostTask.SetExpression('Executable','@[$Package::SevenZipPath]')
     $hostTask.SetExpression('Arguments','@[User::'+$argumentsVariable+']')
     Job-Sql $hostTask ('Capture '+$name+' error')
     $hostTask.SetExpression('Disable','@[User::JobFailed] || !@[User::DayHasFiles]')
@@ -260,12 +259,12 @@ if (!$CompatibilityTest) {
     $projectNs=New-Object Xml.XmlNamespaceManager($projectXml.NameTable)
     $projectNs.AddNamespace('SSIS','www.microsoft.com/SqlServer/SSIS')
     foreach($parameterNode in @($projectXml.SelectNodes('//SSIS:PackageMetaData/SSIS:Parameters/SSIS:Parameter',$projectNs))) {
-        if($parameterNode.GetAttribute('Name','www.microsoft.com/SqlServer/SSIS') -notin @('ConnectionString','ArchiveJobsTable','ArchiveRoot','MaxRecordsPerCsv','SevenZipPath')) {
+        if($parameterNode.GetAttribute('Name','www.microsoft.com/SqlServer/SSIS') -notin @('ConnectionString','ArchiveJobsTable','ArchiveRoot','MaxRecordsPerCsv')) {
             [void]$parameterNode.ParentNode.RemoveChild($parameterNode)
         }
     }
     $parameterList=$projectXml.SelectSingleNode('//SSIS:PackageMetaData/SSIS:Parameters',$projectNs)
-    foreach($parameterName in @('ConnectionString','ArchiveJobsTable','ArchiveRoot','MaxRecordsPerCsv','SevenZipPath')) {
+    foreach($parameterName in @('ConnectionString','ArchiveJobsTable','ArchiveRoot','MaxRecordsPerCsv')) {
         $node=$parameterList.SelectSingleNode('SSIS:Parameter[@SSIS:Name="'+$parameterName+'"]',$projectNs)
         if(!$node) {
             $node=$parameterList.SelectSingleNode('SSIS:Parameter[@SSIS:Name="ConnectionString"]',$projectNs).CloneNode($true)

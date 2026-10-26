@@ -1,11 +1,11 @@
         public void Main()
         {
             string[] parts = Convert.ToString(Dts.Variables["$Package::ArchiveJobsTable"].Value).Split('.');
-            if(parts.Length != 2 && parts.Length != 3) throw new ArgumentException("ArchiveJobsTable must contain schema.table or database.schema.table, for example ArchiveDb.dbo.Archive jobs.");
+            if(parts.Length != 2) throw new ArgumentException("ArchiveJobsTable must contain schema.table, for example Archive.ArchiveJobs.");
             for(int i=0;i<parts.Length;i++) {
                 string name=parts[i].Trim();
                 if(name.StartsWith("[") && name.EndsWith("]")) name=name.Substring(1,name.Length-2).Replace("]]","]");
-                if(string.IsNullOrWhiteSpace(name) || name.Length>128) throw new ArgumentException("Invalid database, schema or table in ArchiveJobsTable.");
+                if(string.IsNullOrWhiteSpace(name) || name.Length>128) throw new ArgumentException("Invalid schema or table in ArchiveJobsTable.");
                 parts[i]="["+name.Replace("]","]]")+"]";
             }
             string table=string.Join(".",parts);
