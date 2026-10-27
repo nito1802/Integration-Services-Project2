@@ -20,7 +20,8 @@
                         for (int i = 0; i < reader.FieldCount; i++)
                             if (reader.GetName(i) != Convert.ToString(schema.Rows[i]["ColumnName"]) || reader.GetFieldType(i) != (Type)schema.Rows[i]["DataType"])
                                 throw new InvalidOperationException("Table columns changed during this export.");
-                        if (data.Rows.Count > 0)
+                        if (data.Rows.Count > 0) {
+                        Directory.CreateDirectory(Path.GetDirectoryName(outputFile));
                         using (var stream = new FileStream(outputFile, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                         using (var writer = new StreamWriter(stream, new UTF8Encoding(true)))
                         {
@@ -46,6 +47,7 @@
                             }
                             writer.Flush();
                             stream.Flush(true);
+                        }
                         }
                     }
                 }

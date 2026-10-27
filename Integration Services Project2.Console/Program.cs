@@ -21,7 +21,7 @@ try
     //    return 0;
     //}
 
-    await new ForeignKeyTestDataCreator().SeedAsync();
+    //await new ForeignKeyTestDataCreator().SeedAsync();
 
     await new EventTestDataCreator().AddAsync();
 

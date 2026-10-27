@@ -1,4 +1,4 @@
-# Archiwizacja CSV w SSIS
+﻿# Archiwizacja CSV w SSIS
 
 Pakiet `Integration Services Project2/Package.dtsx` pobiera zadania z tabeli wskazanej przez `ArchiveJobsTable` i przetwarza **tabele → dni → partie CSV**. Każdy CSV ma własny nagłówek i maksymalnie konfigurowalną liczbę rekordów danych. Po zakończeniu dnia powstaje ZIP zawierający jego pliki CSV.
 
@@ -94,7 +94,7 @@ ArchiveRoot/
             2026_10_01_part3.csv   #  500 rekordów + nagłówek
 ```
 
-Baza pochodzi z `DatabaseName` zadania. Rok, miesiąc i dzień wynikają z daty danych; miesiące mają polskie nazwy bez znaków diakrytycznych (`styczen`, `luty`, `marzec`, `kwiecien`, `maj`, `czerwiec`, `lipiec`, `sierpien`, `wrzesien`, `pazdziernik`, `listopad`, `grudzien`). Przed rozpoczęciem eksportu dnia pakiet sprawdza, czy istnieje już jego ZIP albo katalog roboczy. Kolizja kończy zadanie błędem przed odczytem partii i usuwaniem danych; istniejące pliki pozostają bez zmian. Wymagane jest ręczne sprawdzenie wcześniejszych plików przed ponowieniem. Robocze CSV znajdują się obok ZIP, w katalogu `2026_10_01`. Nazwy katalogów bazy i tabeli kodują niedozwolone znaki jako `~XXXX`. Istniejące archiwa w poprzednim układzie nie są przenoszone.
+Baza pochodzi z `DatabaseName` zadania. Rok, miesiąc i dzień wynikają z daty danych; miesiące mają polskie nazwy bez znaków diakrytycznych (`styczen`, `luty`, `marzec`, `kwiecien`, `maj`, `czerwiec`, `lipiec`, `sierpien`, `wrzesien`, `pazdziernik`, `listopad`, `grudzien`). Przed rozpoczęciem eksportu dnia pakiet sprawdza, czy istnieje już jego ZIP albo katalog roboczy. Kolizja kończy zadanie błędem przed odczytem partii i usuwaniem danych; istniejące pliki pozostają bez zmian. Wymagane jest ręczne sprawdzenie wcześniejszych plików przed ponowieniem. Katalogi roku, miesiąca i dnia powstają dopiero przy zapisie pierwszej niepustej partii CSV; puste dni nie tworzą katalogów. W razie błędu eksportu pliki robocze pozostają do sprawdzenia. Robocze CSV znajdują się obok ZIP, w katalogu `2026_10_01`. Nazwy katalogów bazy i tabeli kodują niedozwolone znaki jako `~XXXX`. Istniejące archiwa w poprzednim układzie nie są przenoszone.
 
 **ZIP jest tworzony przez bloczek Execute Process Task, konfigurowany w Execute Process Task Editor.** Script Task przygotowuje tylko ścieżki i argumenty, nie uruchamia procesu ani kompresji.
 

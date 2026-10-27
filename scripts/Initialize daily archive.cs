@@ -21,7 +21,6 @@
             string zip = folder + ".zip";
             if (Directory.Exists(folder) || File.Exists(folder) || File.Exists(zip) || Directory.Exists(zip))
                 throw new IOException("Archive destination already exists. Existing files must be reviewed before retrying. Folder=" + folder + "; ZIP=" + zip);
-            Directory.CreateDirectory(folder);
             string output = Path.Combine(folder, safeName + "_" + day + ".csv");
             Dts.Variables["User::FolderFullPath"].Value = folder;
             Dts.Variables["User::OutputFile"].Value = output;
