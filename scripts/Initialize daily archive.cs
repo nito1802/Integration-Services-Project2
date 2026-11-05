@@ -37,6 +37,8 @@
             string column = Convert.ToString(Dts.Variables["User::ColumnDate"].Value);
             string from = Convert.ToDateTime(Dts.Variables["User::CurrentDateFrom"].Value).ToString("yyyy-MM-ddTHH:mm:ss.fffffff",CultureInfo.InvariantCulture);
             string to = Convert.ToDateTime(Dts.Variables["User::CurrentDateTo"].Value).ToString("yyyy-MM-ddTHH:mm:ss.fffffff",CultureInfo.InvariantCulture);
+            Dts.Variables["User::NextDaySql"].Value = "SELECT CONVERT(datetime2(7),COALESCE(CONVERT(date,MIN(" + column + ")),@Cutoff)) FROM " + table +
+                " WHERE " + column + " >= CONVERT(datetime2(7),N'" + to + "',126) AND " + column + " < @Cutoff;";
             Dts.Variables["User::StageDaySql"].Value = "SET NOCOUNT ON; IF OBJECT_ID('tempdb..#ArchiveDay') IS NOT NULL DROP TABLE #ArchiveDay; " +
                 "SELECT * INTO #ArchiveDay FROM " + table + " WHERE " + column + " >= CONVERT(datetime2(7),N'" + from + "',126) AND " +
                 column + " < CONVERT(datetime2(7),N'" + to + "',126); SELECT COUNT_BIG(*) AS DayRows FROM #ArchiveDay;";

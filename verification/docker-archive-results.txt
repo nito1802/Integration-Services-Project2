@@ -1,0 +1,6 @@
+PASS: all 3 jobs Success; ErrorMessage NULL; success timestamps match.
+PASS: ZIP integrity, UTF8 BOM, CSV names, day grouping, unique keys, field values, multiline text, NULLs and 1000-row limit.
+ZIPs: 5; CSVs inside ZIPs: 13; archived Orders: 7500; archived Events: 2002.
+Remaining Orders: 2; Events: 1; EmptyTable: 0; eligible source rows: 0.
+Temporary CSV files: 0.
+ArchiveRoot: C:\ArchiveTest

@@ -30,7 +30,7 @@ $destination=Join-Path $root ('verification/archive-paths-'+[guid]::NewGuid().To
 $months=@('styczen','luty','marzec','kwiecien','maj','czerwiec','lipiec','sierpien','wrzesien','pazdziernik','listopad','grudzien')
 function New-ArchiveTest($database,$month) {
     $test=New-Object ArchivePathTest
-    foreach($name in @('FolderFullPath','OutputFile','CurrentDateTo','BatchNumber','BatchHasRows','DayHasFiles','ZipFile','ZipArguments','ZipTestArguments','DayRows','DayExportedRows','StageDaySql','DeleteSql')) { $test.Set('User::'+$name,$null) }
+    foreach($name in @('FolderFullPath','OutputFile','CurrentDateTo','BatchNumber','BatchHasRows','DayHasFiles','ZipFile','ZipArguments','ZipTestArguments','DayRows','DayExportedRows','StageDaySql','DeleteSql','NextDaySql')) { $test.Set('User::'+$name,$null) }
     $test.Set('User::CurrentDateFrom',[datetime]::new(2025,$month,1))
     $test.Set('User::ArchiwumPath',$destination)
     $test.Set('User::DatabaseName',$database)

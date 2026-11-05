@@ -1,4 +1,4 @@
-param([switch]$CompatibilityTest)
+param([switch]$CompatibilityTest,[ValidateSet('SQLServer2022','SQLServer2025')][string]$TargetServerVersion='SQLServer2022')
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $project=Join-Path $root 'Integration Services Project2'
@@ -31,7 +31,7 @@ $package.Description='Daily CSV parts with configurable row limit; verified dail
 $package.Variables.Remove('User::SQLStatement')
 function Add-Variable($name,$value) { [void]$package.Variables.Add($name,$false,'User',$value) }
 foreach($name in @('Tables','BatchData','TableSchema','ShapeData','MetadataData')) { Add-Variable $name (New-Object object) }
-foreach($name in @('JobsSelectSql','JobStartSql','JobResultSql','TableName','ColumnDate','ArchiwumPath','SQLStatement','FolderFullPath','OutputFile','KeyColumns','DatabaseName','JobError','CsvHeader','ShapeSql','MetadataSql','FirstDaySql','QualifiedTableName','StageDaySql','DeleteSql','ZipFile','ZipArguments','ZipTestArguments')) { Add-Variable $name '' }
+foreach($name in @('JobsSelectSql','JobStartSql','JobResultSql','TableName','ColumnDate','ArchiwumPath','SQLStatement','FolderFullPath','OutputFile','KeyColumns','DatabaseName','JobError','CsvHeader','ShapeSql','MetadataSql','FirstDaySql','NextDaySql','QualifiedTableName','StageDaySql','DeleteSql','ZipFile','ZipArguments','ZipTestArguments')) { Add-Variable $name '' }
 foreach($name in @('DeletedRows','DayRows','DayExportedRows')) { Add-Variable $name ([long]0) }
 foreach($name in @('Days','ArchiveJobId','FailedJobs')) { Add-Variable $name ([int]0) }
 Add-Variable 'BatchNumber' ([long]0)
@@ -41,7 +41,7 @@ Add-Variable 'DayHasFiles' $false
 Add-Variable 'CutoffDate' ([datetime]'2000-01-01')
 foreach($name in @('JobActive','JobFailed','BatchHasRows')) { Add-Variable $name $false }
 $archiveRoot=[IO.Path]::GetDirectoryName([string]$package.Parameters['OutputFile'].Value)
-foreach($obsolete in @('TableName','DateColumn','OlderThanDays','OutputFile','SevenZipPath')) { [void]$package.Parameters.Remove($obsolete) }
+foreach($obsolete in @('TableName','DateColumn','OlderThanDays','OutputFile','SevenZipPath')) { if($package.Parameters.Contains($obsolete)) { [void]$package.Parameters.Remove($obsolete) } }
 $p=$package.Parameters.Add('ArchiveRoot',[TypeCode]::String); $p.Value=$archiveRoot
 if($currentValues.ContainsKey('ConnectionString')) { $package.Parameters['ConnectionString'].Value=$currentValues['ConnectionString'] }
 if($currentValues.ContainsKey('ArchiveRoot')) { $package.Parameters['ArchiveRoot'].Value=$currentValues['ArchiveRoot'] }
@@ -138,9 +138,9 @@ Job-Sql $firstDay 'Capture first day error'
 Link $tables $cutoff $firstDay
 $daysLoop=$tables.Executables.Add('STOCK:FORLOOP'); $daysLoop.Name='For each archive day'; $daysLoop.DelayValidation=$true
 $daysLoop.EvalExpression='!@[User::JobFailed] && @[User::CurrentDateFrom] < @[User::CutoffDate]'
-$daysLoop.AssignExpression='@[User::CurrentDateFrom] = DATEADD("day",1,@[User::CurrentDateFrom])'
+# CurrentDateFrom is advanced by Find next archive day; empty calendar days are skipped.
 Link $tables $firstDay $daysLoop
-$guid=Add-Script $daysLoop 'Initialize daily archive' 'User::CurrentDateFrom,User::ArchiwumPath,User::DatabaseName,User::TableName,User::QualifiedTableName,User::ColumnDate,User::KeyColumns' 'User::FolderFullPath,User::OutputFile,User::CurrentDateTo,User::BatchHasRows,User::BatchNumber,User::DayHasFiles,User::ZipFile,User::ZipArguments,User::ZipTestArguments,User::DayRows,User::DayExportedRows,User::StageDaySql,User::DeleteSql'
+$guid=Add-Script $daysLoop 'Initialize daily archive' 'User::CurrentDateFrom,User::ArchiwumPath,User::DatabaseName,User::TableName,User::QualifiedTableName,User::ColumnDate,User::KeyColumns' 'User::FolderFullPath,User::OutputFile,User::CurrentDateTo,User::BatchHasRows,User::BatchNumber,User::DayHasFiles,User::ZipFile,User::ZipArguments,User::ZipTestArguments,User::DayRows,User::DayExportedRows,User::StageDaySql,User::DeleteSql,User::NextDaySql'
 $stageDay=Add-Sql $daysLoop 'Stage archive day' 'ArchiveDb' 'User::StageDaySql' 'SingleRow' $true
 Bind-Result $stageDay '0' 'User::DayRows'
 Job-Sql $stageDay 'Capture day staging error'
@@ -187,6 +187,11 @@ Link $daysLoop $testZip $delete
 Link $daysLoop $delete $checkDelete
 Link $daysLoop $checkDelete $dropDay
 Link $daysLoop $dropDay $cleanup
+$nextDay=Add-Sql $daysLoop 'Find next archive day' 'ArchiveDb' 'User::NextDaySql' 'SingleRow' $true
+Bind-Input $nextDay '@Cutoff' 'User::CutoffDate' DateTime2
+Bind-Result $nextDay '0' 'User::CurrentDateFrom'
+Job-Sql $nextDay 'Capture next day error'
+Link $daysLoop $cleanup $nextDay
 $setStatus=Add-Sql $tables 'Save job result' 'ArchiveJobsDb' 'User::JobResultSql' 'None' $true
 Bind-Input $setStatus '@Id' 'User::ArchiveJobId' Int32
 Bind-Input $setStatus '@Failed' 'User::JobFailed' Boolean
@@ -214,7 +219,8 @@ foreach($parameterName in $currentParameterIds.Keys) {
 }
 $common=Get-Content -LiteralPath (Join-Path $root 'scripts\Common.cs') -Raw
 $compiler='C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\Roslyn\csc.exe'
-$public='C:\Program Files\Microsoft Visual Studio\18\Insiders\Common7\IDE\PublicAssemblies\SSIS\170'
+$scriptMajor=if($TargetServerVersion -eq 'SQLServer2022') {16} else {17}
+$public="C:\Program Files\Microsoft Visual Studio\18\Insiders\Common7\IDE\PublicAssemblies\SSIS\$($scriptMajor)0"
 $buildDir=Join-Path $PSScriptRoot '.script-build'; [void](New-Item -ItemType Directory -Path $buildDir -Force)
 foreach($definition in $scriptDefinitions) {
     $taskNode=$xml.SelectSingleNode('//DTS:Executable[@DTS:ObjectName="'+$definition.Name+'"]',$ns)
@@ -222,6 +228,7 @@ foreach($definition in $scriptDefinitions) {
     $oldName=$projectNode.GetAttribute('Name')
     $newName='ST_'+[Guid]::NewGuid().ToString('N')
     $projectNode.SetAttribute('Name',$newName)
+    $projectNode.SetAttribute('VSTAMajorVersion',[string]$scriptMajor)
     $projectNode.SetAttribute('ReadOnlyVariables',$definition.Read)
     $projectNode.SetAttribute('ReadWriteVariables',$definition.Write)
     $sourceName=if($definition.Name -like 'Capture * error') { 'Capture SQL error' } else { $definition.Name }
@@ -230,6 +237,7 @@ foreach($definition in $scriptDefinitions) {
     foreach($item in $projectNode.SelectNodes('ProjectItem')) {
         $item.SetAttribute('Name',$item.GetAttribute('Name').Replace($oldName,$newName))
         $content=$item.InnerText.Replace($oldName,$newName)
+        $content=$content.Replace('Version=17.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91',"Version=$scriptMajor.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91").Replace('SSIS_ST170',"SSIS_ST$($scriptMajor)0")
         if($item.GetAttribute('Name') -eq 'ScriptMain.cs') { $content=$source }
         $content=$content -replace '(?m)[\t ]+$',''
         $item.InnerText=''; [void]$item.AppendChild($xml.CreateCDataSection($content))
@@ -249,7 +257,7 @@ foreach($definition in $scriptDefinitions) {
 # Existing package identity, package parameters, and target version are preserved.
 # The backup's layout refers to removed tasks; let SSDT arrange the current graph.
 foreach($layout in @($xml.SelectNodes('//DTS:DesignTimeProperties',$ns))) { [void]$layout.ParentNode.RemoveChild($layout) }
-$xml.DocumentElement.SetAttribute('LastModifiedProductVersion','www.microsoft.com/SqlServer/Dts','17.0.1016.0')
+[void]$xml.DocumentElement.SetAttribute('LastModifiedProductVersion','www.microsoft.com/SqlServer/Dts',([Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $public 'Microsoft.SqlServer.ManagedDTS.dll')).FileVersion))
 if($CompatibilityTest) { $destination=Join-Path $PSScriptRoot 'compatibility-test.dtsx' } else { $destination=$packagePath }
 $xml.Save($destination)
 & (Join-Path $PSScriptRoot 'Set-PackageLayout.ps1') -Path $destination
@@ -258,6 +266,7 @@ if (!$CompatibilityTest) {
     $projectXml=[xml](Get-Content -LiteralPath $projectFile -Raw)
     $projectNs=New-Object Xml.XmlNamespaceManager($projectXml.NameTable)
     $projectNs.AddNamespace('SSIS','www.microsoft.com/SqlServer/SSIS')
+    foreach($target in $projectXml.SelectNodes('//TargetServerVersion')) { $target.InnerText=$TargetServerVersion }
     foreach($parameterNode in @($projectXml.SelectNodes('//SSIS:PackageMetaData/SSIS:Parameters/SSIS:Parameter',$projectNs))) {
         if($parameterNode.GetAttribute('Name','www.microsoft.com/SqlServer/SSIS') -notin @('ConnectionString','ArchiveJobsTable','ArchiveRoot','MaxRecordsPerCsv')) {
             [void]$parameterNode.ParentNode.RemoveChild($parameterNode)

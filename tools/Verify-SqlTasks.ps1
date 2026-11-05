@@ -1,4 +1,4 @@
-param([string]$JobsTable='Archive.ArchiveJobs',[switch]$InsertAfterSnapshot,[switch]$Ssis2025,[switch]$KeyTypes,[switch]$NativeProcessTasks,[switch]$Retry,[switch]$FullPackage,[switch]$SpreadDates,[ValidateSet('None','NullKey','Stage','Read','Write','Delete','Zip','ZipTest','FolderCollision','ZipCollision')][string]$FailureMode='None',[int]$MaxRecordsPerCsv=1000)
+param([string]$JobsTable='Archive.ArchiveJobs',[switch]$InsertAfterSnapshot,[switch]$Ssis2025,[switch]$KeyTypes,[switch]$NativeProcessTasks,[switch]$Retry,[switch]$FullPackage,[switch]$SpreadDates,[switch]$SparseDates,[ValidateSet('None','NullKey','Stage','Read','Write','Delete','Zip','ZipTest','FolderCollision','ZipCollision')][string]$FailureMode='None',[int]$MaxRecordsPerCsv=1000)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $config=Get-Content -LiteralPath (Get-Content -LiteralPath (Join-Path $root 'verification/latest-config.txt')) -Raw | ConvertFrom-Json
@@ -14,10 +14,18 @@ $output=Join-Path $config.RunDirectory $(if($Retry) {'retry-csv'} else {'native-
 $package.Parameters['ArchiveRoot'].Value=$output
 $package.Parameters['MaxRecordsPerCsv'].Value=$MaxRecordsPerCsv
 foreach($connection in $package.Connections) { $connection.ConnectionString=$config.ConnectionString }
-$package.Connections['ArchiveDb'].ConnectionString=$sourceConnection.ConnectionString
+
 if($SpreadDates -and !$Retry) {
     $db=New-Object Data.SqlClient.SqlConnection($config.ConnectionString); $db.Open()
     try { $cmd=$db.CreateCommand(); $cmd.CommandText='UPDATE dbo.Orders SET CreatedAt=DATEADD(day,-3-CONVERT(int,OrderNo%20),CONVERT(date,GETDATE())) WHERE OrderNo<=2505;'; [void]$cmd.ExecuteNonQuery() } finally { $db.Dispose() }
+}
+if($SparseDates -and !$Retry) {
+    $db=New-Object Data.SqlClient.SqlConnection($config.ConnectionString); $db.Open()
+    try {
+        $cmd=$db.CreateCommand()
+        $cmd.CommandText="UPDATE dbo.Orders SET CreatedAt=CASE WHEN OrderNo<=2505 THEN CONVERT(datetime2,'20200203') ELSE CONVERT(datetime2,'20250115') END WHERE OrderNo<=3000; UPDATE Archive.ArchiveJobs SET ArchiveOlderThanDays=50 WHERE Id=1;"
+        [void]$cmd.ExecuteNonQuery()
+    } finally { $db.Dispose() }
 }
 if($KeyTypes -and !$Retry) {
     $db=New-Object Data.SqlClient.SqlConnection($config.ConnectionString); $db.Open()
@@ -156,7 +164,7 @@ if($FullPackage) {
         $result=$task.Execute($package.Connections,$task.Variables,$null,$null,$null)
         $errors=@($package.Errors | Select-Object -Skip $before | ForEach-Object Description)
         if($result -ne 'Success' -or $errors.Count -gt 0) {
-            if($name -in @('Calculate retention cutoff','Read archive batch','Read column definitions','Read SQL types and keys','Find first archive day','Stage archive day','Drop staged day','Delete archived day','Create daily ZIP','Verify ZIP integrity')) {
+            if($name -in @('Calculate retention cutoff','Read archive batch','Read column definitions','Read SQL types and keys','Find first archive day','Find next archive day','Stage archive day','Drop staged day','Delete archived day','Create daily ZIP','Verify ZIP integrity')) {
                 # TaskHost.Execute does not dispatch the package scheduler's event handlers.
                 $package.Variables['User::JobFailed'].Value=$true
                 $package.Variables['User::JobError'].Value=$errors -join [Environment]::NewLine
@@ -178,7 +186,10 @@ if($FullPackage) {
             $package.Variables['User::'+$entry[0]].Value=$job[$entry[1]]
         }
         foreach($name in @('Mark job as started','Initialize job variables','Prepare metadata and date queries','Read column definitions','Read SQL types and keys','Prepare export schema and header','Calculate retention cutoff','Find first archive day')) { Step $tables $name }
+        $visitedDays=0
         while(!$package.Variables['User::JobFailed'].Value -and $package.Variables['User::CurrentDateFrom'].Value -lt $package.Variables['User::CutoffDate'].Value) {
+            $visitedDays++
+            if($SparseDates -and $package.Variables['User::ArchiveJobId'].Value -eq 1 -and $visitedDays -gt 2) { throw 'Visited an empty day between 2020 and 2025' }
             if($package.Variables['User::ArchiveJobId'].Value -eq 1 -and $FailureMode -in @('FolderCollision','ZipCollision')) {
                 $day=([datetime]$package.Variables['User::CurrentDateFrom'].Value).ToString('yyyy_MM_dd')
                 $year=([datetime]$package.Variables['User::CurrentDateFrom'].Value).ToString('yyyy')
@@ -205,9 +216,11 @@ if($FullPackage) {
             while(!$package.Variables['User::JobFailed'].Value -and $package.Variables['User::BatchHasRows'].Value) {
                 foreach($name in @('Prepare batch select query','Read archive batch','Write batch to CSV')) { Step $batches $name }
             }
-            foreach($name in @('Verify exported day','Create daily ZIP','Verify ZIP integrity','Delete archived day','Verify deleted row count','Drop staged day','Delete temporary CSV files')) { Step $daily $name }
-            $package.Variables['User::CurrentDateFrom'].Value=([datetime]$package.Variables['User::CurrentDateFrom'].Value).AddDays(1)
+            foreach($name in @('Verify exported day','Create daily ZIP','Verify ZIP integrity','Delete archived day','Verify deleted row count','Drop staged day','Delete temporary CSV files','Find next archive day')) { Step $daily $name }
+
         }
+        if($SparseDates -and !$Retry -and $package.Variables['User::ArchiveJobId'].Value -eq 1 -and $visitedDays -ne 2) { throw 'Expected exactly two archive days' }
+        if($SparseDates -and $package.Variables['User::ArchiveJobId'].Value -eq 1) { Write-Output ("Sparse data: visited days = $visitedDays" ) }
         foreach($name in @('Save job result','Log job result')) { Step $tables $name }
     }
     $result='Individual native tasks completed (scheduler not exercised)'
@@ -259,7 +272,7 @@ try {
                     # Validate against the actual date header below, independent of fixture naming.
                     $dateProperty=$row.PSObject.Properties | Where-Object Name -match '(CreatedAt|HappenedAt).*datetime' | Select-Object -First 1
                     if($dateProperty -and ([datetime]$dateProperty.Value).ToString('yyyy_MM_dd') -ne $zip.Name.Substring(0,10)) { throw 'Mixed day CSV/ZIP' }
-                    if($zip.Directory.Parent.Name -eq 'dbo.Orders') { $orderKeys+= [long]$row.'OrderNo (bigint)' }
+                    if($zip.Directory.Parent.Parent.Name -eq 'dbo.Orders') { $orderKeys+= [long]$row.'OrderNo (bigint)' }
                 }
             }
         } finally { $archive.Dispose() }

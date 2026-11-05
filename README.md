@@ -1,10 +1,10 @@
-﻿# Archiwizacja CSV w SSIS
+# Archiwizacja CSV w SSIS
 
 Pakiet `Integration Services Project2/Package.dtsx` pobiera zadania z tabeli wskazanej przez `ArchiveJobsTable` i przetwarza **tabele → dni → partie CSV**. Każdy CSV ma własny nagłówek i maksymalnie konfigurowalną liczbę rekordów danych. Po zakończeniu dnia powstaje ZIP zawierający jego pliki CSV.
 
 ## Uruchomienie i parametry
 
-Otwórz `Integration Services Project2.slnx` lub projekt `.dtproj`, następnie `Package.dtsx`. Uruchom pakiet przez F5 / Execute Package w Visual Studio z SSIS Projects. Projekt ma `TargetServerVersion = SQLServer2025`.
+Otwórz `Integration Services Project2.slnx` lub projekt `.dtproj`, następnie `Package.dtsx`. Uruchom pakiet przez F5 / Execute Package w Visual Studio z SSIS Projects. Projekt ma `TargetServerVersion = SQLServer2022`; Script Tasks są kompilowane dla bibliotek SSIS 16.0.0.0. Instrukcja budowania `.ispac` i testu SQL Agenta: `deployment/SQLServer2022.md`.
 
 | Parametr pakietu | Znaczenie |
 |---|---|
@@ -16,6 +16,8 @@ Otwórz `Integration Services Project2.slnx` lub projekt `.dtproj`, następnie `
 `DatabaseName` wybiera bazę źródłową przez pełną nazwę tabeli `[baza].[schemat].[tabela]` w przygotowywanym SQL. `ArchiveDb` używa bazowego parametru `ConnectionString` i `RetainSameConnection = true`, aby wszystkie kroki widziały tę samą `#ArchiveDay`. Sesja nie zmienia bieżącej bazy między zadaniami. Nie ma `ChangeDatabase`, otwierania połączeń ani wykonywania SQL w C#. `ArchiveJobsDb` korzysta z tego samego parametru `ConnectionString`; bazę tabeli konfiguracji i statusów wskazuje `ArchiveJobsTable`. `ConnectionString` nie zawiera `Database` / `Initial Catalog`; bazy źródłowe wskazuje `DatabaseName` w zadaniach. Użytkownik pakietu potrzebuje dostępu do źródeł, katalogu archiwum i 7-Zip.
 
 Tabelę konfiguracji tworzy `CreateArchiveJobs.sql`; na początku ustaw `@SchemaName` i `@TableName`. Skrypt wymaga istniejącego schematu i go nie tworzy. Ustaw `ArchiveJobsTable` jako `baza.schemat.tabela` (np. `nito_superDb.Archive.ArchiveJobs`). Przykład zadania znajduje się w `ArchiveJobs.example.sql`. Konfiguracja obejmuje `Id`, `DatabaseName`, `TableName`, `DateColumn`, `ArchiveOlderThanDays` oraz kolumny statusu `LastSuccesProcessedAt`, `LastProcessedAt`, `LastProcessedStatus`, `ErrorMessage`. Zachowano istniejącą pisownię `LastSuccesProcessedAt`.
+
+Dni bez danych są pomijane: po zakończeniu dnia zadanie `Find next archive day` wybiera najmniejszą datę danych od początku następnego dnia i przed progiem retencji. Jeśli nie znajdzie danych, ustawia datę na próg retencji i kończy pętlę. Nie przechodzi przez wszystkie dni kalendarzowe. Rekord dopisany do już przetworzonego dnia pozostaje do następnego uruchomienia.
 
 ## Przepływ
 
@@ -44,7 +46,8 @@ Load archive jobs
     │   ├── Delete archived day — Execute SQL Task, DELETE źródła po kluczach #ArchiveDay
     │   ├── Verify deleted row count
     │   ├── Drop staged day — Execute SQL Task, również po błędzie
-    │   └── Delete temporary CSV files — tylko po sukcesie dnia
+    │   ├── Delete temporary CSV files — tylko po sukcesie dnia
+    │   └── Find next archive day — następny dzień z danymi przed progiem retencji
     ├── Save job result
     └── Log job result
 Check overall archive result
@@ -128,7 +131,7 @@ Zdarzenia `OnError` zapisują `JobFailed` i `JobError` oraz zatrzymują propagac
 
 ## Budowanie i weryfikacja
 
-Aktywne źródła Script Tasks znajdują się w `scripts`. Samo edytowanie `.cs` nie aktualizuje pakietu. `tools/Build-Package.ps1` buduje przepływ, kompiluje skrypty i osadza je w `Package.dtsx`; `tools/Set-PackageLayout.ps1` ustawia diagram. Wymagana jest lokalna instalacja Visual Studio 18 Insiders / SSIS 2025. Historyczne pliki skryptów wykonujących SQL zostały zastąpione komentarzami o wycofaniu; dawne implementacje są w historii Git. Stare weryfikatory tych Script Tasks nie odpowiadają aktualnemu przepływowi.
+Aktywne źródła Script Tasks znajdują się w `scripts`. Samo edytowanie `.cs` nie aktualizuje pakietu. `tools/Build-Package.ps1` buduje przepływ, kompiluje skrypty i osadza je w `Package.dtsx`; `tools/Set-PackageLayout.ps1` ustawia diagram. Wymagana jest lokalna instalacja Visual Studio 18 Insiders / SSIS Projects z bibliotekami dla SQL Server 2022. Domyślny target generatora to SQLServer2022; parametr -TargetServerVersion SQLServer2025 pozwala jawnie przygotować wariant 2025. Historyczne pliki skryptów wykonujących SQL zostały zastąpione komentarzami o wycofaniu; dawne implementacje są w historii Git. Stare weryfikatory tych Script Tasks nie odpowiadają aktualnemu przepływowi.
 
 ```powershell
 .\tools\Build-Package.ps1

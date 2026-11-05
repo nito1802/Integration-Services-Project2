@@ -51,6 +51,7 @@ Place "$daily\Delete archived day" 656 470
 Place "$daily\Verify deleted row count" 340 470
 Place "$daily\Drop staged day" 24 470
 Place "$daily\Delete temporary CSV files" 24 620
+Place "$daily\Find next archive day" 340 620
 Place "$jobs\Save job result" 294 1260
 Place "$jobs\Log job result" 560 1260
 $batch="$daily\Process daily batches"
