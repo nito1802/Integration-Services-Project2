@@ -14,7 +14,7 @@ SELECT Id,TableName,LastProcessedStatus,ErrorMessage,LastProcessedAt,LastSuccesP
 '@
  [void]$command.Parameters.Add('@job',[Data.SqlDbType]::UniqueIdentifier); $command.Parameters['@job'].Value=[guid]$config.JobId
  $data=New-Object Data.DataSet; $adapter=New-Object Data.SqlClient.SqlDataAdapter($command); [void]$adapter.Fill($data)
- $jobResult=@($data.Tables[1].Rows | Where-Object step_id -eq 0)
+ $jobResult=@($data.Tables[1].Rows | Where-Object step_id -eq 0 | Select-Object -Last 1)
  if($jobResult.Count -ne 1 -or $jobResult[0].run_status -ne 1){throw 'SQL Agent job did not succeed'}
  if($data.Tables[2].Rows.Count -ne 1 -or $data.Tables[2].Rows[0].status -ne 7){throw 'SSIS catalog execution did not succeed'}
  if($data.Tables[3].Rows.Count){$data.Tables[3] | Format-List | Out-String | Write-Output;throw 'Warnings/errors were reported by SSISDB'}

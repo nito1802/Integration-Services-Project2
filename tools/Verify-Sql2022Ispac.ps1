@@ -21,9 +21,17 @@ try {
   foreach($item in $script.SelectNodes('ProjectItem')) {if($item.Name -like '*.csproj' -and $item.InnerText -match 'Version=17\.0\.0\.0|SSIS_ST170'){throw 'Embedded script project still targets 2025'}}
  }
  $dn=New-Object Xml.XmlNamespaceManager($package.NameTable); $dn.AddNamespace('DTS','www.microsoft.com/SqlServer/Dts')
+ $dn.AddNamespace('SQLTask','www.microsoft.com/sqlserver/dts/tasks/sqltask')
+ $managers=@($package.SelectNodes('/DTS:Executable/DTS:ConnectionManagers/DTS:ConnectionManager',$dn))
+ if($managers.Count -ne 1 -or $managers[0].GetAttribute('ObjectName','www.microsoft.com/SqlServer/Dts') -ne 'ArchiveDb'){throw 'Expected one shared ArchiveDb connection manager'}
+ $id=$managers[0].GetAttribute('DTSID','www.microsoft.com/SqlServer/Dts')
+ if($managers[0].SelectSingleNode('DTS:PropertyExpression[@DTS:Name="ConnectionString"]',$dn).InnerText -ne '@[$Package::ConnectionString]'){throw 'Shared connection does not use package ConnectionString'}
+ if($managers[0].SelectSingleNode('DTS:ObjectData/DTS:ConnectionManager',$dn).GetAttribute('Retain','www.microsoft.com/SqlServer/Dts') -ne 'True'){throw 'Shared connection must retain the SQL session'}
+ foreach($task in $package.SelectNodes('//SQLTask:SqlTaskData',$dn)){if($task.GetAttribute('Connection','www.microsoft.com/sqlserver/dts/tasks/sqltask') -ne $id){throw 'SQL task does not use shared ArchiveDb'}}
  $connection=$package.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="ConnectionString"]/DTS:Property[@DTS:Name="ParameterValue"]',$dn).InnerText
  if($connection -ne 'Data Source=.;Integrated Security=True;TrustServerCertificate=True'){throw 'Unexpected deployment connection default'}
  $result=@("PASS: ISPAC TargetServerVersion=160 (SQL Server 2022).","PASS: $($scripts.Count) Script Tasks: VSTA 16 and compiled references ManagedDTS/ScriptTask 16.0.0.0.",'PASS: no SQL Server 2025 references in embedded script projects; safe connection defaults.',('SHA256: '+(Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash))
+ $result+='PASS: one retained ArchiveDb connection, controlled by package ConnectionString, used by all SQL tasks.'
  $result | Set-Content (Join-Path $root 'artifacts/sql2022/compatibility.txt') -Encoding UTF8
  $result
 } finally {$zip.Dispose()}

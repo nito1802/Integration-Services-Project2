@@ -54,11 +54,6 @@ $connection.Name='ArchiveDb'
 $connection.SetExpression('ConnectionString','@[$Package::ConnectionString]')
 $connection.Properties['RetainSameConnection'].SetValue($connection,$true)
 $connection.DelayValidation=$true
-$statusConnection=$package.Connections.Add('ADO.NET:System.Data.SqlClient.SqlConnection, System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089')
-$statusConnection.Name='ArchiveJobsDb'
-$statusConnection.SetExpression('ConnectionString','@[$Package::ConnectionString]')
-$statusConnection.Properties['RetainSameConnection'].SetValue($statusConnection,$true)
-$statusConnection.DelayValidation=$true
 function Link($container,$from,$to,$expression='') {
     $constraint=$container.PrecedenceConstraints.Add($from,$to)
     $constraint.Value=[Microsoft.SqlServer.Dts.Runtime.DTSExecResult]::Success
@@ -102,7 +97,7 @@ function Job-Sql($hostTask,$handlerName,$skipAfterError=$true) {
     [void](Add-Script $handler $handlerName 'System::ErrorDescription' 'System::Propagate')
 }
 $prepareQueries=Add-Script $package 'Prepare job queries' '$Package::ArchiveJobsTable' 'User::JobsSelectSql,User::JobStartSql,User::JobResultSql'
-$getSettings=Add-Sql $package 'Load archive jobs' 'ArchiveJobsDb' 'User::JobsSelectSql' 'Rowset' $true
+$getSettings=Add-Sql $package 'Load archive jobs' 'ArchiveDb' 'User::JobsSelectSql' 'Rowset' $true
 Link $package $prepareQueries $getSettings
 Bind-Result $getSettings '0' 'User::Tables'
 $tables=$package.Executables.Add('STOCK:FOREACHLOOP'); $tables.Name='For each archive job'; $tables.DelayValidation=$true; $tables.FailPackageOnFailure=$true
@@ -110,7 +105,7 @@ $tables.ForEachEnumerator=$app.ForEachEnumeratorInfos['Foreach ADO Enumerator'].
 $tables.ForEachEnumerator.InnerObject.DataObjectVariable='User::Tables'
 foreach($entry in @(@('ArchiveJobId',0),@('DatabaseName',1),@('TableName',2),@('Days',3),@('ColumnDate',4))) { $mapping=$tables.VariableMappings.Add(); $mapping.VariableName='User::'+$entry[0]; $mapping.ValueIndex=$entry[1] }
 Link $package $getSettings $tables
-$startJob=Add-Sql $tables 'Mark job as started' 'ArchiveJobsDb' 'User::JobStartSql' 'None' $true
+$startJob=Add-Sql $tables 'Mark job as started' 'ArchiveDb' 'User::JobStartSql' 'None' $true
 Bind-Input $startJob '@Id' 'User::ArchiveJobId' Int32
 $prepareJob=Add-Script $tables 'Initialize job variables' '$Package::ArchiveRoot' 'User::ArchiwumPath,User::BatchHasRows,User::BatchNumber'
 $begin=Add-Script $tables 'Prepare metadata and date queries' 'User::TableName,User::DatabaseName,User::ColumnDate,User::Days,$Package::MaxRecordsPerCsv' 'User::ShapeSql,User::MetadataSql,User::FirstDaySql,User::QualifiedTableName'
@@ -192,7 +187,7 @@ Bind-Input $nextDay '@Cutoff' 'User::CutoffDate' DateTime2
 Bind-Result $nextDay '0' 'User::CurrentDateFrom'
 Job-Sql $nextDay 'Capture next day error'
 Link $daysLoop $cleanup $nextDay
-$setStatus=Add-Sql $tables 'Save job result' 'ArchiveJobsDb' 'User::JobResultSql' 'None' $true
+$setStatus=Add-Sql $tables 'Save job result' 'ArchiveDb' 'User::JobResultSql' 'None' $true
 Bind-Input $setStatus '@Id' 'User::ArchiveJobId' Int32
 Bind-Input $setStatus '@Failed' 'User::JobFailed' Boolean
 Bind-Input $setStatus '@Error' 'User::JobError' String

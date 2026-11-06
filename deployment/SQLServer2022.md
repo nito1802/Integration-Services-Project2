@@ -1,5 +1,9 @@
 # Wydanie dla SQL Server 2022
 
+Aktualny job `SSIS Archive SQL2022 Test 20261106_153717` zostal przelaczony na natywny krok typu **SQL Server Integration Services Package** (`SSIS`). Zachowano cztery parametry pakietu i pojedynczy krok. Konwersje wykonuje `tools/Set-Sql2022TestJobSsisStep.ps1`; kopia poprzedniego T-SQL jest w `artifacts/sql2022/job-step-before-ssis.local.json`. Test natywnego kroku: Success, wykonanie SSISDB nr 8. W SSMS parametry sa dostepne w Job Properties -> Steps -> Edit -> Configuration -> Parameters; obok jest Connection Managers. SSMS 22 wymaga komponentu `Microsoft.SSMS.Component.IS` (Integration Services management capabilities), dostepnego w Visual Studio Installer.
+
+Aktualizacja 2026-11-06: usunieto connection manager `ArchiveJobsDb`. Wszystkie kroki SQL (odczyt konfiguracji, archiwizacja i zapis statusow) uzywaja jednego `ArchiveDb`, sterowanego parametrem pakietu `ConnectionString`, z zachowaniem sesji dla `#ArchiveDay`. Potwierdzono pelnym jobem SQL Agent `SSIS Archive SQL2022 Test 20261106_153717`, wykonanie SSISDB nr 7: Success, bez ostrzezen i bledow. Swieza baza: `SsisArchiveTest2022_20261106_153717`; archiwa: `C:\ArchiveTest\Sql2022_20261106_153717`. Wynik: 5 ZIP, 13 CSV, 9502 rekordy; w zrodle pozostaly 2 zamowienia i 1 zdarzenie.
+
 Projekt domyslnie celuje w SQL Server 2022. Wszystkie 32 Script Tasks maja VSTA 16 oraz binarne referencje do ManagedDTS i ScriptTask 16.0.0.0. Zmiana obejmuje rowniez osadzone projekty C# (referencje i SSIS_ST160), a nie tylko atrybut wersji w XML.
 
 ## Budowanie
