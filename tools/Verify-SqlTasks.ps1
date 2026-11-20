@@ -1,5 +1,6 @@
 param([string]$JobsTable='Archive.ArchiveJobs',[switch]$InsertAfterSnapshot,[switch]$Ssis2025,[switch]$KeyTypes,[switch]$NativeProcessTasks,[switch]$Retry,[switch]$FullPackage,[switch]$SpreadDates,[switch]$SparseDates,[ValidateSet('None','NullKey','Stage','Read','Write','Delete','Zip','ZipTest','FolderCollision','ZipCollision')][string]$FailureMode='None',[int]$MaxRecordsPerCsv=1000)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'Script-Source.ps1')
 $root=Split-Path $PSScriptRoot -Parent
 $config=Get-Content -LiteralPath (Get-Content -LiteralPath (Join-Path $root 'verification/latest-config.txt')) -Raw | ConvertFrom-Json
 if($config.Database -notmatch '^CodexArchiveFlow_[a-f0-9]{32}$') { throw 'Expected isolated LocalDB test' }
@@ -67,6 +68,7 @@ if($FullPackage) {
         if($FailureMode -eq 'Write' -and $names[$i] -eq 'Write batch to CSV') {
             $main=$main.Replace('writer.WriteLine();','writer.WriteLine(); if (Convert.ToString(Dts.Variables["User::TableName"].Value) == "dbo.Orders") throw new IOException("Injected write failure.");')
         }
+        if($names[$i] -notin @('Prepare job queries','Log job result','Capture SQL error')) { $main=Get-JobScriptSource $main }
         $file=Join-Path $build ('Step'+$i+'.cs')
         [IO.File]::WriteAllText($file,$common.Replace('__NAMESPACE__',('NativeProbe'+$i)).Replace('// __MAIN__',$main)); $files+=$file
     }

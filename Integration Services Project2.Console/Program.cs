@@ -9,6 +9,15 @@ Console.OutputEncoding = System.Text.Encoding.UTF8;
 
 try
 {
+    //if (args.Length == 1 && args[0].Equals("seed-related-tables", StringComparison.OrdinalIgnoreCase))
+    //{
+    //    await new ForeignKeyTestDataCreator().SeedRelatedTablesAsync();
+    //    Console.WriteLine("Odtworzono ArchiveRelationTest.Orders, OrderLines i konfigurację powiązania.");
+    //    return 0;
+    //}
+
+    await new ForeignKeyTestDataCreator().SeedRelatedTablesAsync();
+
     //if (args.Length == 1 && args[0].Equals("seed-fk-tables", StringComparison.OrdinalIgnoreCase))
     //{
     //    await new ForeignKeyTestDataCreator().SeedAsync();

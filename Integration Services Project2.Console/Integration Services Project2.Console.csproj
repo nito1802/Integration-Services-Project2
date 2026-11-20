@@ -12,6 +12,8 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="SeedForeignKeyTables.sql" />
+    <EmbeddedResource Include="SeedRelatedTables.sql" />
+    <EmbeddedResource Include="../CreateArchiveJobRelations.sql" Link="CreateArchiveJobRelations.sql" />
     <None Include="../Integration Services Project2.Database/appsettings.json" Link="appsettings.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

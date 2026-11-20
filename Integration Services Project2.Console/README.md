@@ -1,5 +1,22 @@
 # Integration Services Project2.Console
 
+## Tabele testowe z dziećmi bez daty
+
+```powershell
+dotnet run --project "Integration Services Project2.Console" -- seed-related-tables
+```
+
+Polecenie tworzy `Archive.ArchiveJobRelations` w `nito_superDb` i odtwarza
+`ArchiveRelationTest.Orders` oraz `ArchiveRelationTest.OrderLines`. Wymaga istniejącej
+`Archive.ArchiveJobs`. Uruchamiaj je przy zatrzymanym pakiecie.
+
+Ponowienie odtwarza dane, resetuje status zadania dla `Orders` i zapisuje powiązanie
+`Orders.Id = OrderLines.OrderId`. Przy retencji 30 dni zamówienia 1 i 2 oraz pozycje
+101–103 kwalifikują się do archiwizacji. Zamówienie 3 i pozycja 104 pozostają w źródle.
+Każdy wpis w tabeli technicznej wskazuje zadanie nadrzędne oraz bezpośrednią relację
+jednokolumnową w tej samej bazie źródłowej. SSIS wymaga obsługi tej konfiguracji,
+zanim uruchomisz pakiet na tych danych.
+
 ## Tabele testowe z kluczami obcymi
 
 `ForeignKeyTestDataCreator.SeedAsync()` tworzy cztery tabele w bazie `nito_superDb` i odtwarza ich dane:

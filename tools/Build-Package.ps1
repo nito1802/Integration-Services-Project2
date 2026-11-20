@@ -1,5 +1,6 @@
 param([switch]$CompatibilityTest,[ValidateSet('SQLServer2022','SQLServer2025')][string]$TargetServerVersion='SQLServer2022')
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'Script-Source.ps1')
 $root=Split-Path $PSScriptRoot -Parent
 $project=Join-Path $root 'Integration Services Project2'
 $packagePath=Join-Path $project 'Package.dtsx'
@@ -62,10 +63,7 @@ function Link($container,$from,$to,$expression='') {
 $scriptDefinitions=New-Object System.Collections.Generic.List[object]
 function Add-Script($container,$name,$read,$write) {
     $hostTask=$container.Executables.Add('STOCK:ScriptTask'); $hostTask.Name=$name; $hostTask.DelayValidation=$true; $hostTask.FailPackageOnFailure=$true
-    $sharedWrite=@('User::JobActive','User::JobFailed','User::JobError','User::FailedJobs','User::ArchiveJobId','User::OutputFile')
-    $writes=@((@($write -split ',') + $sharedWrite) | Where-Object { $_ } | Select-Object -Unique)
-    $reads=@((@($read -split ',') + @('User::TableName')) | Where-Object { $_ -and $_ -notin $writes } | Select-Object -Unique)
-    $scriptDefinitions.Add(@{Name=$name; Read=($reads -join ','); Write=($writes -join ',')})
+    $scriptDefinitions.Add(@{Name=$name; HandleJobError=$false})
     return $hostTask
 }
 function Add-Sql($container,$name,$connectionName,$sql,$result='None',$variableSource=$false) {
@@ -196,11 +194,11 @@ $report=Add-Script $tables 'Log job result' '' ''
 Link $tables $setStatus $report
 $summary=Add-Script $package 'Check overall archive result' '' ''
 Link $package $tables $summary
-# Use the same SSIS error handling for C# and SQL tasks. Preparation resets the
-# previous job's flags, so it must run even when the preceding job failed.
-Job-Sql $prepareJob 'Capture preparation error' $false
-foreach($task in @($begin,$processMetadata,$guid,$construct,$export,$verifyDay,$checkDelete,$cleanup)) {
-    Job-Sql $task ('Capture '+$task.Name+' error')
+# Script errors are captured inside Main, before SSIS raises OnError. A nested
+# Script Task handler would request locks still owned by its failing parent.
+foreach($task in @($prepareJob,$begin,$processMetadata,$guid,$construct,$export,$verifyDay,$checkDelete,$cleanup)) {
+    ($scriptDefinitions | Where-Object { $_.Name -eq $task.Name }).HandleJobError=$true
+    if($task -ne $prepareJob) { $task.SetExpression('Disable','@[User::JobFailed]') }
 }
 $checkDelete.SetExpression('Disable','@[User::JobFailed] || !@[User::DayHasFiles]')
 $skeleton=Join-Path $PSScriptRoot 'package-skeleton.dtsx'
@@ -224,10 +222,12 @@ foreach($definition in $scriptDefinitions) {
     $newName='ST_'+[Guid]::NewGuid().ToString('N')
     $projectNode.SetAttribute('Name',$newName)
     $projectNode.SetAttribute('VSTAMajorVersion',[string]$scriptMajor)
-    $projectNode.SetAttribute('ReadOnlyVariables',$definition.Read)
-    $projectNode.SetAttribute('ReadWriteVariables',$definition.Write)
     $sourceName=if($definition.Name -like 'Capture * error') { 'Capture SQL error' } else { $definition.Name }
     $main=Get-Content -LiteralPath (Join-Path $root ('scripts\'+$sourceName+'.cs')) -Raw
+    if($definition.HandleJobError) { $main=Get-JobScriptSource $main }
+    $access=Get-ScriptVariableAccess $main
+    $projectNode.SetAttribute('ReadOnlyVariables',$access.Read)
+    $projectNode.SetAttribute('ReadWriteVariables',$access.Write)
     $source=$common.Replace('__NAMESPACE__',$newName).Replace('// __MAIN__',$main)
     foreach($item in $projectNode.SelectNodes('ProjectItem')) {
         $item.SetAttribute('Name',$item.GetAttribute('Name').Replace($oldName,$newName))
