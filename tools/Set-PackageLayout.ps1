@@ -25,11 +25,11 @@ function Place($id,$x,$y,$width=210,$height=46,$container=$false) {
         [void]$layout.AppendLine("        <NodeLayout Id=`"$escaped`" TopLeft=`"$x,$y`" Size=`"$width,$height`" />")
     }
 }
-# Coordinates are relative to the containing graph/panel.
+# Coordinates are relative to the containing panel.
 Place 'Package\Prepare job queries' 32 24
 Place 'Package\Load archive jobs' 32 120
-Place 'Package\For each archive job' 32 216 1100 1400 $true
-Place 'Package\Check overall archive result' 32 1666
+Place 'Package\For each archive job' 32 216 1100 2300 $true
+Place 'Package\Check overall archive result' 32 2566
 $jobs='Package\For each archive job'
 Place "$jobs\Mark job as started" 28 24
 Place "$jobs\Initialize job variables" 294 24
@@ -39,25 +39,36 @@ Place "$jobs\Read SQL types and keys" 826 140
 Place "$jobs\Prepare export schema and header" 560 140
 Place "$jobs\Calculate retention cutoff" 294 140
 Place "$jobs\Find first archive day" 294 260
-Place "$jobs\For each archive day" 28 410 1030 810 $true
+Place "$jobs\For each archive day" 28 410 1030 1640 $true
 $daily="$jobs\For each archive day"
-Place "$daily\Initialize daily archive" 24 24
-Place "$daily\Stage archive day" 340 24
-Place "$daily\Process daily batches" 24 130 950 150 $true
-Place "$daily\Verify exported day" 24 340
-Place "$daily\Create daily ZIP" 340 340
-Place "$daily\Verify ZIP integrity" 656 340
-Place "$daily\Delete archived day" 656 470
-Place "$daily\Verify deleted row count" 340 470
-Place "$daily\Drop staged day" 24 470
-Place "$daily\Delete temporary CSV files" 24 620
-Place "$daily\Find next archive day" 340 620
-Place "$jobs\Save job result" 294 1260
-Place "$jobs\Log job result" 560 1260
-$batch="$daily\Process daily batches"
+Place "$daily\Prepare related archive group" 24 24
+Place "$daily\Stage parent day" 340 24
+Place "$daily\Load archive members" 656 24
+Place "$daily\Plan archive graph" 656 85
+Place "$daily\For each archive member" 24 140 970 1100 $true
+$member="$daily\For each archive member"
+Place "$member\Prepare archive member" 24 24
+Place "$member\Read member column definitions" 340 24
+Place "$member\Read member SQL types and keys" 656 24
+Place "$member\Prepare member export schema" 656 150
+Place "$member\Initialize daily archive" 340 150
+Place "$member\Drop previous member snapshot" 24 150
+Place "$member\Stage archive day" 24 230
+Place "$member\Process daily batches" 24 300 920 150 $true
+Place "$member\Verify exported day" 24 530
+Place "$member\Create daily ZIP" 340 530
+Place "$member\Verify ZIP integrity" 656 530
+Place "$member\Collect archive member deletion" 656 700
+Place "$daily\Prepare group deletion" 24 1320
+Place "$daily\Delete archived day" 340 1320
+Place "$daily\Finalize successful archives" 656 1320
+Place "$daily\Find next archive day" 656 1450
+Place "$jobs\Save job result" 294 2130
+Place "$jobs\Log job result" 560 2130
+$batch="$member\Process daily batches"
 Place "$batch\Prepare batch select query" 24 24 240
-Place "$batch\Read archive batch" 340 24 240
-Place "$batch\Write batch to CSV" 656 24 240
+Place "$batch\Read archive batch" 330 24 240
+Place "$batch\Write batch to CSV" 636 24 240
 foreach($constraint in $xml.SelectNodes('//DTS:PrecedenceConstraint',$ns)) {
     $from=$positions[$constraint.GetAttribute('From',$ns.LookupNamespace('DTS'))]
     $to=$positions[$constraint.GetAttribute('To',$ns.LookupNamespace('DTS'))]

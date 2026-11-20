@@ -9,6 +9,12 @@ Console.OutputEncoding = System.Text.Encoding.UTF8;
 
 try
 {
+    if (args.Length == 1 && args[0].Equals("seed-related-tables", StringComparison.OrdinalIgnoreCase))
+    {
+        await new ForeignKeyTestDataCreator().SeedRelatedTablesAsync();
+        Console.WriteLine("Odtworzono Orders, OrderLines, LineDetails i konfigurację łańcucha.");
+        return 0;
+    }
     //if (args.Length == 1 && args[0].Equals("seed-related-tables", StringComparison.OrdinalIgnoreCase))
     //{
     //    await new ForeignKeyTestDataCreator().SeedRelatedTablesAsync();

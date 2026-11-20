@@ -9,6 +9,16 @@
                 parts[i]="["+name.Replace("]","]]")+"]";
             }
             string table=string.Join(".",parts);
+            string relationsTable = table.Substring(0, table.LastIndexOf('.')) + ".[ArchiveJobRelations]";
+            Dts.Variables["User::MembersSelectSql"].Value =
+                "IF OBJECT_ID(N'" + relationsTable.Replace("'", "''") + "',N'U') IS NULL " +
+                "SELECT CONVERT(sysname,N'') AS ChildSchema,CONVERT(sysname,N'') AS ChildTable," +
+                "CONVERT(sysname,N'') AS ParentKeyColumn,CONVERT(sysname,N'') AS ChildKeyColumn," +
+                "CONVERT(sysname,N'') AS ParentSchema,CONVERT(sysname,N'') AS ParentTable WHERE 1=0; ELSE " +
+                "SELECT PARSENAME(ChildTable,2) AS ChildSchema,PARSENAME(ChildTable,1) AS ChildTable,ParentKeyColumn,ChildKeyColumn," +
+                "COALESCE(PARSENAME(NULLIF(ParentTable,N''),2),N'') AS ParentSchema," +
+                "COALESCE(PARSENAME(NULLIF(ParentTable,N''),1),N'') AS ParentTable FROM " +
+                relationsTable + " WHERE ArchiveJobId=@Id ORDER BY Id;";
             Dts.Variables["User::JobsSelectSql"].Value="SELECT Id, DatabaseName, TableName, ArchiveOlderThanDays, DateColumn FROM "+table+" ORDER BY Id;";
             Dts.Variables["User::JobStartSql"].Value="UPDATE "+table+" SET ErrorMessage=NULL, LastProcessedAt=SYSDATETIME(), LastProcessedStatus=NULL WHERE Id=@Id; IF @@ROWCOUNT<>1 THROW 50001,'Archive job no longer exists.',1;";
             Dts.Variables["User::JobResultSql"].Value="DECLARE @Now datetime2=SYSDATETIME(); UPDATE "+table+

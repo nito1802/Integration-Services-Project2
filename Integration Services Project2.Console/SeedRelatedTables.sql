@@ -29,6 +29,19 @@ BEGIN TRY
         CREATE INDEX IX_ArchiveRelationTest_OrderLines_OrderId ON ArchiveRelationTest.OrderLines(OrderId);
     END;
 
+    IF OBJECT_ID(N'ArchiveRelationTest.LineDetails', N'U') IS NULL
+    BEGIN
+        CREATE TABLE ArchiveRelationTest.LineDetails (
+            Id int NOT NULL CONSTRAINT PK_ArchiveRelationTest_LineDetails PRIMARY KEY,
+            OrderLineId int NOT NULL,
+            Payload nvarchar(100) NOT NULL,
+            CONSTRAINT FK_ArchiveRelationTest_LineDetails_OrderLines FOREIGN KEY (OrderLineId)
+                REFERENCES ArchiveRelationTest.OrderLines(Id)
+        );
+        CREATE INDEX IX_ArchiveRelationTest_LineDetails_OrderLineId ON ArchiveRelationTest.LineDetails(OrderLineId);
+    END;
+
+    DELETE FROM ArchiveRelationTest.LineDetails;
     DELETE FROM ArchiveRelationTest.OrderLines;
     DELETE FROM ArchiveRelationTest.Orders;
 
@@ -38,6 +51,10 @@ BEGIN TRY
     INSERT ArchiveRelationTest.OrderLines (Id, OrderId, Payload)
     VALUES (101,1,N'Old order, first line'), (102,1,N'Old order, second line'),
            (103,2,N'Another old order'), (104,3,N'Current order');
+    INSERT ArchiveRelationTest.LineDetails (Id, OrderLineId, Payload)
+    VALUES (1001,101,N'Old line, first detail'), (1002,101,N'Old line, second detail'),
+           (1003,102,N'Another old line detail'), (1004,103,N'Second order detail'),
+           (1005,104,N'Current order detail');
 
     DECLARE @JobId int;
     SELECT @JobId=Id FROM Archive.ArchiveJobs
@@ -56,9 +73,10 @@ BEGIN TRY
         WHERE Id=@JobId;
 
     DELETE FROM Archive.ArchiveJobRelations WHERE ArchiveJobId=@JobId
-        AND ChildSchema=N'ArchiveRelationTest' AND ChildTable=N'OrderLines';
-    INSERT Archive.ArchiveJobRelations (ArchiveJobId,ChildSchema,ChildTable,ParentKeyColumn,ChildKeyColumn)
-    VALUES (@JobId,N'ArchiveRelationTest',N'OrderLines',N'Id',N'OrderId');
+        AND ChildTable IN (N'ArchiveRelationTest.OrderLines',N'ArchiveRelationTest.LineDetails');
+    INSERT Archive.ArchiveJobRelations (ArchiveJobId,ChildTable,ParentKeyColumn,ChildKeyColumn,ParentTable)
+    VALUES (@JobId,N'ArchiveRelationTest.OrderLines',N'Id',N'OrderId',N'ArchiveRelationTest.Orders'),
+           (@JobId,N'ArchiveRelationTest.LineDetails',N'Id',N'OrderLineId',N'ArchiveRelationTest.OrderLines');
 
     COMMIT TRANSACTION;
 END TRY

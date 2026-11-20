@@ -31,10 +31,10 @@ $package.DelayValidation=$true
 $package.Description='Daily CSV parts with configurable row limit; verified daily ZIP before source deletion; daily ZIP via Execute Process Tasks.'
 $package.Variables.Remove('User::SQLStatement')
 function Add-Variable($name,$value) { [void]$package.Variables.Add($name,$false,'User',$value) }
-foreach($name in @('Tables','BatchData','TableSchema','ShapeData','MetadataData')) { Add-Variable $name (New-Object object) }
-foreach($name in @('JobsSelectSql','JobStartSql','JobResultSql','TableName','ColumnDate','ArchiwumPath','SQLStatement','FolderFullPath','OutputFile','KeyColumns','DatabaseName','JobError','CsvHeader','ShapeSql','MetadataSql','FirstDaySql','NextDaySql','QualifiedTableName','StageDaySql','DeleteSql','ZipFile','ZipArguments','ZipTestArguments')) { Add-Variable $name '' }
-foreach($name in @('DeletedRows','DayRows','DayExportedRows')) { Add-Variable $name ([long]0) }
-foreach($name in @('Days','ArchiveJobId','FailedJobs')) { Add-Variable $name ([int]0) }
+foreach($name in @('Tables','BatchData','TableSchema','ShapeData','MetadataData','ArchiveMembers','CompletedArchives','RelationsData')) { Add-Variable $name (New-Object object) }
+foreach($name in @('JobsSelectSql','JobStartSql','JobResultSql','TableName','ColumnDate','ArchiwumPath','SQLStatement','FolderFullPath','OutputFile','KeyColumns','DatabaseName','JobError','CsvHeader','ShapeSql','MetadataSql','FirstDaySql','NextDaySql','QualifiedTableName','StageDaySql','DeleteSql','ZipFile','ZipArguments','ZipTestArguments','MembersSelectSql','ParentTableName','ParentQualifiedTable','MemberSchema','MemberTable','MemberParentKey','MemberChildKey','MemberSourceSql','GroupStageSql','GroupDeleteSql','GroupDropSql','ArchiveAttempt','MemberSnapshot','MemberDropSql','MemberPlanSource','ZipProcessOutput','ZipProcessError')) { Add-Variable $name '' }
+foreach($name in @('DeletedRows','DayRows','DayExportedRows','GroupExpectedRows')) { Add-Variable $name ([long]0) }
+foreach($name in @('Days','ArchiveJobId','FailedJobs','MemberIndex')) { Add-Variable $name ([int]0) }
 Add-Variable 'BatchNumber' ([long]0)
 Add-Variable 'CurrentDateFrom' ([datetime]'2000-01-01')
 Add-Variable 'CurrentDateTo' ([datetime]'2000-01-01')
@@ -133,14 +133,48 @@ $daysLoop=$tables.Executables.Add('STOCK:FORLOOP'); $daysLoop.Name='For each arc
 $daysLoop.EvalExpression='!@[User::JobFailed] && @[User::CurrentDateFrom] < @[User::CutoffDate]'
 # CurrentDateFrom is advanced by Find next archive day; empty calendar days are skipped.
 Link $tables $firstDay $daysLoop
-$guid=Add-Script $daysLoop 'Initialize daily archive' 'User::CurrentDateFrom,User::ArchiwumPath,User::DatabaseName,User::TableName,User::QualifiedTableName,User::ColumnDate,User::KeyColumns' 'User::FolderFullPath,User::OutputFile,User::CurrentDateTo,User::BatchHasRows,User::BatchNumber,User::DayHasFiles,User::ZipFile,User::ZipArguments,User::ZipTestArguments,User::DayRows,User::DayExportedRows,User::StageDaySql,User::DeleteSql,User::NextDaySql'
-$stageDay=Add-Sql $daysLoop 'Stage archive day' 'ArchiveDb' 'User::StageDaySql' 'SingleRow' $true
+$group=Add-Script $daysLoop 'Prepare related archive group' '' ''
+$stageGroup=Add-Sql $daysLoop 'Stage parent day' 'ArchiveDb' 'User::GroupStageSql' 'None' $true
+Job-Sql $stageGroup 'Capture parent staging error'
+$loadMembers=Add-Sql $daysLoop 'Load archive members' 'ArchiveDb' 'User::MembersSelectSql' 'Rowset' $true
+Bind-Input $loadMembers '@Id' 'User::ArchiveJobId' Int32
+Bind-Result $loadMembers '0' 'User::RelationsData'
+Job-Sql $loadMembers 'Capture members error'
+Link $daysLoop $group $stageGroup
+Link $daysLoop $stageGroup $loadMembers
+$members=$daysLoop.Executables.Add('STOCK:FOREACHLOOP'); $members.Name='For each archive member'; $members.DelayValidation=$true
+$members.SetExpression('Disable','@[User::JobFailed]')
+$members.ForEachEnumerator=$app.ForEachEnumeratorInfos['Foreach ADO Enumerator'].CreateNew()
+$members.ForEachEnumerator.InnerObject.DataObjectVariable='User::ArchiveMembers'
+foreach($entry in @(@('MemberSchema',0),@('MemberTable',1),@('MemberParentKey',2),@('MemberChildKey',3),@('MemberPlanSource',4))) {
+    $mapping=$members.VariableMappings.Add(); $mapping.VariableName='User::'+$entry[0]; $mapping.ValueIndex=$entry[1]
+}
+$planGraph=Add-Script $daysLoop 'Plan archive graph' '' ''
+Link $daysLoop $loadMembers $planGraph
+Link $daysLoop $planGraph $members
+$prepareMember=Add-Script $members 'Prepare archive member' '' ''
+$memberShape=Add-Sql $members 'Read member column definitions' 'ArchiveDb' 'User::ShapeSql' 'Rowset' $true
+Bind-Result $memberShape '0' 'User::ShapeData'
+Job-Sql $memberShape 'Capture member shape error'
+$memberMetadata=Add-Sql $members 'Read member SQL types and keys' 'ArchiveDb' 'User::MetadataSql' 'Rowset' $true
+Bind-Result $memberMetadata '0' 'User::MetadataData'
+Job-Sql $memberMetadata 'Capture member metadata error'
+$memberSchema=Add-Script $members 'Prepare member export schema' '' ''
+Link $members $prepareMember $memberShape
+Link $members $memberShape $memberMetadata
+Link $members $memberMetadata $memberSchema
+$guid=Add-Script $members 'Initialize daily archive' '' ''
+$stageDay=Add-Sql $members 'Stage archive day' 'ArchiveDb' 'User::StageDaySql' 'SingleRow' $true
 Bind-Result $stageDay '0' 'User::DayRows'
 Job-Sql $stageDay 'Capture day staging error'
-Link $daysLoop $guid $stageDay
-$batches=$daysLoop.Executables.Add('STOCK:FORLOOP'); $batches.Name='Process daily batches'; $batches.DelayValidation=$true
+Link $members $memberSchema $guid
+$dropMember=Add-Sql $members 'Drop previous member snapshot' 'ArchiveDb' 'User::MemberDropSql' 'None' $true
+Job-Sql $dropMember 'Capture member cleanup error'
+Link $members $guid $dropMember
+Link $members $dropMember $stageDay
+$batches=$members.Executables.Add('STOCK:FORLOOP'); $batches.Name='Process daily batches'; $batches.DelayValidation=$true
 $batches.EvalExpression='!@[User::JobFailed] && @[User::BatchHasRows]'
-Link $daysLoop $stageDay $batches
+Link $members $stageDay $batches
 $construct=Add-Script $batches 'Prepare batch select query' 'User::KeyColumns,User::DayExportedRows,$Package::MaxRecordsPerCsv' 'User::SQLStatement'
 $fetch=Add-Sql $batches 'Read archive batch' 'ArchiveDb' 'User::SQLStatement' 'Rowset' $true
 Bind-Result $fetch '0' 'User::BatchData'
@@ -151,10 +185,13 @@ Link $batches $construct $fetch
 Link $batches $fetch $export
 $batches.PrecedenceConstraints[$batches.PrecedenceConstraints.Count-1].Value=[Microsoft.SqlServer.Dts.Runtime.DTSExecResult]::Success
 function Add-ZipProcess($name,$argumentsVariable) {
-    $hostTask=$daysLoop.Executables.Add('STOCK:ExecuteProcessTask'); $hostTask.Name=$name; $hostTask.DelayValidation=$true
+    $hostTask=$members.Executables.Add('STOCK:ExecuteProcessTask'); $hostTask.Name=$name; $hostTask.DelayValidation=$true
     $task=$hostTask.InnerObject
     $task.RequireFullFileName=$true
     $task.Executable='C:\Program Files\7-Zip\7z.exe'
+    $task.WindowStyle=[System.Diagnostics.ProcessWindowStyle]::Hidden
+    $task.StandardOutputVariable='User::ZipProcessOutput'
+    $task.StandardErrorVariable='User::ZipProcessError'
     $task.FailTaskIfReturnCodeIsNotSuccessValue=$true; $task.SuccessValue=0
     $task.TimeOut=600; $task.TerminateProcessAfterTimeOut=$true
     $hostTask.SetExpression('Arguments','@[User::'+$argumentsVariable+']')
@@ -164,27 +201,25 @@ function Add-ZipProcess($name,$argumentsVariable) {
 }
 $zip=Add-ZipProcess 'Create daily ZIP' 'ZipArguments'
 $testZip=Add-ZipProcess 'Verify ZIP integrity' 'ZipTestArguments'
-$cleanup=Add-Script $daysLoop 'Delete temporary CSV files' 'User::FolderFullPath,User::DayHasFiles' ''
-$verifyDay=Add-Script $daysLoop 'Verify exported day' 'User::DayRows,User::DayExportedRows' ''
+$verifyDay=Add-Script $members 'Verify exported day' 'User::DayRows,User::DayExportedRows' ''
+$collect=Add-Script $members 'Collect archive member deletion' '' ''
+Link $members $batches $verifyDay
+Link $members $verifyDay $zip
+Link $members $zip $testZip
+Link $members $testZip $collect
+$prepareDelete=Add-Script $daysLoop 'Prepare group deletion' '' ''
+Link $daysLoop $members $prepareDelete
 $delete=Add-Sql $daysLoop 'Delete archived day' 'ArchiveDb' 'User::DeleteSql' 'SingleRow' $true
 Bind-Result $delete '0' 'User::DeletedRows'
 Job-Sql $delete 'Capture day delete error'
-$delete.SetExpression('Disable','@[User::JobFailed] || !@[User::DayHasFiles]')
-$checkDelete=Add-Script $daysLoop 'Verify deleted row count' 'User::DayRows,User::DeletedRows,User::DayHasFiles' ''
-$dropDay=Add-Sql $daysLoop 'Drop staged day' 'ArchiveDb' "IF OBJECT_ID('tempdb..#ArchiveDay') IS NOT NULL DROP TABLE #ArchiveDay;"
-Job-Sql $dropDay 'Capture day cleanup error' $false
-Link $daysLoop $batches $verifyDay
-Link $daysLoop $verifyDay $zip
-Link $daysLoop $zip $testZip
-Link $daysLoop $testZip $delete
-Link $daysLoop $delete $checkDelete
-Link $daysLoop $checkDelete $dropDay
-Link $daysLoop $dropDay $cleanup
+Link $daysLoop $prepareDelete $delete
 $nextDay=Add-Sql $daysLoop 'Find next archive day' 'ArchiveDb' 'User::NextDaySql' 'SingleRow' $true
 Bind-Input $nextDay '@Cutoff' 'User::CutoffDate' DateTime2
 Bind-Result $nextDay '0' 'User::CurrentDateFrom'
 Job-Sql $nextDay 'Capture next day error'
-Link $daysLoop $cleanup $nextDay
+$finalize=Add-Script $daysLoop 'Finalize successful archives' '' ''
+Link $daysLoop $delete $finalize
+Link $daysLoop $finalize $nextDay
 $setStatus=Add-Sql $tables 'Save job result' 'ArchiveDb' 'User::JobResultSql' 'None' $true
 Bind-Input $setStatus '@Id' 'User::ArchiveJobId' Int32
 Bind-Input $setStatus '@Failed' 'User::JobFailed' Boolean
@@ -196,11 +231,12 @@ $summary=Add-Script $package 'Check overall archive result' '' ''
 Link $package $tables $summary
 # Script errors are captured inside Main, before SSIS raises OnError. A nested
 # Script Task handler would request locks still owned by its failing parent.
-foreach($task in @($prepareJob,$begin,$processMetadata,$guid,$construct,$export,$verifyDay,$checkDelete,$cleanup)) {
+foreach($task in @($prepareJob,$begin,$processMetadata,$guid,$construct,$export,$verifyDay,$finalize,$group,$prepareMember,$memberSchema,$collect,$planGraph)) {
     ($scriptDefinitions | Where-Object { $_.Name -eq $task.Name }).HandleJobError=$true
     if($task -ne $prepareJob) { $task.SetExpression('Disable','@[User::JobFailed]') }
 }
-$checkDelete.SetExpression('Disable','@[User::JobFailed] || !@[User::DayHasFiles]')
+# Restore the parent name even after a member failed, so logs identify the job.
+($scriptDefinitions | Where-Object { $_.Name -eq 'Prepare group deletion' }).HandleJobError=$true
 $skeleton=Join-Path $PSScriptRoot 'package-skeleton.dtsx'
 $app.SaveToXml($skeleton,$package,$null)
 $xml=[xml](Get-Content -LiteralPath $skeleton -Raw)
@@ -222,7 +258,7 @@ foreach($definition in $scriptDefinitions) {
     $newName='ST_'+[Guid]::NewGuid().ToString('N')
     $projectNode.SetAttribute('Name',$newName)
     $projectNode.SetAttribute('VSTAMajorVersion',[string]$scriptMajor)
-    $sourceName=if($definition.Name -like 'Capture * error') { 'Capture SQL error' } else { $definition.Name }
+    $sourceName=if($definition.Name -in @('Capture Create daily ZIP error','Capture Verify ZIP integrity error')) { 'Capture process error' } elseif($definition.Name -like 'Capture * error') { 'Capture SQL error' } elseif($definition.Name -eq 'Prepare member export schema') { 'Prepare export schema and header' } else { $definition.Name }
     $main=Get-Content -LiteralPath (Join-Path $root ('scripts\'+$sourceName+'.cs')) -Raw
     if($definition.HandleJobError) { $main=Get-JobScriptSource $main }
     $access=Get-ScriptVariableAccess $main

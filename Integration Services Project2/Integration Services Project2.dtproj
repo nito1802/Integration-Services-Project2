@@ -41,10 +41,10 @@
                 <SSIS:Property SSIS:Name="Name">ArchiveClosedOrders</SSIS:Property>
                 <SSIS:Property SSIS:Name="VersionMajor">1</SSIS:Property>
                 <SSIS:Property SSIS:Name="VersionMinor">0</SSIS:Property>
-                <SSIS:Property SSIS:Name="VersionBuild">44</SSIS:Property>
+                <SSIS:Property SSIS:Name="VersionBuild">51</SSIS:Property>
                 <SSIS:Property SSIS:Name="VersionComments">
                 </SSIS:Property>
-                <SSIS:Property SSIS:Name="VersionGUID">{B30CB9AD-D5C2-4BE0-ACCA-E1D9B73C5C97}</SSIS:Property>
+                <SSIS:Property SSIS:Name="VersionGUID">{7F26F02B-B9B8-4E52-BF39-9AD634E5AAA9}</SSIS:Property>
                 <SSIS:Property SSIS:Name="PackageFormatVersion">8</SSIS:Property>
                 <SSIS:Property SSIS:Name="Description">CSV archive: configuration -&gt; tables -&gt; full days -&gt; stable batches of 1000. One CSV per table and execution, in execution-date folder. Source tables are read only.</SSIS:Property>
                 <SSIS:Property SSIS:Name="ProtectionLevel">0</SSIS:Property>

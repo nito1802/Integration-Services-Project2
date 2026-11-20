@@ -20,7 +20,12 @@
                 safeName, date.ToString("yyyy", CultureInfo.InvariantCulture), months[date.Month - 1], day);
             string zip = folder + ".zip";
             if (Directory.Exists(folder) || File.Exists(folder) || File.Exists(zip) || Directory.Exists(zip))
-                throw new IOException("Archive destination already exists. Existing files must be reviewed before retrying. Folder=" + folder + "; ZIP=" + zip);
+            {
+                folder += "_retry_" + Convert.ToString(Dts.Variables["User::ArchiveAttempt"].Value);
+                zip = folder + ".zip";
+                if (Directory.Exists(folder) || File.Exists(folder) || File.Exists(zip) || Directory.Exists(zip))
+                    throw new IOException("Archive attempt destination already exists: " + folder);
+            }
             string output = Path.Combine(folder, safeName + "_" + day + ".csv");
             Dts.Variables["User::FolderFullPath"].Value = folder;
             Dts.Variables["User::OutputFile"].Value = output;
@@ -34,14 +39,13 @@
             Dts.Variables["User::DayRows"].Value = 0L;
             Dts.Variables["User::DayExportedRows"].Value = 0L;
             string table = Convert.ToString(Dts.Variables["User::QualifiedTableName"].Value);
-            string column = Convert.ToString(Dts.Variables["User::ColumnDate"].Value);
-            string from = Convert.ToDateTime(Dts.Variables["User::CurrentDateFrom"].Value).ToString("yyyy-MM-ddTHH:mm:ss.fffffff",CultureInfo.InvariantCulture);
-            string to = Convert.ToDateTime(Dts.Variables["User::CurrentDateTo"].Value).ToString("yyyy-MM-ddTHH:mm:ss.fffffff",CultureInfo.InvariantCulture);
-            Dts.Variables["User::NextDaySql"].Value = "SELECT CONVERT(datetime2(7),COALESCE(CONVERT(date,MIN(" + column + ")),@Cutoff)) FROM " + table +
-                " WHERE " + column + " >= CONVERT(datetime2(7),N'" + to + "',126) AND " + column + " < @Cutoff;";
-            Dts.Variables["User::StageDaySql"].Value = "SET NOCOUNT ON; IF OBJECT_ID('tempdb..#ArchiveDay') IS NOT NULL DROP TABLE #ArchiveDay; " +
-                "SELECT * INTO #ArchiveDay FROM " + table + " WHERE " + column + " >= CONVERT(datetime2(7),N'" + from + "',126) AND " +
-                column + " < CONVERT(datetime2(7),N'" + to + "',126); SELECT COUNT_BIG(*) AS DayRows FROM #ArchiveDay;";
+            string snapshot = "#ArchiveMember" + Convert.ToInt32(Dts.Variables["User::MemberIndex"].Value).ToString(CultureInfo.InvariantCulture);
+            Dts.Variables["User::MemberSnapshot"].Value = snapshot;
+            Dts.Variables["User::MemberDropSql"].Value = "IF OBJECT_ID('tempdb.." + snapshot + "') IS NOT NULL DROP TABLE " + snapshot + ";";
+            Dts.Variables["User::StageDaySql"].Value = "SET NOCOUNT ON; " +
+                Convert.ToString(Dts.Variables["User::MemberSourceSql"].Value).Replace("SELECT * FROM #ArchiveParents", "SELECT * INTO " + snapshot + " FROM #ArchiveParents")
+                    .Replace("SELECT c.* FROM ", "SELECT c.* INTO " + snapshot + " FROM ") +
+                "; SELECT COUNT_BIG(*) AS DayRows FROM " + snapshot + ";";
             var matches = new List<string>();
             var nullKeys = new List<string>();
             foreach(string key in Convert.ToString(Dts.Variables["User::KeyColumns"].Value).Split(',')) {
@@ -50,9 +54,9 @@
                 nullKeys.Add(name + " IS NULL");
             }
             Dts.Variables["User::StageDaySql"].Value = Convert.ToString(Dts.Variables["User::StageDaySql"].Value).Replace(
-                "SELECT COUNT_BIG(*) AS DayRows", "IF EXISTS(SELECT 1 FROM #ArchiveDay WHERE " + string.Join(" OR ",nullKeys.ToArray()) +
+                "SELECT COUNT_BIG(*) AS DayRows", "IF EXISTS(SELECT 1 FROM " + snapshot + " WHERE " + string.Join(" OR ",nullKeys.ToArray()) +
                 ") THROW 50004,'Archive key must not contain NULL.',1; SELECT COUNT_BIG(*) AS DayRows");
             Dts.Variables["User::DeleteSql"].Value = "SET NOCOUNT ON; DELETE s FROM " + table +
-                " s INNER JOIN #ArchiveDay d ON " + string.Join(" AND ",matches.ToArray()) + "; SELECT CONVERT(bigint,@@ROWCOUNT) AS DeletedRows;";
+                " s INNER JOIN " + snapshot + " d ON " + string.Join(" AND ",matches.ToArray()) + ";";
             Dts.TaskResult = (int)DTSExecResult.Success;
         }

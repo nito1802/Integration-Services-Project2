@@ -7,15 +7,43 @@ dotnet run --project "Integration Services Project2.Console" -- seed-related-tab
 ```
 
 Polecenie tworzy `Archive.ArchiveJobRelations` w `nito_superDb` i odtwarza
-`ArchiveRelationTest.Orders` oraz `ArchiveRelationTest.OrderLines`. Wymaga istniejącej
+`ArchiveRelationTest.Orders`, `ArchiveRelationTest.OrderLines` i `ArchiveRelationTest.LineDetails`. Wymaga istniejącej
 `Archive.ArchiveJobs`. Uruchamiaj je przy zatrzymanym pakiecie.
 
 Ponowienie odtwarza dane, resetuje status zadania dla `Orders` i zapisuje powiązanie
 `Orders.Id = OrderLines.OrderId`. Przy retencji 30 dni zamówienia 1 i 2 oraz pozycje
-101–103 kwalifikują się do archiwizacji. Zamówienie 3 i pozycja 104 pozostają w źródle.
+101–103 oraz szczegóły 1001–1004 kwalifikują się do archiwizacji.
+Zamówienie 3, pozycja 104 i szczegół 1005 pozostają w źródle.
 Każdy wpis w tabeli technicznej wskazuje zadanie nadrzędne oraz bezpośrednią relację
-jednokolumnową w tej samej bazie źródłowej. SSIS wymaga obsługi tej konfiguracji,
-zanim uruchomisz pakiet na tych danych.
+jednokolumnową w tej samej bazie źródłowej. Pakiet odczytuje tę konfigurację
+ze schematu i bazy wskazanych w `ArchiveJobsTable`, z tabeli `ArchiveJobRelations`.
+
+SSIS wybiera dzień rodzica według jego daty i eksportuje dzieci po skonfigurowanym
+kluczu. Każda tabela ma własny katalog i ZIP pod dniem rodzica. Po sprawdzeniu
+liczby rekordów i integralności wszystkich ZIP-ów usuwa dzieci, następnie rodzica,
+w jednej transakcji dla całego dnia. Błąd usuwania wycofuje wszystkie usunięcia.
+Tabele bez rekordów dla danego dnia nie tworzą pustych archiwów.
+
+Ponowienie przy istniejącym katalogu lub ZIP-ie zapisuje nową próbę z sufiksem
+`_retry_<guid>`. Po zatwierdzeniu usuwania całej grupy poprawny ZIP zastępuje
+standardowy ZIP tego dnia. Pakiet usuwa pozostałe ZIP-y retry i foldery CSV
+tego dnia dla przetworzonych tabel. Przy błędzie eksportu lub usuwania pliki
+pozostają dostępne do wglądu. Dzieci konfiguruje się
+w `ArchiveJobRelations`, a zadanie z retencją i datą dotyczy rodzica.
+Kolumny `ParentTable` i `ChildTable` przechowują nazwy w formacie
+`schema.Tabela`, tak jak `ArchiveJobs.TableName`. Pusta wartość `ParentTable`
+wskazuje główną tabelę zadania. Każda relacja łączy jedną parę kolumn.
+Seed zapisuje łańcuch `Orders.Id → OrderLines.OrderId` oraz
+`OrderLines.Id → LineDetails.OrderLineId`.
+
+Pakiet układa cały graf relacji przed eksportem. Każdą tabelę eksportuje raz
+dla danego dnia, wybierając sumę rekordów osiągalnych przez jej rodziców.
+Usuwanie przebiega w odwrotnej kolejności zależności. Cykl lub rodzic
+nieosiągalny od tabeli głównej kończy zadanie błędem przed eksportem.
+`CreateArchiveJobRelations.sql` aktualizuje istniejącą tabelę techniczną,
+zachowując dotychczasowe wpisy i umożliwiając wiele relacji do jednej tabeli.
+Migracja scala stare kolumny schematu z nazwami tabel i usuwa `ParentSchema`
+oraz `ChildSchema`.
 
 ## Tabele testowe z kluczami obcymi
 
