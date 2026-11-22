@@ -143,9 +143,9 @@ if($FullPackage) {
     $stubPath=Join-Path $build 'Stub.cs'; [IO.File]::WriteAllText($stubPath,$stub)
     $files=@($stubPath)
     $common=Get-Content -LiteralPath (Join-Path $root 'scripts/Common.cs') -Raw
-    $names=@('Prepare job queries','Initialize job variables','Prepare metadata and date queries','Initialize daily archive','Prepare batch select query','Write batch to CSV','Verify exported day','Verify deleted row count','Log job result','Capture SQL error','Prepare export schema and header','Delete temporary CSV files','Prepare related archive group','Prepare archive member','Prepare member export schema','Collect archive member deletion','Prepare group deletion','Finalize successful archives','Plan archive graph','Collect ZIP process diagnostics')
+    $names=@('Prepare job queries','Initialize job variables','Prepare metadata and date queries','Initialize daily archive','Prepare batch select query','Write batch to CSV','Verify exported day','Verify deleted row count','Log job result','Capture SQL error','Prepare export schema and header','Delete temporary CSV files','Prepare related archive group','Prepare archive member','Prepare member export schema','Collect archive member deletion','Prepare group deletion','Finalize successful archives','Plan archive graph','Collect ZIP process diagnostics','Create daily ZIP','Verify ZIP integrity')
     for($i=0;$i -lt $names.Count;$i++) {
-                $sourceName=if($names[$i] -eq 'Prepare member export schema') {'Prepare export schema and header'} else {$names[$i]}
+                $sourceName=if($names[$i] -in @('Create daily ZIP','Verify ZIP integrity')) {'Run ZIP process'} elseif($names[$i] -eq 'Prepare member export schema') {'Prepare export schema and header'} else {$names[$i]}
         $main=Get-Content -LiteralPath (Join-Path $root ('scripts/'+$sourceName+'.cs')) -Raw
         if($RelatedFailure -eq 'ChildWrite' -and $names[$i] -eq 'Write batch to CSV') {
             $main=$main.Replace('writer.WriteLine();','writer.WriteLine(); if (Convert.ToString(Dts.Variables["User::TableName"].Value) == "dbo.OrderLines") throw new IOException("Injected child CSV failure.");')
@@ -171,6 +171,15 @@ if($FullPackage) {
             $probe.Variables.Clear()
             foreach($variable in $package.Variables) { $v=New-Object ProbeVariable; $v.Value=$variable.Value; $probe.Variables.Add($variable.QualifiedName,$v) }
             foreach($parameter in $package.Parameters) { $key='$Package::'+$parameter.Name; if(!$probe.Variables.ContainsKey($key)) { $probe.Variables.Add($key,(New-Object ProbeVariable)) }; $probe.Variables[$key].Value=$parameter.Value }
+            $v=New-Object ProbeVariable; $v.Value=$name
+            $probe.Variables['System::TaskName']=$v
+            if(($FailureMode -eq 'Zip' -and $name -eq 'Create daily ZIP') -or
+               ($FailureMode -eq 'ZipTest' -and $name -eq 'Verify ZIP integrity') -or
+               ($RelatedFailure -eq 'ChildZip' -and $name -eq 'Verify ZIP integrity' -and
+                $package.Variables['User::TableName'].Value -eq 'dbo.OrderLines')) {
+                $variable=if($name -eq 'Create daily ZIP') {'ZipArguments'} else {'ZipTestArguments'}
+                $probe.Variables['User::'+$variable].Value='invalid-command'
+            }
             $script=New-Object ('NativeProbe'+$index+'.ScriptMain'); $script.Dts=$probe
             try { $script.Main() }
             catch {
@@ -202,57 +211,6 @@ if($FullPackage) {
             }
             foreach($variable in $package.Variables) { if($variable.Namespace -eq 'User') { $variable.Value=$probe.Variables[$variable.QualifiedName].Value } }
             return
-        }
-        if($name -in @('Create daily ZIP','Verify ZIP integrity')) {
-            if(!$MultiDatabase) {
-                $dbCheck=New-Object Data.SqlClient.SqlConnection($config.ConnectionString); $dbCheck.Open()
-                try {
-                    $check=$dbCheck.CreateCommand()
-                    if($Related -and $package.Variables['User::TableName'].Value -eq 'dbo.SharedDetails') {
-                        $check.CommandText='SELECT COUNT_BIG(*) FROM dbo.SharedDetails c JOIN dbo.OrderLines l ON l.Id=c.LineId JOIN dbo.Orders p ON p.OrderNo=l.OrderId WHERE p.CreatedAt>=@From AND p.CreatedAt<@To;'
-                    } elseif($Related -and $package.Variables['User::TableName'].Value -eq 'dbo.LineDetails') {
-                        $check.CommandText='SELECT COUNT_BIG(*) FROM dbo.LineDetails c JOIN dbo.OrderLines l ON l.Id=c.OrderLineId JOIN dbo.Orders p ON p.OrderNo=l.OrderId WHERE p.CreatedAt>=@From AND p.CreatedAt<@To;'
-                    } elseif($Related -and $package.Variables['User::TableName'].Value -ne 'dbo.Orders') {
-                        $check.CommandText='SELECT COUNT_BIG(*) FROM '+$package.Variables['User::TableName'].Value+' c WHERE EXISTS(SELECT 1 FROM dbo.Orders p WHERE p.OrderNo=c.OrderId AND p.CreatedAt>=@From AND p.CreatedAt<@To);'
-                    } else {
-                        $check.CommandText='SELECT COUNT_BIG(*) FROM '+$package.Variables['User::TableName'].Value+' WHERE '+$package.Variables['User::ColumnDate'].Value+' >= @From AND '+$package.Variables['User::ColumnDate'].Value+' < @To;'
-                    }
-                    [void]$check.Parameters.AddWithValue('@From',$package.Variables['User::CurrentDateFrom'].Value)
-                    [void]$check.Parameters.AddWithValue('@To',$package.Variables['User::CurrentDateTo'].Value)
-                    if([long]$check.ExecuteScalar() -ne ([long]$package.Variables['User::DayRows'].Value + $(if($InsertAfterSnapshot -and $package.Variables['User::ArchiveJobId'].Value -eq 1 -and $package.Variables['User::CurrentDateFrom'].Value -eq $insertedDay) {1} else {0}))) { throw 'Source day was modified/deleted before ZIP verification' }
-                } finally { $dbCheck.Dispose() }
-            }
-            # Exercise the real Execute Process Task. Inject failure via unsupported 7z command.
-            $variable=if($name -eq 'Create daily ZIP') {'ZipArguments'} else {'ZipTestArguments'}
-            $task.InnerObject.Executable='C:\Program Files\7-Zip\7z.exe'
-            $task.InnerObject.Arguments=[string]$package.Variables['User::'+$variable].Value
-            if($package.Variables['User::ArchiveJobId'].Value -eq 1 -and (($FailureMode -eq 'Zip' -and $name -eq 'Create daily ZIP') -or ($FailureMode -eq 'ZipTest' -and $name -eq 'Verify ZIP integrity'))) {
-                $package.Variables['User::'+$variable].Value='invalid-command'
-                $task.InnerObject.Arguments='invalid-command'
-            }
-            if($RelatedFailure -eq 'ChildZip' -and $package.Variables['User::TableName'].Value -eq 'dbo.OrderLines' -and $name -eq 'Verify ZIP integrity') {
-                $task.InnerObject.Arguments='invalid-command'
-            }
-            if(!$NativeProcessTasks) {
-                # Execute Process Task is license-gated outside SSDT on this workstation.
-                # Verify its configured executable/arguments using a test-only process host.
-                $process=New-Object Diagnostics.Process
-                $process.StartInfo.FileName=$task.InnerObject.Executable
-                $process.StartInfo.Arguments=$task.InnerObject.Arguments
-                $process.StartInfo.UseShellExecute=$false; $process.StartInfo.CreateNoWindow=$true
-                $process.StartInfo.RedirectStandardOutput=$true; $process.StartInfo.RedirectStandardError=$true
-                try {
-                    [void]$process.Start()
-                    $stdout=$process.StandardOutput.ReadToEnd(); $stderr=$process.StandardError.ReadToEnd()
-                    $process.WaitForExit()
-                    if($process.ExitCode -ne 0) {
-                        $package.Variables['User::JobFailed'].Value=$true
-                        $package.Variables['User::ZipProcessFailed'].Value=$true
-                        $package.Variables['User::JobError'].Value="7-Zip exit=$($process.ExitCode): $stderr"
-                    }
-                } finally { $process.Dispose() }
-                return
-            }
         }
         if($FailureMode -eq 'Read' -and $name -eq 'Read archive batch' -and $package.Variables['User::ArchiveJobId'].Value -eq 1) {
             $package.Variables['User::SQLStatement'].Value='SELECT MissingArchiveReadColumn FROM #ArchiveDay;'

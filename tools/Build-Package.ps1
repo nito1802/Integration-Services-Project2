@@ -28,7 +28,7 @@ $package.VersionBuild=[Math]::Max($package.VersionBuild,[int]$current.DocumentEl
 $package.MaxConcurrentExecutables=1
 $package.TransactionOption=[Microsoft.SqlServer.Dts.Runtime.DTSTransactionOption]::NotSupported
 $package.DelayValidation=$true
-$package.Description='Daily CSV parts with configurable row limit; verified daily ZIP before source deletion; daily ZIP via Execute Process Tasks.'
+$package.Description='Daily CSV parts with configurable row limit; verified ZIP before source deletion; console-free 7-Zip creation and integrity checks.'
 $package.Variables.Remove('User::SQLStatement')
 function Add-Variable($name,$value) { [void]$package.Variables.Add($name,$false,'User',$value) }
 foreach($name in @('Tables','BatchData','TableSchema','ShapeData','MetadataData','ArchiveMembers','CompletedArchives','RelationsData')) { Add-Variable $name (New-Object object) }
@@ -185,23 +185,8 @@ $export=Add-Script $batches 'Write batch to CSV' 'User::BatchData,User::TableSch
 Link $batches $construct $fetch
 Link $batches $fetch $export
 $batches.PrecedenceConstraints[$batches.PrecedenceConstraints.Count-1].Value=[Microsoft.SqlServer.Dts.Runtime.DTSExecResult]::Success
-function Add-ZipProcess($name,$argumentsVariable) {
-    $hostTask=$members.Executables.Add('STOCK:ExecuteProcessTask'); $hostTask.Name=$name; $hostTask.DelayValidation=$true
-    $task=$hostTask.InnerObject
-    $task.RequireFullFileName=$true
-    $task.Executable='C:\Program Files\7-Zip\7z.exe'
-    $task.WindowStyle=[System.Diagnostics.ProcessWindowStyle]::Hidden
-    $task.StandardOutputVariable='User::ZipProcessOutput'
-    $task.StandardErrorVariable='User::ZipProcessError'
-    $task.FailTaskIfReturnCodeIsNotSuccessValue=$true; $task.SuccessValue=0
-    $task.TimeOut=600; $task.TerminateProcessAfterTimeOut=$true
-    $hostTask.SetExpression('Arguments','@[User::'+$argumentsVariable+']')
-    Job-Sql $hostTask ('Capture '+$name+' error')
-    $hostTask.SetExpression('Disable','@[User::JobFailed] || !@[User::DayHasFiles]')
-    return $hostTask
-}
-$zip=Add-ZipProcess 'Create daily ZIP' 'ZipArguments'
-$testZip=Add-ZipProcess 'Verify ZIP integrity' 'ZipTestArguments'
+$zip=Add-Script $members 'Create daily ZIP' '' ''
+$testZip=Add-Script $members 'Verify ZIP integrity' '' ''
 $verifyDay=Add-Script $members 'Verify exported day' 'User::DayRows,User::DayExportedRows' ''
 $collect=Add-Script $members 'Collect archive member deletion' '' ''
 Link $members $batches $verifyDay
@@ -234,10 +219,12 @@ $summary=Add-Script $package 'Check overall archive result' '' ''
 Link $package $tables $summary
 # Script errors are captured inside Main, before SSIS raises OnError. A nested
 # Script Task handler would request locks still owned by its failing parent.
-foreach($task in @($prepareJob,$begin,$processMetadata,$guid,$construct,$export,$verifyDay,$finalize,$group,$prepareMember,$memberSchema,$collect,$planGraph)) {
+foreach($task in @($prepareJob,$begin,$processMetadata,$guid,$construct,$export,$verifyDay,$finalize,$group,$prepareMember,$memberSchema,$collect,$planGraph,$zip,$testZip)) {
     ($scriptDefinitions | Where-Object { $_.Name -eq $task.Name }).HandleJobError=$true
     if($task -ne $prepareJob) { $task.SetExpression('Disable','@[User::JobFailed]') }
 }
+$zip.SetExpression('Disable','@[User::JobFailed] || !@[User::DayHasFiles]')
+$testZip.SetExpression('Disable','@[User::JobFailed] || !@[User::DayHasFiles]')
 # Restore the parent name even after a member failed, so logs identify the job.
 ($scriptDefinitions | Where-Object { $_.Name -eq 'Collect ZIP process diagnostics' }).HandleJobError=$true
 ($scriptDefinitions | Where-Object { $_.Name -eq 'Prepare group deletion' }).HandleJobError=$true
@@ -262,7 +249,7 @@ foreach($definition in $scriptDefinitions) {
     $newName='ST_'+[Guid]::NewGuid().ToString('N')
     $projectNode.SetAttribute('Name',$newName)
     $projectNode.SetAttribute('VSTAMajorVersion',[string]$scriptMajor)
-    $sourceName=if($definition.Name -in @('Capture Create daily ZIP error','Capture Verify ZIP integrity error')) { 'Capture process error' } elseif($definition.Name -like 'Capture * error') { 'Capture SQL error' } elseif($definition.Name -eq 'Prepare member export schema') { 'Prepare export schema and header' } else { $definition.Name }
+    $sourceName=if($definition.Name -in @('Create daily ZIP','Verify ZIP integrity')) { 'Run ZIP process' } elseif($definition.Name -like 'Capture * error') { 'Capture SQL error' } elseif($definition.Name -eq 'Prepare member export schema') { 'Prepare export schema and header' } else { $definition.Name }
     $main=Get-Content -LiteralPath (Join-Path $root ('scripts\'+$sourceName+'.cs')) -Raw
     if($definition.HandleJobError) { $main=Get-JobScriptSource $main }
     $access=Get-ScriptVariableAccess $main
