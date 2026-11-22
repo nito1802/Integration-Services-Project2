@@ -11,7 +11,7 @@ $currentNs=New-Object Xml.XmlNamespaceManager($current.NameTable)
 $currentNs.AddNamespace('DTS','www.microsoft.com/SqlServer/Dts')
 $currentValues=@{}
 $currentParameterIds=@{}
-foreach($name in @('ConnectionString','ArchiveJobsTable','ArchiveRoot','MaxRecordsPerCsv')) {
+foreach($name in @('ConnectionString','ArchiveJobsTable','ArchiveJobRelationsTable','ArchiveRoot','MaxRecordsPerCsv')) {
     $valueNode=$current.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="'+$name+'"]/DTS:Property[@DTS:Name="ParameterValue"]',$currentNs)
     if($valueNode) { $currentValues[$name]=$valueNode.InnerText; $currentParameterIds[$name]=$valueNode.ParentNode.GetAttribute('DTSID','www.microsoft.com/SqlServer/Dts') }
 }
@@ -40,13 +40,13 @@ Add-Variable 'CurrentDateFrom' ([datetime]'2000-01-01')
 Add-Variable 'CurrentDateTo' ([datetime]'2000-01-01')
 Add-Variable 'DayHasFiles' $false
 Add-Variable 'CutoffDate' ([datetime]'2000-01-01')
-foreach($name in @('JobActive','JobFailed','BatchHasRows')) { Add-Variable $name $false }
+foreach($name in @('JobActive','JobFailed','BatchHasRows','ZipProcessFailed')) { Add-Variable $name $false }
 $archiveRoot=[IO.Path]::GetDirectoryName([string]$package.Parameters['OutputFile'].Value)
 foreach($obsolete in @('TableName','DateColumn','OlderThanDays','OutputFile','SevenZipPath')) { if($package.Parameters.Contains($obsolete)) { [void]$package.Parameters.Remove($obsolete) } }
 $p=$package.Parameters.Add('ArchiveRoot',[TypeCode]::String); $p.Value=$archiveRoot
 if($currentValues.ContainsKey('ConnectionString')) { $package.Parameters['ConnectionString'].Value=$currentValues['ConnectionString'] }
 if($currentValues.ContainsKey('ArchiveRoot')) { $package.Parameters['ArchiveRoot'].Value=$currentValues['ArchiveRoot'] }
-foreach($entry in @(@('ArchiveJobsTable',[TypeCode]::String,'nito_superDb.Archive.ArchiveJobs'),@('MaxRecordsPerCsv',[TypeCode]::Int32,1000))) {
+foreach($entry in @(@('ArchiveJobsTable',[TypeCode]::String,'nito_superDb.Archive.ArchiveJobs'),@('ArchiveJobRelationsTable',[TypeCode]::String,'nito_superDb.Archive.ArchiveJobRelations'),@('MaxRecordsPerCsv',[TypeCode]::Int32,1000))) {
     $p=$package.Parameters.Add($entry[0],$entry[1]); $p.Value=$entry[2]
     if($currentValues.ContainsKey($entry[0])) { $p.Value=[Convert]::ChangeType($currentValues[$entry[0]],$entry[1]) }
 }
@@ -94,7 +94,7 @@ function Job-Sql($hostTask,$handlerName,$skipAfterError=$true) {
     $handler=$hostTask.EventHandlers.Add('OnError'); $handler.MaximumErrorCount=0
     [void](Add-Script $handler $handlerName 'System::ErrorDescription' 'System::Propagate')
 }
-$prepareQueries=Add-Script $package 'Prepare job queries' '$Package::ArchiveJobsTable' 'User::JobsSelectSql,User::JobStartSql,User::JobResultSql'
+$prepareQueries=Add-Script $package 'Prepare job queries' '$Package::ArchiveJobsTable,$Package::ArchiveJobRelationsTable' 'User::JobsSelectSql,User::JobStartSql,User::JobResultSql'
 $getSettings=Add-Sql $package 'Load archive jobs' 'ArchiveDb' 'User::JobsSelectSql' 'Rowset' $true
 Link $package $prepareQueries $getSettings
 Bind-Result $getSettings '0' 'User::Tables'
@@ -138,6 +138,7 @@ $stageGroup=Add-Sql $daysLoop 'Stage parent day' 'ArchiveDb' 'User::GroupStageSq
 Job-Sql $stageGroup 'Capture parent staging error'
 $loadMembers=Add-Sql $daysLoop 'Load archive members' 'ArchiveDb' 'User::MembersSelectSql' 'Rowset' $true
 Bind-Input $loadMembers '@Id' 'User::ArchiveJobId' Int32
+Bind-Input $loadMembers '@DatabaseName' 'User::DatabaseName' String 128
 Bind-Result $loadMembers '0' 'User::RelationsData'
 Job-Sql $loadMembers 'Capture members error'
 Link $daysLoop $group $stageGroup
@@ -206,7 +207,9 @@ $collect=Add-Script $members 'Collect archive member deletion' '' ''
 Link $members $batches $verifyDay
 Link $members $verifyDay $zip
 Link $members $zip $testZip
-Link $members $testZip $collect
+$processDiagnostics=Add-Script $members 'Collect ZIP process diagnostics' '' ''
+Link $members $testZip $processDiagnostics
+Link $members $processDiagnostics $collect
 $prepareDelete=Add-Script $daysLoop 'Prepare group deletion' '' ''
 Link $daysLoop $members $prepareDelete
 $delete=Add-Sql $daysLoop 'Delete archived day' 'ArchiveDb' 'User::DeleteSql' 'SingleRow' $true
@@ -236,6 +239,7 @@ foreach($task in @($prepareJob,$begin,$processMetadata,$guid,$construct,$export,
     if($task -ne $prepareJob) { $task.SetExpression('Disable','@[User::JobFailed]') }
 }
 # Restore the parent name even after a member failed, so logs identify the job.
+($scriptDefinitions | Where-Object { $_.Name -eq 'Collect ZIP process diagnostics' }).HandleJobError=$true
 ($scriptDefinitions | Where-Object { $_.Name -eq 'Prepare group deletion' }).HandleJobError=$true
 $skeleton=Join-Path $PSScriptRoot 'package-skeleton.dtsx'
 $app.SaveToXml($skeleton,$package,$null)
@@ -299,12 +303,12 @@ if (!$CompatibilityTest) {
     $projectNs.AddNamespace('SSIS','www.microsoft.com/SqlServer/SSIS')
     foreach($target in $projectXml.SelectNodes('//TargetServerVersion')) { $target.InnerText=$TargetServerVersion }
     foreach($parameterNode in @($projectXml.SelectNodes('//SSIS:PackageMetaData/SSIS:Parameters/SSIS:Parameter',$projectNs))) {
-        if($parameterNode.GetAttribute('Name','www.microsoft.com/SqlServer/SSIS') -notin @('ConnectionString','ArchiveJobsTable','ArchiveRoot','MaxRecordsPerCsv')) {
+        if($parameterNode.GetAttribute('Name','www.microsoft.com/SqlServer/SSIS') -notin @('ConnectionString','ArchiveJobsTable','ArchiveJobRelationsTable','ArchiveRoot','MaxRecordsPerCsv')) {
             [void]$parameterNode.ParentNode.RemoveChild($parameterNode)
         }
     }
     $parameterList=$projectXml.SelectSingleNode('//SSIS:PackageMetaData/SSIS:Parameters',$projectNs)
-    foreach($parameterName in @('ConnectionString','ArchiveJobsTable','ArchiveRoot','MaxRecordsPerCsv')) {
+    foreach($parameterName in @('ConnectionString','ArchiveJobsTable','ArchiveJobRelationsTable','ArchiveRoot','MaxRecordsPerCsv')) {
         $node=$parameterList.SelectSingleNode('SSIS:Parameter[@SSIS:Name="'+$parameterName+'"]',$projectNs)
         if(!$node) {
             $node=$parameterList.SelectSingleNode('SSIS:Parameter[@SSIS:Name="ConnectionString"]',$projectNs).CloneNode($true)

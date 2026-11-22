@@ -1,15 +1,26 @@
+        private static string ConfigurationTable(string value, string parameter)
+        {
+            string[] parts = value.Split('.');
+            if (parts.Length != 2 && parts.Length != 3)
+                throw new ArgumentException(parameter + " must contain schema.table or database.schema.table.");
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string name = parts[i].Trim();
+                if (name.StartsWith("[") && name.EndsWith("]"))
+                    name = name.Substring(1, name.Length - 2).Replace("]]", "]");
+                if (string.IsNullOrWhiteSpace(name) || name.Length > 128)
+                    throw new ArgumentException("Invalid database, schema or table in " + parameter + ".");
+                parts[i] = "[" + name.Replace("]", "]]") + "]";
+            }
+            return string.Join(".", parts);
+        }
+
         public void Main()
         {
-            string[] parts = Convert.ToString(Dts.Variables["$Package::ArchiveJobsTable"].Value).Split('.');
-            if(parts.Length != 2 && parts.Length != 3) throw new ArgumentException("ArchiveJobsTable must contain schema.table or database.schema.table, for example nito_superDb.Archive.ArchiveJobs.");
-            for(int i=0;i<parts.Length;i++) {
-                string name=parts[i].Trim();
-                if(name.StartsWith("[") && name.EndsWith("]")) name=name.Substring(1,name.Length-2).Replace("]]","]");
-                if(string.IsNullOrWhiteSpace(name) || name.Length>128) throw new ArgumentException("Invalid database, schema or table in ArchiveJobsTable.");
-                parts[i]="["+name.Replace("]","]]")+"]";
-            }
-            string table=string.Join(".",parts);
-            string relationsTable = table.Substring(0, table.LastIndexOf('.')) + ".[ArchiveJobRelations]";
+            string table = ConfigurationTable(
+                Convert.ToString(Dts.Variables["$Package::ArchiveJobsTable"].Value), "ArchiveJobsTable");
+            string relationsTable = ConfigurationTable(
+                Convert.ToString(Dts.Variables["$Package::ArchiveJobRelationsTable"].Value), "ArchiveJobRelationsTable");
             Dts.Variables["User::MembersSelectSql"].Value =
                 "IF OBJECT_ID(N'" + relationsTable.Replace("'", "''") + "',N'U') IS NULL " +
                 "SELECT CONVERT(sysname,N'') AS ChildSchema,CONVERT(sysname,N'') AS ChildTable," +
@@ -18,7 +29,7 @@
                 "SELECT PARSENAME(ChildTable,2) AS ChildSchema,PARSENAME(ChildTable,1) AS ChildTable,ParentKeyColumn,ChildKeyColumn," +
                 "COALESCE(PARSENAME(NULLIF(ParentTable,N''),2),N'') AS ParentSchema," +
                 "COALESCE(PARSENAME(NULLIF(ParentTable,N''),1),N'') AS ParentTable FROM " +
-                relationsTable + " WHERE ArchiveJobId=@Id ORDER BY Id;";
+                relationsTable + " WHERE ArchiveJobId=@Id AND DatabaseName=@DatabaseName ORDER BY Id;";
             Dts.Variables["User::JobsSelectSql"].Value="SELECT Id, DatabaseName, TableName, ArchiveOlderThanDays, DateColumn FROM "+table+" ORDER BY Id;";
             Dts.Variables["User::JobStartSql"].Value="UPDATE "+table+" SET ErrorMessage=NULL, LastProcessedAt=SYSDATETIME(), LastProcessedStatus=NULL WHERE Id=@Id; IF @@ROWCOUNT<>1 THROW 50001,'Archive job no longer exists.',1;";
             Dts.Variables["User::JobResultSql"].Value="DECLARE @Now datetime2=SYSDATETIME(); UPDATE "+table+

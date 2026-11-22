@@ -1,105 +1,77 @@
-# Integration Services Project2.Console
+# Wspólny seed testów archiwizacji
 
-## Tabele testowe z dziećmi bez daty
-
-```powershell
-dotnet run --project "Integration Services Project2.Console" -- seed-related-tables
-```
-
-Polecenie tworzy `Archive.ArchiveJobRelations` w `nito_superDb` i odtwarza
-`ArchiveRelationTest.Orders`, `ArchiveRelationTest.OrderLines` i `ArchiveRelationTest.LineDetails`. Wymaga istniejącej
-`Archive.ArchiveJobs`. Uruchamiaj je przy zatrzymanym pakiecie.
-
-Ponowienie odtwarza dane, resetuje status zadania dla `Orders` i zapisuje powiązanie
-`Orders.Id = OrderLines.OrderId`. Przy retencji 30 dni zamówienia 1 i 2 oraz pozycje
-101–103 oraz szczegóły 1001–1004 kwalifikują się do archiwizacji.
-Zamówienie 3, pozycja 104 i szczegół 1005 pozostają w źródle.
-Każdy wpis w tabeli technicznej wskazuje zadanie nadrzędne oraz bezpośrednią relację
-jednokolumnową w tej samej bazie źródłowej. Pakiet odczytuje tę konfigurację
-ze schematu i bazy wskazanych w `ArchiveJobsTable`, z tabeli `ArchiveJobRelations`.
-
-SSIS wybiera dzień rodzica według jego daty i eksportuje dzieci po skonfigurowanym
-kluczu. Każda tabela ma własny katalog i ZIP pod dniem rodzica. Po sprawdzeniu
-liczby rekordów i integralności wszystkich ZIP-ów usuwa dzieci, następnie rodzica,
-w jednej transakcji dla całego dnia. Błąd usuwania wycofuje wszystkie usunięcia.
-Tabele bez rekordów dla danego dnia nie tworzą pustych archiwów.
-
-Ponowienie przy istniejącym katalogu lub ZIP-ie zapisuje nową próbę z sufiksem
-`_retry_<guid>`. Po zatwierdzeniu usuwania całej grupy poprawny ZIP zastępuje
-standardowy ZIP tego dnia. Pakiet usuwa pozostałe ZIP-y retry i foldery CSV
-tego dnia dla przetworzonych tabel. Przy błędzie eksportu lub usuwania pliki
-pozostają dostępne do wglądu. Dzieci konfiguruje się
-w `ArchiveJobRelations`, a zadanie z retencją i datą dotyczy rodzica.
-Kolumny `ParentTable` i `ChildTable` przechowują nazwy w formacie
-`schema.Tabela`, tak jak `ArchiveJobs.TableName`. Pusta wartość `ParentTable`
-wskazuje główną tabelę zadania. Każda relacja łączy jedną parę kolumn.
-Seed zapisuje łańcuch `Orders.Id → OrderLines.OrderId` oraz
-`OrderLines.Id → LineDetails.OrderLineId`.
-
-Pakiet układa cały graf relacji przed eksportem. Każdą tabelę eksportuje raz
-dla danego dnia, wybierając sumę rekordów osiągalnych przez jej rodziców.
-Usuwanie przebiega w odwrotnej kolejności zależności. Cykl lub rodzic
-nieosiągalny od tabeli głównej kończy zadanie błędem przed eksportem.
-`CreateArchiveJobRelations.sql` aktualizuje istniejącą tabelę techniczną,
-zachowując dotychczasowe wpisy i umożliwiając wiele relacji do jednej tabeli.
-Migracja scala stare kolumny schematu z nazwami tabel i usuwa `ParentSchema`
-oraz `ChildSchema`.
-
-## Tabele testowe z kluczami obcymi
-
-`ForeignKeyTestDataCreator.SeedAsync()` tworzy cztery tabele w bazie `nito_superDb` i odtwarza ich dane:
-
-```powershell
-dotnet run --project "Integration Services Project2.Console" -- seed-fk-tables
-```
-
-Każda tabela ma 1000 rekordów: 2025-01-01–2025-01-10, po 100 dziennie.
-Każde dziecko wskazuje jednego rodzica z tego samego dnia. Oba FK mają `ON DELETE NO ACTION`.
-Zadania w `Archive.ArchiveJobs` otrzymują nowe Id w kolejności:
-
-1. `ArchiveFkTest.GoodChild`
-2. `ArchiveFkTest.GoodParent`
-3. `ArchiveFkTest.BadParent`
-4. `ArchiveFkTest.BadChild`
-
-Retencja wynosi 30 dni. Pierwsza para powinna przejść archiwizację i usuwanie.
-Przy drugim rodzicu usunięcie zablokuje FK; późniejsze zadanie dziecka może się udać,
-więc błąd rodzica należy sprawdzić podczas pierwszego uruchomienia pakietu.
-Eksport rodzica może już powstać przed błędem usuwania.
-
-Uruchamiaj seed przy zatrzymanym pakiecie. Ponowienie usuwa i odtwarza dane wyłącznie
-w tych czterech tabelach oraz zastępuje wyłącznie ich cztery zadania (resetując statusy).
-Pozostałe tabele i zadania pozostają bez zmian. Seed wykonuje się w jednej transakcji.
-Korzysta z połączenia aplikacji, z bazą docelową ustawioną jawnie na `nito_superDb`.
-
-## Dane testowe SmartHome.Events
-
-```powershell
-dotnet run --project "Integration Services Project2.Console" -- seed-events
-```
-
-`EventTestDataCreator.AddAsync()` dodaje dokładnie 50 000 rekordów w jednej transakcji do `SmartHome.Events` w bazie wskazanej przez istniejące połączenie `ArchiveJobsDatabase`. Każde uruchomienie dodaje nowy zestaw. Nie dodaje zadania archiwizacji.
-
-Dni **2025-01-01–2025-01-20** mają po **2500 nowych rekordów** (dla limitu 1000: **1000 + 1000 + 500**, czyli 3 party na dzień). `CreatedAt` i `ExecutedAt` są jednakowe i rozłożone w obrębie dnia. Istniejące dane mogą zwiększyć liczbę partów. Użyte wartości `Name` to `OpenedExternally`/`ClosedExternally`, a `Type` to `Door`.
-
-Każdy zestaw ma unikalny znacznik `SSIS-TEST-<guid>` w `Comment`; po nim jest `; row=<numer 1–50000>`. Konsola wypisuje znacznik, filtr SQL i dla każdego dnia liczbę rekordów oraz minimalne/maksymalne ID. Zakres ID może zawierać cudze rekordy przy równoczesnych zapisach — dokładny wybór zapewnia filtr po znaczniku:
-
-```sql
-SELECT * FROM SmartHome.Events
-WHERE Comment LIKE N'SSIS-TEST-<guid z konsoli>; row=%'
-ORDER BY CreatedAt, Id;
-```
-
-Generator wymaga istniejącej tabeli; nie uruchamia migracji. Aby uruchomić w Visual Studio, ustaw argument aplikacji na `seed-events`.
-
-W Visual Studio ustaw ten projekt jako **Set as Startup Project** i uruchom przez F5 lub Ctrl+F5. Program przekazuje gotową listę obiektów `ArchiveJob` do metody `ArchiveJobCreator.AddAsync(List<ArchiveJob> jobs)`. Listę edytuj w `Program.cs`; wstępnie zawiera zadania dla `MyData.Snapshots` i `SmartHome.Events`. Każde uruchomienie dodaje wszystkie rekordy z listy, również jeśli podobne zadania już istnieją.
-
-`ArchiveJobCreator` otrzymuje `ArchiveJobsDbContext` przez konstruktor. `Program.cs` rejestruje kontekst i serwis w kontenerze DI. Zapis używa `SaveChangesAsync`; identyfikator nadaje SQL Server. Daty przetwarzania, status i błąd nowego zadania pozostają NULL do uruchomienia SSIS.
-
-Program korzysta z tego samego `Integration Services Project2.Database/appsettings.json`, podlinkowanego do projektu i kopiowanego do katalogu wynikowego. Nie trzeba utrzymywać drugiej konfiguracji. Tabela musi wcześniej istnieć; program nie wykonuje migracji automatycznie. Istnienie tabeli źródłowej i kolumny daty sprawdza SSIS.
-
-Z terminala w katalogu solucji:
+Uruchom projekt bez argumentów albo przez F5 w Visual Studio:
 
 ```powershell
 dotnet run --project "Integration Services Project2.Console"
 ```
+
+Program wykonuje jedną metodę `TestDataSeeder.SeedAsync()`. Połączenie pochodzi
+z `ConnectionStrings:ArchiveJobsDatabase`. Konfiguracja zadań i relacji znajduje
+się w `nito_superDb.Archive`, a tabele źródłowe w bazach `nito_superDb`
+i `nito_SomeApps` na tym samym serwerze. Obie bazy muszą istnieć.
+
+## Dane tworzone w każdej bazie
+
+| Obiekt | Liczba |
+|---|---:|
+| Zadania dla tabel głównych Root01–Root40 | 40 |
+| Relacje | 25 |
+| Tabele główne i zależne w ArchiveScenarioTest | 64 |
+| Rekordy danych testowych | 189 |
+
+Łącznie seed utrzymuje 80 własnych zadań i 50 własnych relacji.
+Wcześniejsze zadania oraz inne schematy zachowują swoje dane.
+Dlatego całkowita liczba wpisów konfiguracji może być większa.
+
+## Scenariusze
+
+- Root01 ma dziecko z relacją jeden-do-wielu.
+- Root02 ma dziecko i wnuki.
+- Root03 tworzy łańcuch czterech tabel.
+- Root04 ma trzy tabele dzieci.
+- Root05 rozgałęzia się na Left i Right, które wskazują wspólne Shared.
+  Rekord Shared pasujący przez obie relacje jest eksportowany raz.
+- Root06 tworzy łańcuch pięciu tabel.
+- Root07 ma dwie gałęzie z kolejnymi dziećmi.
+- Root08 ma trzy tabele dzieci.
+- Root09–Root38 to samodzielne tabele z datą.
+- Root39 zawiera wyłącznie świeże rekordy.
+- Root40 pozostaje pusta.
+
+Retencja wynosi 30 dni. Zwykły rodzic ma rekordy sprzed 60 i 59 dni oraz
+jeden dzisiejszy. Dzieci mają po dwa rekordy wskazujące starego rodzica
+i jeden wskazujący świeżego. Tabele zależne nie mają dat.
+Wszystkie FK mają ON DELETE NO ACTION, a kolumny FK są indeksowane.
+
+Po poprawnej archiwizacji z każdej bazy powinny zostać wyeksportowane
+124 rekordy, a w źródle pozostać 65 rekordów. Każda baza ma identyczne
+nazwy tabel i klucze, co pozwala sprawdzić rozdzielenie danych po DatabaseName.
+
+## Konfiguracja i ponowienie
+
+ArchiveJobRelations przechowuje DatabaseName, ArchiveJobId, ParentTable,
+ChildTable, ParentKeyColumn i ChildKeyColumn. Nazwy tabel mają format
+schema.Tabela. Pakiet pobiera relacje pasujące do Id zadania oraz jego DatabaseName.
+Kolumna DatabaseName istniejących relacji jest uzupełniana na podstawie ArchiveJobs.
+Parametr pakietu ArchiveJobRelationsTable wskazuje tabelę relacji niezależnie
+od ArchiveJobsTable. Przyjmuje schema.Tabela albo baza.schema.Tabela.
+Domyślna wartość w projekcie to nito_superDb.Archive.ArchiveJobRelations.
+
+Uruchamiaj seed przy zatrzymanym pakiecie. Ponowienie odtwarza dane
+ArchiveScenarioTest w obu bazach, resetuje statusy jego zadań i odtwarza
+jego relacje. Identyfikatory zadań pozostają stabilne.
+Odtworzenie obu baz i konfiguracji wykonuje się w jednej transakcji.
+Aktualizacja struktury ArchiveJobRelations poprzedza tę transakcję.
+
+## Weryfikacja w izolowanych bazach
+
+```powershell
+powershell -NoProfile -File tools/Create-TestDatabase.ps1
+powershell -NoProfile -File tools/Build-Package.ps1 -CompatibilityTest
+powershell -NoProfile -File tools/Verify-SqlTasks.ps1 -MultiDatabase
+```
+
+Test wykonuje rzeczywiste zadania SQL i kod skryptów pakietu na dwóch LocalDB,
+sprawdza 80 statusów Success, zawartość ZIP-ów, brak powtórzonych kluczy
+oraz liczbę rekordów pozostałych w obu bazach.

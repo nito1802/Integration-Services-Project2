@@ -4,7 +4,7 @@ $root=Split-Path $PSScriptRoot -Parent
 $source=Join-Path $root 'Integration Services Project2'
 $destination=Join-Path $root 'artifacts/sql2022/project'
 [void](New-Item -ItemType Directory -Path $destination -Force)
-$defaults=@{ConnectionString='Data Source=.;Integrated Security=True;TrustServerCertificate=True';ArchiveJobsTable='Archive.ArchiveJobs';ArchiveRoot='C:\ArchiveTest';MaxRecordsPerCsv='1000'}
+$defaults=@{ConnectionString='Data Source=.;Integrated Security=True;TrustServerCertificate=True';ArchiveJobsTable='Archive.ArchiveJobs';ArchiveJobRelationsTable='Archive.ArchiveJobRelations';ArchiveRoot='C:\ArchiveTest';MaxRecordsPerCsv='1000'}
 $package=[xml](Get-Content (Join-Path $source 'Package.dtsx') -Raw)
 $ns=New-Object Xml.XmlNamespaceManager($package.NameTable); $ns.AddNamespace('DTS','www.microsoft.com/SqlServer/Dts')
 foreach($script in $package.SelectNodes('//ScriptProject')) { if($script.VSTAMajorVersion -ne '16') { throw 'Rebuild package with Build-Package.ps1 -TargetServerVersion SQLServer2022 first.' } }

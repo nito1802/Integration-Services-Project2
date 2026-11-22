@@ -1,4 +1,4 @@
-param([switch]$Related,[ValidateSet('None','ChildWrite','ChildZip','Delete','Cycle')][string]$RelatedFailure='None',[string]$JobsTable='Archive.ArchiveJobs',[switch]$InsertAfterSnapshot,[switch]$Ssis2025,[switch]$KeyTypes,[switch]$NativeProcessTasks,[switch]$Retry,[switch]$FullPackage,[switch]$SpreadDates,[switch]$SparseDates,[ValidateSet('None','NullKey','Stage','Read','Write','Delete','Zip','ZipTest','FolderCollision','ZipCollision')][string]$FailureMode='None',[int]$MaxRecordsPerCsv=1000)
+param([switch]$MultiDatabase,[switch]$Related,[ValidateSet('None','ChildWrite','ChildZip','Delete','Cycle')][string]$RelatedFailure='None',[string]$JobsTable='Archive.ArchiveJobs',[string]$RelationsTable='Archive.ArchiveJobRelations',[switch]$InsertAfterSnapshot,[switch]$Ssis2025,[switch]$KeyTypes,[switch]$NativeProcessTasks,[switch]$Retry,[switch]$FullPackage,[switch]$SpreadDates,[switch]$SparseDates,[ValidateSet('None','NullKey','Stage','Read','Write','Delete','Zip','ZipTest','FolderCollision','ZipCollision')][string]$FailureMode='None',[int]$MaxRecordsPerCsv=1000)
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'Script-Source.ps1')
 $root=Split-Path $PSScriptRoot -Parent
@@ -10,6 +10,7 @@ $packagePath=if($Ssis2025) { Join-Path $root 'Integration Services Project2/Pack
 $package=$app.LoadPackage($packagePath,$null)
 $package.Parameters['ConnectionString'].Value=$config.ConnectionString
 $package.Parameters['ArchiveJobsTable'].Value=$JobsTable
+$package.Parameters['ArchiveJobRelationsTable'].Value=$RelationsTable
 $output=Join-Path $config.RunDirectory $(if($Retry -and !$Related) {'retry-csv'} else {'native-csv'})
 [void](New-Item -ItemType Directory -Path $output -Force)
 $package.Parameters['ArchiveRoot'].Value=$output
@@ -59,17 +60,17 @@ INSERT dbo.OrderLines SELECT CONVERT(int,OrderNo)*2,OrderNo,N'first' FROM dbo.Or
 INSERT dbo.OrderLines SELECT CONVERT(int,OrderNo)*2+1,OrderNo,N'second' FROM dbo.Orders;
 CREATE TABLE dbo.OrderNotes(Id int PRIMARY KEY,OrderId bigint NOT NULL REFERENCES dbo.Orders(OrderNo),Payload nvarchar(100));
 INSERT dbo.OrderNotes VALUES(1,1,N'old note'),(2,3002,N'current note');
-INSERT Archive.ArchiveJobRelations(ArchiveJobId,ChildTable,ParentKeyColumn,ChildKeyColumn)
-VALUES(1,N'dbo.OrderLines',N'OrderNo',N'OrderId'),(1,N'dbo.OrderNotes',N'OrderNo',N'OrderId');
+INSERT Archive.ArchiveJobRelations(ArchiveJobId,DatabaseName,ChildTable,ParentKeyColumn,ChildKeyColumn)
+VALUES(1,DB_NAME(),N'dbo.OrderLines',N'OrderNo',N'OrderId'),(1,DB_NAME(),N'dbo.OrderNotes',N'OrderNo',N'OrderId');
 CREATE TABLE dbo.LineDetails(Id int PRIMARY KEY,OrderLineId int NOT NULL REFERENCES dbo.OrderLines(Id),Payload nvarchar(100));
 INSERT dbo.LineDetails SELECT Id,Id,N'detail' FROM dbo.OrderLines;
-INSERT Archive.ArchiveJobRelations(ArchiveJobId,ChildTable,ParentKeyColumn,ChildKeyColumn,ParentTable)
-VALUES(1,N'dbo.LineDetails',N'Id',N'OrderLineId',N'dbo.OrderLines');
+INSERT Archive.ArchiveJobRelations(ArchiveJobId,DatabaseName,ChildTable,ParentKeyColumn,ChildKeyColumn,ParentTable)
+VALUES(1,DB_NAME(),N'dbo.LineDetails',N'Id',N'OrderLineId',N'dbo.OrderLines');
 CREATE TABLE dbo.SharedDetails(Id int PRIMARY KEY,LineId int NOT NULL REFERENCES dbo.OrderLines(Id),NoteId int NOT NULL REFERENCES dbo.OrderNotes(Id));
 INSERT dbo.SharedDetails VALUES(1,2,1),(2,6004,2);
-INSERT Archive.ArchiveJobRelations(ArchiveJobId,ChildTable,ParentKeyColumn,ChildKeyColumn,ParentTable)
-VALUES(1,N'dbo.SharedDetails',N'Id',N'LineId',N'dbo.OrderLines'),
-      (1,N'dbo.SharedDetails',N'Id',N'NoteId',N'dbo.OrderNotes');
+INSERT Archive.ArchiveJobRelations(ArchiveJobId,DatabaseName,ChildTable,ParentKeyColumn,ChildKeyColumn,ParentTable)
+VALUES(1,DB_NAME(),N'dbo.SharedDetails',N'Id',N'LineId',N'dbo.OrderLines'),
+      (1,DB_NAME(),N'dbo.SharedDetails',N'Id',N'NoteId',N'dbo.OrderNotes');
 "@
         [void]$cmd.ExecuteNonQuery()
         if($RelatedFailure -eq 'Cycle') {
@@ -82,11 +83,47 @@ VALUES(1,N'dbo.SharedDetails',N'Id',N'LineId',N'dbo.OrderLines'),
         }
     } finally { $db.Dispose() }
 }
+if($Related -and !$Retry -and $RelationsTable -eq 'Archive.Relations custom') {
+    $db=New-Object Data.SqlClient.SqlConnection($config.ConnectionString); $db.Open()
+    try {
+        $cmd=$db.CreateCommand()
+        $cmd.CommandText="EXEC sys.sp_rename N'Archive.ArchiveJobRelations',N'Relations custom',N'OBJECT';"
+        [void]$cmd.ExecuteNonQuery()
+    } finally { $db.Dispose() }
+}
 if($Related -and $Retry) {
     $db=New-Object Data.SqlClient.SqlConnection($config.ConnectionString); $db.Open()
     try {
         $cmd=$db.CreateCommand(); $cmd.CommandText="DROP TRIGGER IF EXISTS dbo.RejectParentDelete;"
         [void]$cmd.ExecuteNonQuery()
+    } finally { $db.Dispose() }
+}
+if($MultiDatabase) {
+    $otherDatabase=$config.Database+'_Other'
+    $db=New-Object Data.SqlClient.SqlConnection($config.ConnectionString); $db.Open()
+    try {
+        $cmd=$db.CreateCommand()
+        $dataPath=(Join-Path $config.RunDirectory 'other.mdf').Replace("'","''")
+        $logPath=(Join-Path $config.RunDirectory 'other.ldf').Replace("'","''")
+        $cmd.CommandText="CREATE DATABASE [$otherDatabase] ON PRIMARY (NAME=N'OtherData',FILENAME=N'$dataPath') LOG ON (NAME=N'OtherLog',FILENAME=N'$logPath');"
+        [void]$cmd.ExecuteNonQuery()
+        $cmd.CommandText=Get-Content (Join-Path $root 'CreateArchiveJobRelations.sql') -Raw
+        [void]$cmd.ExecuteNonQuery()
+        $cmd.CommandText='DELETE FROM Archive.ArchiveJobs;'
+        [void]$cmd.ExecuteNonQuery()
+        $seed=(Get-Content (Join-Path $root 'Integration Services Project2.Console/SeedAll.sql') -Raw).
+            Replace('nito_superDb',$config.Database).Replace('nito_SomeApps',$otherDatabase)
+        $transaction=$db.BeginTransaction()
+        $cmd.Transaction=$transaction
+        try {
+            $cmd.CommandText=$seed
+            [void]$cmd.Parameters.Add('@DatabaseName',[Data.SqlDbType]::NVarChar,128)
+            foreach($database in @($config.Database,$otherDatabase)) {
+                $cmd.Parameters['@DatabaseName'].Value=$database
+                [void]$cmd.ExecuteNonQuery()
+            }
+            $transaction.Commit()
+        } catch { $transaction.Rollback(); throw }
     } finally { $db.Dispose() }
 }
 $batchSizes=@{}
@@ -106,7 +143,7 @@ if($FullPackage) {
     $stubPath=Join-Path $build 'Stub.cs'; [IO.File]::WriteAllText($stubPath,$stub)
     $files=@($stubPath)
     $common=Get-Content -LiteralPath (Join-Path $root 'scripts/Common.cs') -Raw
-    $names=@('Prepare job queries','Initialize job variables','Prepare metadata and date queries','Initialize daily archive','Prepare batch select query','Write batch to CSV','Verify exported day','Verify deleted row count','Log job result','Capture SQL error','Prepare export schema and header','Delete temporary CSV files','Prepare related archive group','Prepare archive member','Prepare member export schema','Collect archive member deletion','Prepare group deletion','Finalize successful archives','Plan archive graph')
+    $names=@('Prepare job queries','Initialize job variables','Prepare metadata and date queries','Initialize daily archive','Prepare batch select query','Write batch to CSV','Verify exported day','Verify deleted row count','Log job result','Capture SQL error','Prepare export schema and header','Delete temporary CSV files','Prepare related archive group','Prepare archive member','Prepare member export schema','Collect archive member deletion','Prepare group deletion','Finalize successful archives','Plan archive graph','Collect ZIP process diagnostics')
     for($i=0;$i -lt $names.Count;$i++) {
                 $sourceName=if($names[$i] -eq 'Prepare member export schema') {'Prepare export schema and header'} else {$names[$i]}
         $main=Get-Content -LiteralPath (Join-Path $root ('scripts/'+$sourceName+'.cs')) -Raw
@@ -167,22 +204,24 @@ if($FullPackage) {
             return
         }
         if($name -in @('Create daily ZIP','Verify ZIP integrity')) {
-            $dbCheck=New-Object Data.SqlClient.SqlConnection($config.ConnectionString); $dbCheck.Open()
-            try {
-                $check=$dbCheck.CreateCommand()
-                if($Related -and $package.Variables['User::TableName'].Value -eq 'dbo.SharedDetails') {
-                    $check.CommandText='SELECT COUNT_BIG(*) FROM dbo.SharedDetails c JOIN dbo.OrderLines l ON l.Id=c.LineId JOIN dbo.Orders p ON p.OrderNo=l.OrderId WHERE p.CreatedAt>=@From AND p.CreatedAt<@To;'
-                } elseif($Related -and $package.Variables['User::TableName'].Value -eq 'dbo.LineDetails') {
-                    $check.CommandText='SELECT COUNT_BIG(*) FROM dbo.LineDetails c JOIN dbo.OrderLines l ON l.Id=c.OrderLineId JOIN dbo.Orders p ON p.OrderNo=l.OrderId WHERE p.CreatedAt>=@From AND p.CreatedAt<@To;'
-                } elseif($Related -and $package.Variables['User::TableName'].Value -ne 'dbo.Orders') {
-                    $check.CommandText='SELECT COUNT_BIG(*) FROM '+$package.Variables['User::TableName'].Value+' c WHERE EXISTS(SELECT 1 FROM dbo.Orders p WHERE p.OrderNo=c.OrderId AND p.CreatedAt>=@From AND p.CreatedAt<@To);'
-                } else {
-                    $check.CommandText='SELECT COUNT_BIG(*) FROM '+$package.Variables['User::TableName'].Value+' WHERE '+$package.Variables['User::ColumnDate'].Value+' >= @From AND '+$package.Variables['User::ColumnDate'].Value+' < @To;'
-                }
-                [void]$check.Parameters.AddWithValue('@From',$package.Variables['User::CurrentDateFrom'].Value)
-                [void]$check.Parameters.AddWithValue('@To',$package.Variables['User::CurrentDateTo'].Value)
-                if([long]$check.ExecuteScalar() -ne ([long]$package.Variables['User::DayRows'].Value + $(if($InsertAfterSnapshot -and $package.Variables['User::ArchiveJobId'].Value -eq 1 -and $package.Variables['User::CurrentDateFrom'].Value -eq $insertedDay) {1} else {0}))) { throw 'Source day was modified/deleted before ZIP verification' }
-            } finally { $dbCheck.Dispose() }
+            if(!$MultiDatabase) {
+                $dbCheck=New-Object Data.SqlClient.SqlConnection($config.ConnectionString); $dbCheck.Open()
+                try {
+                    $check=$dbCheck.CreateCommand()
+                    if($Related -and $package.Variables['User::TableName'].Value -eq 'dbo.SharedDetails') {
+                        $check.CommandText='SELECT COUNT_BIG(*) FROM dbo.SharedDetails c JOIN dbo.OrderLines l ON l.Id=c.LineId JOIN dbo.Orders p ON p.OrderNo=l.OrderId WHERE p.CreatedAt>=@From AND p.CreatedAt<@To;'
+                    } elseif($Related -and $package.Variables['User::TableName'].Value -eq 'dbo.LineDetails') {
+                        $check.CommandText='SELECT COUNT_BIG(*) FROM dbo.LineDetails c JOIN dbo.OrderLines l ON l.Id=c.OrderLineId JOIN dbo.Orders p ON p.OrderNo=l.OrderId WHERE p.CreatedAt>=@From AND p.CreatedAt<@To;'
+                    } elseif($Related -and $package.Variables['User::TableName'].Value -ne 'dbo.Orders') {
+                        $check.CommandText='SELECT COUNT_BIG(*) FROM '+$package.Variables['User::TableName'].Value+' c WHERE EXISTS(SELECT 1 FROM dbo.Orders p WHERE p.OrderNo=c.OrderId AND p.CreatedAt>=@From AND p.CreatedAt<@To);'
+                    } else {
+                        $check.CommandText='SELECT COUNT_BIG(*) FROM '+$package.Variables['User::TableName'].Value+' WHERE '+$package.Variables['User::ColumnDate'].Value+' >= @From AND '+$package.Variables['User::ColumnDate'].Value+' < @To;'
+                    }
+                    [void]$check.Parameters.AddWithValue('@From',$package.Variables['User::CurrentDateFrom'].Value)
+                    [void]$check.Parameters.AddWithValue('@To',$package.Variables['User::CurrentDateTo'].Value)
+                    if([long]$check.ExecuteScalar() -ne ([long]$package.Variables['User::DayRows'].Value + $(if($InsertAfterSnapshot -and $package.Variables['User::ArchiveJobId'].Value -eq 1 -and $package.Variables['User::CurrentDateFrom'].Value -eq $insertedDay) {1} else {0}))) { throw 'Source day was modified/deleted before ZIP verification' }
+                } finally { $dbCheck.Dispose() }
+            }
             # Exercise the real Execute Process Task. Inject failure via unsupported 7z command.
             $variable=if($name -eq 'Create daily ZIP') {'ZipArguments'} else {'ZipTestArguments'}
             $task.InnerObject.Executable='C:\Program Files\7-Zip\7z.exe'
@@ -208,6 +247,7 @@ if($FullPackage) {
                     $process.WaitForExit()
                     if($process.ExitCode -ne 0) {
                         $package.Variables['User::JobFailed'].Value=$true
+                        $package.Variables['User::ZipProcessFailed'].Value=$true
                         $package.Variables['User::JobError'].Value="7-Zip exit=$($process.ExitCode): $stderr"
                     }
                 } finally { $process.Dispose() }
@@ -283,7 +323,7 @@ if($FullPackage) {
                 while(!$package.Variables['User::JobFailed'].Value -and $package.Variables['User::BatchHasRows'].Value) {
                     foreach($name in @('Prepare batch select query','Read archive batch','Write batch to CSV')) { Step $batches $name }
                 }
-                foreach($name in @('Verify exported day','Create daily ZIP','Verify ZIP integrity','Collect archive member deletion')) { Step $members $name }
+                foreach($name in @('Verify exported day','Create daily ZIP','Verify ZIP integrity','Collect ZIP process diagnostics','Collect archive member deletion')) { Step $members $name }
             }
             foreach($name in @('Prepare group deletion','Delete archived day','Finalize successful archives','Find next archive day')) { Step $daily $name }
 
@@ -293,6 +333,45 @@ if($FullPackage) {
         foreach($name in @('Save job result','Log job result')) { Step $tables $name }
     }
     $result='Individual native tasks completed (scheduler not exercised)'
+}
+if($MultiDatabase) {
+    $db=New-Object Data.SqlClient.SqlConnection($config.ConnectionString); $db.Open()
+    try {
+        $cmd=$db.CreateCommand()
+        $cmd.CommandText="SELECT COUNT(*) FROM Archive.ArchiveJobs WHERE LastProcessedStatus=N'Success';"
+        if($cmd.ExecuteScalar() -ne 80) {
+            $cmd.CommandText='SELECT TableName,DatabaseName,ErrorMessage FROM Archive.ArchiveJobs WHERE LastProcessedStatus<>N''Success'';'
+            $t=New-Object Data.DataTable; $t.Load($cmd.ExecuteReader())
+            throw ($t | Format-List | Out-String)
+        }
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        foreach($database in @($config.Database,$otherDatabase)) {
+            $cmd.CommandText="SELECT SUM(p.rows) FROM [$database].sys.tables t JOIN [$database].sys.schemas s ON s.schema_id=t.schema_id JOIN [$database].sys.partitions p ON p.object_id=t.object_id AND p.index_id IN(0,1) WHERE s.name=N'ArchiveScenarioTest';"
+            if($cmd.ExecuteScalar() -ne 65) { throw "Unexpected remaining data in $database" }
+            $folder=Join-Path $output $database
+            $rows=0
+            $keys=New-Object 'System.Collections.Generic.HashSet[string]'
+            foreach($zip in (Get-ChildItem $folder -Recurse -Filter '*.zip')) {
+                $archive=[IO.Compression.ZipFile]::OpenRead($zip.FullName)
+                try {
+                    foreach($entry in $archive.Entries) {
+                        $reader=New-Object IO.StreamReader($entry.Open())
+                        try { $csv=@($reader.ReadToEnd() | ConvertFrom-Csv -Delimiter ';') }
+                        finally { $reader.Dispose() }
+                        foreach($row in $csv) {
+                            $key=$zip.Directory.Parent.Parent.Name+':'+$row.'Id (int)'
+                            if(!$keys.Add($key)) { throw "Repeated archive key $key in $database" }
+                        }
+                        $rows+=$csv.Count
+                    }
+                } finally { $archive.Dispose() }
+            }
+            if($rows -ne 124) { throw "Unexpected exported count $rows in $database" }
+            Write-Output "PASS: $database, 40 jobs, 25 relations, 124 unique exported rows, 65 retained rows."
+        }
+        if(@(Get-ChildItem $output -Recurse -Filter '*.csv').Count) { throw 'Loose CSV files remain' }
+    } finally { $db.Dispose() }
+    exit 0
 }
 if($Related) {
     $db=New-Object Data.SqlClient.SqlConnection($config.ConnectionString); $db.Open()

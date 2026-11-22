@@ -59,6 +59,7 @@ Place "$member\Verify exported day" 24 530
 Place "$member\Create daily ZIP" 340 530
 Place "$member\Verify ZIP integrity" 656 530
 Place "$member\Collect archive member deletion" 656 700
+Place "$member\Collect ZIP process diagnostics" 340 700
 Place "$daily\Prepare group deletion" 24 1320
 Place "$daily\Delete archived day" 340 1320
 Place "$daily\Finalize successful archives" 656 1320

@@ -3,11 +3,14 @@ $root=Split-Path $PSScriptRoot -Parent
 $directory=Join-Path $root 'artifacts/sql2022'
 $config=Get-Content (Join-Path $directory 'test.local.json') -Raw | ConvertFrom-Json
 $connection=New-Object Data.SqlClient.SqlConnection('Data Source=.\SSISARCHIVE22;Integrated Security=True;Initial Catalog=msdb;TrustServerCertificate=True')
+if(!$config.PSObject.Properties['ArchiveJobRelationsTable']) {
+ $config | Add-Member -NotePropertyName ArchiveJobRelationsTable -NotePropertyValue 'Archive.ArchiveJobRelations'
+}
 $step=@'
-/ISSERVER "\"\SSISDB\ArchiveTest\Archive.Sql2022\Package.dtsx\"" /SERVER "\".\SSISARCHIVE22\"" /Par "\"$Package::ConnectionString\"";"\"__CONNECTION__\"" /Par "\"$Package::ArchiveJobsTable\"";"\"__TABLE__\"" /Par "\"$Package::ArchiveRoot\"";"\"__ROOT__\"" /Par "\"$Package::MaxRecordsPerCsv(Int32)\"";__LIMIT__ /Par "\"$ServerOption::LOGGING_LEVEL(Int16)\"";1 /Par "\"$ServerOption::SYNCHRONIZED(Boolean)\"";True /CALLERINFO SQLAGENT /REPORTING E
+/ISSERVER "\"\SSISDB\ArchiveTest\Archive.Sql2022\Package.dtsx\"" /SERVER "\".\SSISARCHIVE22\"" /Par "\"$Package::ConnectionString\"";"\"__CONNECTION__\"" /Par "\"$Package::ArchiveJobsTable\"";"\"__TABLE__\"" /Par "\"$Package::ArchiveJobRelationsTable\"";"\"__RELATIONS__\"" /Par "\"$Package::ArchiveRoot\"";"\"__ROOT__\"" /Par "\"$Package::MaxRecordsPerCsv(Int32)\"";__LIMIT__ /Par "\"$ServerOption::LOGGING_LEVEL(Int16)\"";1 /Par "\"$ServerOption::SYNCHRONIZED(Boolean)\"";True /CALLERINFO SQLAGENT /REPORTING E
 '@
-foreach($value in @($config.ConnectionString,$config.ArchiveJobsTable,$config.ArchiveRoot)){if($value.Contains('"')){throw 'Unexpected quote in test parameter'}}
-$step=$step.Replace('__CONNECTION__',$config.ConnectionString).Replace('__TABLE__',$config.ArchiveJobsTable).Replace('__ROOT__',$config.ArchiveRoot).Replace('__LIMIT__',[string][int]$config.MaxRecordsPerCsv)
+foreach($value in @($config.ConnectionString,$config.ArchiveJobsTable,$config.ArchiveJobRelationsTable,$config.ArchiveRoot)){if($value.Contains('"')){throw 'Unexpected quote in test parameter'}}
+$step=$step.Replace('__CONNECTION__',$config.ConnectionString).Replace('__TABLE__',$config.ArchiveJobsTable).Replace('__RELATIONS__',$config.ArchiveJobRelationsTable).Replace('__ROOT__',$config.ArchiveRoot).Replace('__LIMIT__',[string][int]$config.MaxRecordsPerCsv)
 try {
  $connection.Open(); $command=$connection.CreateCommand()
  $command.CommandText='SELECT j.name,s.step_id,s.step_name,s.subsystem,s.command FROM dbo.sysjobs j JOIN dbo.sysjobsteps s ON j.job_id=s.job_id WHERE j.job_id=@job;'

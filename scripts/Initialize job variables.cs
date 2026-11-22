@@ -2,6 +2,7 @@
         {
             Dts.Variables["User::JobActive"].Value = true;
             Dts.Variables["User::JobFailed"].Value = false;
+            Dts.Variables["User::ZipProcessFailed"].Value = false;
             Dts.Variables["User::JobError"].Value = "";
             Dts.Variables["User::OutputFile"].Value = "";
             Dts.Variables["User::BatchHasRows"].Value = true;

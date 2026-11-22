@@ -47,6 +47,7 @@ DECLARE @execution bigint;
 EXEC SSISDB.catalog.create_execution @folder_name=N'ArchiveTest',@project_name=N'Archive.Sql2022',@package_name=N'Package.dtsx',@use32bitruntime=0,@execution_id=@execution OUTPUT;
 EXEC SSISDB.catalog.set_execution_parameter_value @execution_id=@execution,@object_type=30,@parameter_name=N'ConnectionString',@parameter_value=N'__CONNECTION__';
 EXEC SSISDB.catalog.set_execution_parameter_value @execution_id=@execution,@object_type=30,@parameter_name=N'ArchiveJobsTable',@parameter_value=N'__DATABASE__.Archive.ArchiveJobs';
+EXEC SSISDB.catalog.set_execution_parameter_value @execution_id=@execution,@object_type=30,@parameter_name=N'ArchiveJobRelationsTable',@parameter_value=N'__DATABASE__.Archive.ArchiveJobRelations';
 EXEC SSISDB.catalog.set_execution_parameter_value @execution_id=@execution,@object_type=30,@parameter_name=N'ArchiveRoot',@parameter_value=N'__ARCHIVE__';
 DECLARE @limit int=1000,@logging smallint=1,@synchronous bit=1;
 EXEC SSISDB.catalog.set_execution_parameter_value @execution_id=@execution,@object_type=30,@parameter_name=N'MaxRecordsPerCsv',@parameter_value=@limit;
@@ -70,7 +71,7 @@ SELECT CONVERT(nvarchar(36),@job);
  [void]$command.Parameters.Add('@name',[Data.SqlDbType]::NVarChar,128); $command.Parameters['@name'].Value=$jobName
  [void]$command.Parameters.Add('@step',[Data.SqlDbType]::NVarChar,-1); $command.Parameters['@step'].Value=$step
  $jobId=[string]$command.ExecuteScalar(); $command.Dispose()
- $config=[ordered]@{Database=$database;ConnectionString=$testConnection;ArchiveJobsTable="$database.Archive.ArchiveJobs";ArchiveRoot=$archiveRoot;MaxRecordsPerCsv=1000;JobName=$jobName;JobId=$jobId}
+ $config=[ordered]@{Database=$database;ConnectionString=$testConnection;ArchiveJobsTable="$database.Archive.ArchiveJobs";ArchiveJobRelationsTable="$database.Archive.ArchiveJobRelations";ArchiveRoot=$archiveRoot;MaxRecordsPerCsv=1000;JobName=$jobName;JobId=$jobId}
  $config | ConvertTo-Json | Set-Content (Join-Path $evidence 'test.local.json') -Encoding UTF8
  $step | Set-Content (Join-Path $evidence 'job-step.sql') -Encoding UTF8
  Write-Output "Started SQL Agent job: $jobName"

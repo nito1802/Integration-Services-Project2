@@ -48,6 +48,13 @@ BEGIN TRY
         END;
         ALTER TABLE Archive.ArchiveJobRelations DROP COLUMN ParentSchema,ChildSchema;
     END;
+    IF COL_LENGTH(N'Archive.ArchiveJobRelations', N'DatabaseName') IS NULL
+    BEGIN
+        ALTER TABLE Archive.ArchiveJobRelations ADD DatabaseName nvarchar(128) NULL;
+        EXEC(N'UPDATE r SET DatabaseName=j.DatabaseName FROM Archive.ArchiveJobRelations r
+            JOIN Archive.ArchiveJobs j ON j.Id=r.ArchiveJobId;');
+        ALTER TABLE Archive.ArchiveJobRelations ALTER COLUMN DatabaseName nvarchar(128) NOT NULL;
+    END;
     IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'Archive.ArchiveJobRelations') AND name=N'UX_ArchiveJobRelations_Edge')
         EXEC(N'CREATE UNIQUE NONCLUSTERED INDEX UX_ArchiveJobRelations_Edge ON Archive.ArchiveJobRelations
             (ArchiveJobId,ParentTable,ChildTable,ParentKeyColumn,ChildKeyColumn)');
