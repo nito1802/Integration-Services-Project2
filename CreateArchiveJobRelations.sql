@@ -65,3 +65,31 @@ BEGIN CATCH
     IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
     THROW;
 END CATCH;
+
+
+
+INSERT INTO Archive.ArchiveJobRelations (
+    ArchiveJobId,
+    DatabaseName,
+    ParentTable,
+    ChildTable,
+    ParentKeyColumn,
+    ChildKeyColumn
+)
+VALUES
+(
+    @ArchiveJobId,
+    N'aa360_genericsignature_dev01',
+    N'dbo.Processes',
+    N'dbo.AutentiProcesses',
+    N'Id',
+    N'ProcessId'
+),
+(
+    @ArchiveJobId,
+    N'aa360_genericsignature_dev01',
+    N'dbo.AutentiProcesses',
+    N'dbo.AutentiRecipients',
+    N'EnvelopeId',
+    N'EnvelopeId'
+);
