@@ -29,7 +29,7 @@
                 "SELECT PARSENAME(ChildTable,2) AS ChildSchema,PARSENAME(ChildTable,1) AS ChildTable,ParentKeyColumn,ChildKeyColumn," +
                 "COALESCE(PARSENAME(NULLIF(ParentTable,N''),2),N'') AS ParentSchema," +
                 "COALESCE(PARSENAME(NULLIF(ParentTable,N''),1),N'') AS ParentTable FROM " +
-                relationsTable + " WHERE ArchiveJobId=@Id AND DatabaseName=@DatabaseName ORDER BY Id;";
+                relationsTable + " WHERE DatabaseName=@DatabaseName ORDER BY Id;";
             Dts.Variables["User::JobsSelectSql"].Value="SELECT Id, DatabaseName, TableName, ArchiveOlderThanDays, DateColumn FROM "+table+" ORDER BY Id;";
             Dts.Variables["User::JobStartSql"].Value="UPDATE "+table+" SET ErrorMessage=NULL, LastProcessedAt=SYSDATETIME(), LastProcessedStatus=NULL WHERE Id=@Id; IF @@ROWCOUNT<>1 THROW 50001,'Archive job no longer exists.',1;";
             Dts.Variables["User::JobResultSql"].Value="DECLARE @Now datetime2=SYSDATETIME(); UPDATE "+table+

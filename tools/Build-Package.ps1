@@ -137,7 +137,6 @@ $group=Add-Script $daysLoop 'Prepare related archive group' '' ''
 $stageGroup=Add-Sql $daysLoop 'Stage parent day' 'ArchiveDb' 'User::GroupStageSql' 'None' $true
 Job-Sql $stageGroup 'Capture parent staging error'
 $loadMembers=Add-Sql $daysLoop 'Load archive members' 'ArchiveDb' 'User::MembersSelectSql' 'Rowset' $true
-Bind-Input $loadMembers '@Id' 'User::ArchiveJobId' Int32
 Bind-Input $loadMembers '@DatabaseName' 'User::DatabaseName' String 128
 Bind-Result $loadMembers '0' 'User::RelationsData'
 Job-Sql $loadMembers 'Capture members error'

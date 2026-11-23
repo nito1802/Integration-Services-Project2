@@ -50,10 +50,10 @@ nazwy tabel i klucze, co pozwala sprawdzić rozdzielenie danych po DatabaseName.
 
 ## Konfiguracja i ponowienie
 
-ArchiveJobRelations przechowuje DatabaseName, ArchiveJobId, ParentTable,
+ArchiveJobRelations przechowuje DatabaseName, ParentTable,
 ChildTable, ParentKeyColumn i ChildKeyColumn. Nazwy tabel mają format
-schema.Tabela. Pakiet pobiera relacje pasujące do Id zadania oraz jego DatabaseName.
-Kolumna DatabaseName istniejących relacji jest uzupełniana na podstawie ArchiveJobs.
+schema.Tabela. Pakiet pobiera relacje dla DatabaseName zadania i przechodzi od jego TableName po kolejnych ParentTable → ChildTable.
+Relacje są wspólne dla zadań dotyczących tych samych tabel. Migracja uzupełnia stare puste ParentTable i DatabaseName z ArchiveJobs, scala duplikaty oraz usuwa ArchiveJobId i powiązany FK. Usunięcie zadania zachowuje konfigurację relacji.
 Parametr pakietu ArchiveJobRelationsTable wskazuje tabelę relacji niezależnie
 od ArchiveJobsTable. Przyjmuje schema.Tabela albo baza.schema.Tabela.
 Domyślna wartość w projekcie to nito_superDb.Archive.ArchiveJobRelations.

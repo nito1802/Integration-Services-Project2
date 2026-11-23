@@ -1,21 +1,16 @@
--- Run in the configuration database after creating Archive.ArchiveJobs.
-IF OBJECT_ID(N'Archive.ArchiveJobs', N'U') IS NULL
-    THROW 50001, 'Archive.ArchiveJobs must exist.', 1;
-
+-- Run in the database containing the Archive configuration schema.
+-- Migrates existing job-bound relations to shared database/table relations.
 SET XACT_ABORT ON;
 BEGIN TRANSACTION;
 BEGIN TRY
     IF OBJECT_ID(N'Archive.ArchiveJobRelations', N'U') IS NULL
         CREATE TABLE Archive.ArchiveJobRelations (
             Id int IDENTITY NOT NULL CONSTRAINT PK_ArchiveJobRelations PRIMARY KEY,
-            ArchiveJobId int NOT NULL,
             DatabaseName nvarchar(128) NOT NULL,
-            ParentTable nvarchar(257) NOT NULL CONSTRAINT DF_ArchiveJobRelations_ParentTable DEFAULT N'',
+            ParentTable nvarchar(257) NOT NULL,
             ChildTable nvarchar(257) NOT NULL,
             ParentKeyColumn sysname NOT NULL,
-            ChildKeyColumn sysname NOT NULL,
-            CONSTRAINT FK_ArchiveJobRelations_ArchiveJobs FOREIGN KEY (ArchiveJobId)
-                REFERENCES Archive.ArchiveJobs(Id)
+            ChildKeyColumn sysname NOT NULL
         );
 
     IF COL_LENGTH(N'Archive.ArchiveJobRelations', N'ChildSchema') IS NOT NULL
@@ -56,9 +51,48 @@ BEGIN TRY
             JOIN Archive.ArchiveJobs j ON j.Id=r.ArchiveJobId;');
         ALTER TABLE Archive.ArchiveJobRelations ALTER COLUMN DatabaseName nvarchar(128) NOT NULL;
     END;
+    IF COL_LENGTH(N'Archive.ArchiveJobRelations', N'ArchiveJobId') IS NOT NULL
+    BEGIN
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'Archive.ArchiveJobRelations') AND name=N'UX_ArchiveJobRelations_Edge')
+            DROP INDEX UX_ArchiveJobRelations_Edge ON Archive.ArchiveJobRelations;
+        EXEC(N'UPDATE r SET ParentTable=j.TableName
+            FROM Archive.ArchiveJobRelations r JOIN Archive.ArchiveJobs j ON j.Id=r.ArchiveJobId
+            WHERE NULLIF(LTRIM(RTRIM(r.ParentTable)),N'''') IS NULL;');
+        DECLARE @ForeignKeys nvarchar(max)=N'';
+        SELECT @ForeignKeys=@ForeignKeys+N'ALTER TABLE Archive.ArchiveJobRelations DROP CONSTRAINT '+QUOTENAME(f.name)+N';'
+        FROM sys.foreign_keys f
+        JOIN sys.foreign_key_columns fc ON fc.constraint_object_id=f.object_id
+        JOIN sys.columns c ON c.object_id=fc.parent_object_id AND c.column_id=fc.parent_column_id
+        WHERE f.parent_object_id=OBJECT_ID(N'Archive.ArchiveJobRelations') AND c.name=N'ArchiveJobId';
+        IF @ForeignKeys<>N'' EXEC sys.sp_executesql @ForeignKeys;
+        ALTER TABLE Archive.ArchiveJobRelations DROP COLUMN ArchiveJobId;
+    END;
+
+    -- Identical edges may have belonged to several jobs before the migration.
+    ;WITH Duplicates AS (
+        SELECT Id,ROW_NUMBER() OVER (
+            PARTITION BY DatabaseName,ParentTable,ChildTable,ParentKeyColumn,ChildKeyColumn
+            ORDER BY Id
+        ) AS Occurrence
+        FROM Archive.ArchiveJobRelations
+    )
+    DELETE FROM Duplicates WHERE Occurrence>1;
+
+    DECLARE @ParentDefault sysname;
+    SELECT @ParentDefault=d.name FROM sys.default_constraints d
+    JOIN sys.columns c ON c.object_id=d.parent_object_id AND c.column_id=d.parent_column_id
+    WHERE d.parent_object_id=OBJECT_ID(N'Archive.ArchiveJobRelations') AND c.name=N'ParentTable';
+    IF @ParentDefault IS NOT NULL
+    BEGIN
+        DECLARE @DropParentDefault nvarchar(max)=N'ALTER TABLE Archive.ArchiveJobRelations DROP CONSTRAINT '+QUOTENAME(@ParentDefault);
+        EXEC sys.sp_executesql @DropParentDefault;
+    END;
+    IF OBJECT_ID(N'Archive.CK_ArchiveJobRelations_ParentTable',N'C') IS NULL
+        ALTER TABLE Archive.ArchiveJobRelations ADD CONSTRAINT CK_ArchiveJobRelations_ParentTable
+            CHECK(NULLIF(LTRIM(RTRIM(ParentTable)),N'') IS NOT NULL);
     IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'Archive.ArchiveJobRelations') AND name=N'UX_ArchiveJobRelations_Edge')
         EXEC(N'CREATE UNIQUE NONCLUSTERED INDEX UX_ArchiveJobRelations_Edge ON Archive.ArchiveJobRelations
-            (ArchiveJobId,ParentTable,ChildTable,ParentKeyColumn,ChildKeyColumn)');
+            (DatabaseName,ParentTable,ChildTable,ParentKeyColumn,ChildKeyColumn)');
     COMMIT TRANSACTION;
 END TRY
 BEGIN CATCH
@@ -66,30 +100,11 @@ BEGIN CATCH
     THROW;
 END CATCH;
 
-
-
-INSERT INTO Archive.ArchiveJobRelations (
-    ArchiveJobId,
-    DatabaseName,
-    ParentTable,
-    ChildTable,
-    ParentKeyColumn,
-    ChildKeyColumn
-)
+-- Example only. Run separately in your configuration database:
+/*
+INSERT Archive.ArchiveJobRelations
+    (DatabaseName,ParentTable,ChildTable,ParentKeyColumn,ChildKeyColumn)
 VALUES
-(
-    @ArchiveJobId,
-    N'aa360_genericsignature_dev01',
-    N'dbo.Processes',
-    N'dbo.AutentiProcesses',
-    N'Id',
-    N'ProcessId'
-),
-(
-    @ArchiveJobId,
-    N'aa360_genericsignature_dev01',
-    N'dbo.AutentiProcesses',
-    N'dbo.AutentiRecipients',
-    N'EnvelopeId',
-    N'EnvelopeId'
-);
+    (N'aa360_genericsignature_dev01',N'dbo.Processes',N'dbo.AutentiProcesses',N'Id',N'ProcessId'),
+    (N'aa360_genericsignature_dev01',N'dbo.AutentiProcesses',N'dbo.AutentiRecipients',N'EnvelopeId',N'EnvelopeId');
+*/

@@ -11,34 +11,34 @@ EXEC @LockResult=sys.sp_getapplock @Resource=N'ArchiveScenarioTest.Seed',
 IF @LockResult<0 THROW 50013,'Could not acquire seed lock.',1;
 
 DECLARE @Edges TABLE (
-    Position int PRIMARY KEY, RootNumber int, ParentName sysname, ChildName sysname, ChildColumn sysname
+    Position int PRIMARY KEY, ParentName sysname, ChildName sysname, ChildColumn sysname
 );
 INSERT @Edges VALUES
-    (1,1,N'Root01',N'R01_Items',N'ParentId'),
-    (2,2,N'Root02',N'R02_Items',N'ParentId'),
-    (3,2,N'R02_Items',N'R02_Details',N'ParentId'),
-    (4,3,N'Root03',N'R03_A',N'ParentId'),
-    (5,3,N'R03_A',N'R03_B',N'ParentId'),
-    (6,3,N'R03_B',N'R03_C',N'ParentId'),
-    (7,4,N'Root04',N'R04_A',N'ParentId'),
-    (8,4,N'Root04',N'R04_B',N'ParentId'),
-    (9,4,N'Root04',N'R04_C',N'ParentId'),
-    (10,5,N'Root05',N'R05_Left',N'ParentId'),
-    (11,5,N'Root05',N'R05_Right',N'ParentId'),
-    (12,5,N'R05_Left',N'R05_Shared',N'LeftId'),
-    (13,5,N'R05_Right',N'R05_Shared',N'RightId'),
-    (14,6,N'Root06',N'R06_A',N'ParentId'),
-    (15,6,N'R06_A',N'R06_B',N'ParentId'),
-    (16,6,N'R06_B',N'R06_C',N'ParentId'),
-    (17,6,N'R06_C',N'R06_D',N'ParentId'),
-    (18,7,N'Root07',N'R07_A',N'ParentId'),
-    (19,7,N'Root07',N'R07_B',N'ParentId'),
-    (20,7,N'R07_A',N'R07_A1',N'ParentId'),
-    (21,7,N'R07_A',N'R07_A2',N'ParentId'),
-    (22,7,N'R07_B',N'R07_B1',N'ParentId'),
-    (23,8,N'Root08',N'R08_A',N'ParentId'),
-    (24,8,N'Root08',N'R08_B',N'ParentId'),
-    (25,8,N'Root08',N'R08_C',N'ParentId');
+    (1,N'Root01',N'R01_Items',N'ParentId'),
+    (2,N'Root02',N'R02_Items',N'ParentId'),
+    (3,N'R02_Items',N'R02_Details',N'ParentId'),
+    (4,N'Root03',N'R03_A',N'ParentId'),
+    (5,N'R03_A',N'R03_B',N'ParentId'),
+    (6,N'R03_B',N'R03_C',N'ParentId'),
+    (7,N'Root04',N'R04_A',N'ParentId'),
+    (8,N'Root04',N'R04_B',N'ParentId'),
+    (9,N'Root04',N'R04_C',N'ParentId'),
+    (10,N'Root05',N'R05_Left',N'ParentId'),
+    (11,N'Root05',N'R05_Right',N'ParentId'),
+    (12,N'R05_Left',N'R05_Shared',N'LeftId'),
+    (13,N'R05_Right',N'R05_Shared',N'RightId'),
+    (14,N'Root06',N'R06_A',N'ParentId'),
+    (15,N'R06_A',N'R06_B',N'ParentId'),
+    (16,N'R06_B',N'R06_C',N'ParentId'),
+    (17,N'R06_C',N'R06_D',N'ParentId'),
+    (18,N'Root07',N'R07_A',N'ParentId'),
+    (19,N'Root07',N'R07_B',N'ParentId'),
+    (20,N'R07_A',N'R07_A1',N'ParentId'),
+    (21,N'R07_A',N'R07_A2',N'ParentId'),
+    (22,N'R07_B',N'R07_B1',N'ParentId'),
+    (23,N'Root08',N'R08_A',N'ParentId'),
+    (24,N'Root08',N'R08_B',N'ParentId'),
+    (25,N'Root08',N'R08_C',N'ParentId');
 
 DECLARE @Nodes TABLE (Name sysname PRIMARY KEY, Position int, IsRoot bit);
 DECLARE @Number int=1;
@@ -159,9 +159,8 @@ UPDATE j SET DateColumn=N'CreatedAt',ArchiveOlderThanDays=30,LastProcessedAt=NUL
 FROM Archive.ArchiveJobs j JOIN @Nodes n ON j.TableName=N'ArchiveScenarioTest.'+n.Name AND n.IsRoot=1
 WHERE j.DatabaseName=@DatabaseName;
 
-DELETE r FROM Archive.ArchiveJobRelations r JOIN Archive.ArchiveJobs j ON j.Id=r.ArchiveJobId
-WHERE j.DatabaseName=@DatabaseName AND j.TableName LIKE N'ArchiveScenarioTest.%';
-INSERT Archive.ArchiveJobRelations(ArchiveJobId,DatabaseName,ParentTable,ChildTable,ParentKeyColumn,ChildKeyColumn)
-SELECT j.Id,@DatabaseName,N'ArchiveScenarioTest.'+e.ParentName,N'ArchiveScenarioTest.'+e.ChildName,N'Id',e.ChildColumn
-FROM @Edges e JOIN Archive.ArchiveJobs j ON j.DatabaseName=@DatabaseName AND
-    j.TableName=N'ArchiveScenarioTest.Root'+RIGHT(N'0'+CONVERT(nvarchar(2),e.RootNumber),2);
+DELETE FROM Archive.ArchiveJobRelations
+WHERE DatabaseName=@DatabaseName AND ParentTable LIKE N'ArchiveScenarioTest.%';
+INSERT Archive.ArchiveJobRelations(DatabaseName,ParentTable,ChildTable,ParentKeyColumn,ChildKeyColumn)
+SELECT @DatabaseName,N'ArchiveScenarioTest.'+ParentName,N'ArchiveScenarioTest.'+ChildName,N'Id',ChildColumn
+FROM @Edges;

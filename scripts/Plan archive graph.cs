@@ -8,17 +8,33 @@
             string root = Convert.ToString(Dts.Variables["User::ParentTableName"].Value);
             string database = Quote(Convert.ToString(Dts.Variables["User::DatabaseName"].Value));
             var edges = ((DataSet)Dts.Variables["User::RelationsData"].Value).Tables[0];
-            var pending = new Dictionary<string, List<DataRow>>(StringComparer.Ordinal);
-            foreach (DataRow edge in edges.Rows)
-            {
-                string child = Quote(Convert.ToString(edge["ChildSchema"])) + "." + Quote(Convert.ToString(edge["ChildTable"]));
-                if (!pending.ContainsKey(child)) pending.Add(child, new List<DataRow>());
-                pending[child].Add(edge);
-            }
             // Use the same quoted representation as relation entries.
             string[] parts = root.Split('.');
             if (parts.Length != 2) throw new InvalidOperationException("Root table must contain schema.table.");
             string rootKey = Quote(parts[0].Trim().Trim('[', ']')) + "." + Quote(parts[1].Trim().Trim('[', ']'));
+            var reachable = new HashSet<string>(StringComparer.Ordinal);
+            reachable.Add(rootKey);
+            bool expanded;
+            do
+            {
+                expanded = false;
+                foreach (DataRow edge in edges.Rows)
+                {
+                    string parent = Quote(Convert.ToString(edge["ParentSchema"])) + "." + Quote(Convert.ToString(edge["ParentTable"]));
+                    if (!reachable.Contains(parent)) continue;
+                    string child = Quote(Convert.ToString(edge["ChildSchema"])) + "." + Quote(Convert.ToString(edge["ChildTable"]));
+                    expanded |= reachable.Add(child);
+                }
+            } while (expanded);
+            var pending = new Dictionary<string, List<DataRow>>(StringComparer.Ordinal);
+            foreach (DataRow edge in edges.Rows)
+            {
+                string parent = Quote(Convert.ToString(edge["ParentSchema"])) + "." + Quote(Convert.ToString(edge["ParentTable"]));
+                if (!reachable.Contains(parent)) continue;
+                string child = Quote(Convert.ToString(edge["ChildSchema"])) + "." + Quote(Convert.ToString(edge["ChildTable"]));
+                if (!pending.ContainsKey(child)) pending.Add(child, new List<DataRow>());
+                pending[child].Add(edge);
+            }
             var indices = new Dictionary<string, int>(StringComparer.Ordinal);
             indices.Add(rootKey, 0);
             var plan = new DataTable();
@@ -46,7 +62,7 @@
                     if (parentsReady) { ready = node.Key; break; }
                 }
                 if (ready == null || indices.ContainsKey(ready))
-                    throw new InvalidOperationException("Archive relations contain a cycle or a parent unreachable from the root.");
+                    throw new InvalidOperationException("Archive relations reachable from the root contain a cycle.");
                 var predicates = new List<string>();
                 foreach (DataRow edge in pending[ready])
                 {

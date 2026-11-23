@@ -60,21 +60,26 @@ INSERT dbo.OrderLines SELECT CONVERT(int,OrderNo)*2,OrderNo,N'first' FROM dbo.Or
 INSERT dbo.OrderLines SELECT CONVERT(int,OrderNo)*2+1,OrderNo,N'second' FROM dbo.Orders;
 CREATE TABLE dbo.OrderNotes(Id int PRIMARY KEY,OrderId bigint NOT NULL REFERENCES dbo.Orders(OrderNo),Payload nvarchar(100));
 INSERT dbo.OrderNotes VALUES(1,1,N'old note'),(2,3002,N'current note');
-INSERT Archive.ArchiveJobRelations(ArchiveJobId,DatabaseName,ChildTable,ParentKeyColumn,ChildKeyColumn)
-VALUES(1,DB_NAME(),N'dbo.OrderLines',N'OrderNo',N'OrderId'),(1,DB_NAME(),N'dbo.OrderNotes',N'OrderNo',N'OrderId');
+INSERT Archive.ArchiveJobRelations(DatabaseName,ChildTable,ParentKeyColumn,ChildKeyColumn,ParentTable)
+VALUES(DB_NAME(),N'dbo.OrderLines',N'OrderNo',N'OrderId',N'dbo.Orders'),(DB_NAME(),N'dbo.OrderNotes',N'OrderNo',N'OrderId',N'dbo.Orders');
 CREATE TABLE dbo.LineDetails(Id int PRIMARY KEY,OrderLineId int NOT NULL REFERENCES dbo.OrderLines(Id),Payload nvarchar(100));
 INSERT dbo.LineDetails SELECT Id,Id,N'detail' FROM dbo.OrderLines;
-INSERT Archive.ArchiveJobRelations(ArchiveJobId,DatabaseName,ChildTable,ParentKeyColumn,ChildKeyColumn,ParentTable)
-VALUES(1,DB_NAME(),N'dbo.LineDetails',N'Id',N'OrderLineId',N'dbo.OrderLines');
+INSERT Archive.ArchiveJobRelations(DatabaseName,ChildTable,ParentKeyColumn,ChildKeyColumn,ParentTable)
+VALUES(DB_NAME(),N'dbo.LineDetails',N'Id',N'OrderLineId',N'dbo.OrderLines');
 CREATE TABLE dbo.SharedDetails(Id int PRIMARY KEY,LineId int NOT NULL REFERENCES dbo.OrderLines(Id),NoteId int NOT NULL REFERENCES dbo.OrderNotes(Id));
 INSERT dbo.SharedDetails VALUES(1,2,1),(2,6004,2);
-INSERT Archive.ArchiveJobRelations(ArchiveJobId,DatabaseName,ChildTable,ParentKeyColumn,ChildKeyColumn,ParentTable)
-VALUES(1,DB_NAME(),N'dbo.SharedDetails',N'Id',N'LineId',N'dbo.OrderLines'),
-      (1,DB_NAME(),N'dbo.SharedDetails',N'Id',N'NoteId',N'dbo.OrderNotes');
+INSERT Archive.ArchiveJobRelations(DatabaseName,ChildTable,ParentKeyColumn,ChildKeyColumn,ParentTable)
+VALUES(DB_NAME(),N'dbo.SharedDetails',N'Id',N'LineId',N'dbo.OrderLines'),
+      (DB_NAME(),N'dbo.SharedDetails',N'Id',N'NoteId',N'dbo.OrderNotes');
+-- Unrelated cycles and an incoming edge from an unreachable parent must stay outside this root's graph.
+INSERT Archive.ArchiveJobRelations(DatabaseName,ParentTable,ChildTable,ParentKeyColumn,ChildKeyColumn)
+VALUES(DB_NAME(),N'dbo.UnrelatedA',N'dbo.UnrelatedB',N'Id',N'ParentId'),
+      (DB_NAME(),N'dbo.UnrelatedB',N'dbo.UnrelatedA',N'Id',N'ParentId'),
+      (DB_NAME(),N'dbo.UnreachableParent',N'dbo.SharedDetails',N'Id',N'LineId');
 "@
         [void]$cmd.ExecuteNonQuery()
         if($RelatedFailure -eq 'Cycle') {
-            $cmd.CommandText="UPDATE Archive.ArchiveJobRelations SET ParentTable=N'dbo.LineDetails' WHERE ChildTable=N'dbo.OrderLines';"
+            $cmd.CommandText="INSERT Archive.ArchiveJobRelations(DatabaseName,ParentTable,ChildTable,ParentKeyColumn,ChildKeyColumn) VALUES(DB_NAME(),N'dbo.LineDetails',N'dbo.OrderLines',N'Id',N'Id');"
             [void]$cmd.ExecuteNonQuery()
         }
         if($RelatedFailure -eq 'Delete') {
