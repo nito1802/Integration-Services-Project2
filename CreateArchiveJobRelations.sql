@@ -237,3 +237,62 @@ ORDER BY
     ForeignKeyName,
     fc.constraint_column_id
 OPTION (MAXRECURSION 32767);
+
+
+
+
+
+
+------------------------
+
+
+INSERT INTO Archive.ArchiveJobRelations (
+    DatabaseName,
+    ParentTable,
+    ChildTable,
+    ParentKeyColumn,
+    ChildKeyColumn
+)
+VALUES
+(
+    N'360_genericsignature_dev01',
+    N'dbo.Processes',
+    N'dbo.AutentiProcesses',
+    N'Id',
+    N'ProcessId'
+),
+(
+    N'360_genericsignature_dev01',
+    N'dbo.Processes',
+    N'dbo.CallProcesses',
+    N'Id',
+    N'ProcessId'
+),
+(
+    N'360_genericsignature_dev01',
+    N'dbo.Processes',
+    N'dbo.EkProcesses',
+    N'Id',
+    N'ProcessId'
+),
+(
+    N'360_genericsignature_dev01',
+    N'dbo.Processes',
+    N'dbo.ProcessData',
+    N'Id',
+    N'ProcessId'
+),
+(
+    N'360_genericsignature_dev01',
+    N'dbo.AutentiProcesses',
+    N'dbo.AutentiRecipients',
+    N'EnvelopeId',
+    N'EnvelopeId'
+),
+(
+    N'360_genericsignature_dev01',
+    N'dbo.EkProcesses',
+    N'dbo.EkProcessHistories',
+    N'Id',
+    N'ProcessId'
+);
