@@ -108,3 +108,41 @@ VALUES
     (N'aa360_genericsignature_dev01',N'dbo.Processes',N'dbo.AutentiProcesses',N'Id',N'ProcessId'),
     (N'aa360_genericsignature_dev01',N'dbo.AutentiProcesses',N'dbo.AutentiRecipients',N'EnvelopeId',N'EnvelopeId');
 */
+
+
+INSERT INTO Archive.ArchiveJobRelations (
+    DatabaseName,
+    ParentTable,
+    ChildTable,
+    ParentKeyColumn,
+    ChildKeyColumn
+)
+VALUES
+(
+    N'aa360_genericsignature_dev01',
+    N'dbo.Processes',
+    N'dbo.AutentiProcesses',
+    N'Id',
+    N'ProcessId'
+),
+(
+    N'aa360_genericsignature_dev01',
+    N'dbo.AutentiProcesses',
+    N'dbo.AutentiRecipients',
+    N'EnvelopeId',
+    N'EnvelopeId'
+);
+
+
+INSERT INTO Archive.ArchiveJobs (
+    DatabaseName,
+    TableName,
+    DateColumn,
+    ArchiveOlderThanDays
+)
+VALUES (
+    N'aa360_genericsignature_dev01',
+    N'dbo.Processes',
+    N'CreationDate',
+    30
+);
