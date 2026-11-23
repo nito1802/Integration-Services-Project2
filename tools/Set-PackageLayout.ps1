@@ -27,6 +27,7 @@ function Place($id,$x,$y,$width=210,$height=46,$container=$false) {
 }
 # Coordinates are relative to the containing panel.
 Place 'Package\Prepare job queries' 32 24
+Place 'Package\Initialize run log' 310 24
 Place 'Package\Load archive jobs' 32 120
 Place 'Package\For each archive job' 32 216 1100 2300 $true
 Place 'Package\Check overall archive result' 32 2566

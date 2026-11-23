@@ -11,7 +11,7 @@ $currentNs=New-Object Xml.XmlNamespaceManager($current.NameTable)
 $currentNs.AddNamespace('DTS','www.microsoft.com/SqlServer/Dts')
 $currentValues=@{}
 $currentParameterIds=@{}
-foreach($name in @('ConnectionString','ArchiveJobsTable','ArchiveJobRelationsTable','ArchiveRoot','MaxRecordsPerCsv')) {
+foreach($name in @('ConnectionString','ArchiveJobsTable','ArchiveJobRelationsTable','ArchiveRoot','LogFolder','MaxRecordsPerCsv')) {
     $valueNode=$current.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="'+$name+'"]/DTS:Property[@DTS:Name="ParameterValue"]',$currentNs)
     if($valueNode) { $currentValues[$name]=$valueNode.InnerText; $currentParameterIds[$name]=$valueNode.ParentNode.GetAttribute('DTSID','www.microsoft.com/SqlServer/Dts') }
 }
@@ -36,6 +36,11 @@ foreach($name in @('JobsSelectSql','JobStartSql','JobResultSql','TableName','Col
 foreach($name in @('DeletedRows','DayRows','DayExportedRows','GroupExpectedRows')) { Add-Variable $name ([long]0) }
 foreach($name in @('Days','ArchiveJobId','FailedJobs','MemberIndex')) { Add-Variable $name ([int]0) }
 Add-Variable 'BatchNumber' ([long]0)
+Add-Variable 'RunLogFile' ''
+Add-Variable 'RunSummaryFile' ''
+foreach($name in @('RunStartedTicks','JobStartedTicks','MemberStartedTicks')) { Add-Variable $name ([long]0) }
+Add-Variable 'JobNumber' 0
+Add-Variable 'DayNumber' 0
 Add-Variable 'CurrentDateFrom' ([datetime]'2000-01-01')
 Add-Variable 'CurrentDateTo' ([datetime]'2000-01-01')
 Add-Variable 'DayHasFiles' $false
@@ -46,7 +51,7 @@ foreach($obsolete in @('TableName','DateColumn','OlderThanDays','OutputFile','Se
 $p=$package.Parameters.Add('ArchiveRoot',[TypeCode]::String); $p.Value=$archiveRoot
 if($currentValues.ContainsKey('ConnectionString')) { $package.Parameters['ConnectionString'].Value=$currentValues['ConnectionString'] }
 if($currentValues.ContainsKey('ArchiveRoot')) { $package.Parameters['ArchiveRoot'].Value=$currentValues['ArchiveRoot'] }
-foreach($entry in @(@('ArchiveJobsTable',[TypeCode]::String,'nito_superDb.Archive.ArchiveJobs'),@('ArchiveJobRelationsTable',[TypeCode]::String,'nito_superDb.Archive.ArchiveJobRelations'),@('MaxRecordsPerCsv',[TypeCode]::Int32,1000))) {
+foreach($entry in @(@('ArchiveJobsTable',[TypeCode]::String,'nito_superDb.Archive.ArchiveJobs'),@('ArchiveJobRelationsTable',[TypeCode]::String,'nito_superDb.Archive.ArchiveJobRelations'),@('LogFolder',[TypeCode]::String,'C:\ArchiveLogs'),@('MaxRecordsPerCsv',[TypeCode]::Int32,1000))) {
     $p=$package.Parameters.Add($entry[0],$entry[1]); $p.Value=$entry[2]
     if($currentValues.ContainsKey($entry[0])) { $p.Value=[Convert]::ChangeType($currentValues[$entry[0]],$entry[1]) }
 }
@@ -75,6 +80,12 @@ function Add-Sql($container,$name,$connectionName,$sql,$result='None',$variableS
     if($variableSource) { $task.SqlStatementSourceType=[Enum]::Parse($task.SqlStatementSourceType.GetType(),'Variable') }
     $task.ResultSetType=[Enum]::Parse($task.ResultSetType.GetType(),'ResultSetType_'+$result)
     $task.TimeOut=300
+    foreach($event in @(@('OnPreExecute','SQL START'),@('OnPostExecute','SQL END'),@('OnError','SQL ERROR'))) {
+        $handler=$hostTask.EventHandlers.Add($event[0]); $handler.MaximumErrorCount=0
+        $logger=Add-Script $handler ('Log '+$name+' '+$event[0]) '' ''
+        $definition=$scriptDefinitions[$scriptDefinitions.Count-1]
+        $definition.SqlProgress=$event[1]
+    }
     return $hostTask
 }
 function Bind-Input($hostTask,$parameter,$variable,[System.Data.DbType]$type,$size=-1) {
@@ -91,10 +102,12 @@ function Job-Sql($hostTask,$handlerName,$skipAfterError=$true) {
     # OnError records the job failure. The scheduler can then reach Save job result.
     $hostTask.ForceExecutionResult=[Microsoft.SqlServer.Dts.Runtime.DTSForcedExecResult]::Success
     if($skipAfterError) { $hostTask.SetExpression('Disable','@[User::JobFailed]') }
-    $handler=$hostTask.EventHandlers.Add('OnError'); $handler.MaximumErrorCount=0
+    $handler=$hostTask.EventHandlers['OnError']; $handler.MaximumErrorCount=0
     [void](Add-Script $handler $handlerName 'System::ErrorDescription' 'System::Propagate')
 }
 $prepareQueries=Add-Script $package 'Prepare job queries' '$Package::ArchiveJobsTable,$Package::ArchiveJobRelationsTable' 'User::JobsSelectSql,User::JobStartSql,User::JobResultSql'
+$initializeLog=Add-Script $package 'Initialize run log' '' ''
+Link $package $initializeLog $prepareQueries
 $getSettings=Add-Sql $package 'Load archive jobs' 'ArchiveDb' 'User::JobsSelectSql' 'Rowset' $true
 Link $package $prepareQueries $getSettings
 Bind-Result $getSettings '0' 'User::Tables'
@@ -248,9 +261,20 @@ foreach($definition in $scriptDefinitions) {
     $newName='ST_'+[Guid]::NewGuid().ToString('N')
     $projectNode.SetAttribute('Name',$newName)
     $projectNode.SetAttribute('VSTAMajorVersion',[string]$scriptMajor)
-    $sourceName=if($definition.Name -in @('Create daily ZIP','Verify ZIP integrity')) { 'Run ZIP process' } elseif($definition.Name -like 'Capture * error') { 'Capture SQL error' } elseif($definition.Name -eq 'Prepare member export schema') { 'Prepare export schema and header' } else { $definition.Name }
+    $sourceName=if($definition.SqlProgress) { 'Log SQL progress' } elseif($definition.Name -in @('Create daily ZIP','Verify ZIP integrity')) { 'Run ZIP process' } elseif($definition.Name -like 'Capture * error') { 'Capture SQL error' } elseif($definition.Name -eq 'Prepare member export schema') { 'Prepare export schema and header' } else { $definition.Name }
     $main=Get-Content -LiteralPath (Join-Path $root ('scripts\'+$sourceName+'.cs')) -Raw
     if($definition.HandleJobError) { $main=Get-JobScriptSource $main }
+    if($definition.SqlProgress) {
+        $detail=if($definition.SqlProgress -eq 'SQL ERROR') {'Convert.ToString(Dts.Variables["System::ErrorDescription"].Value)'}else{'""'}
+        $main=$main.Replace('__SQL_STATE__',$definition.SqlProgress).Replace('__SQL_DETAIL__',$detail)
+    } elseif($definition.Name -ne 'Initialize run log' -and $definition.Name -notlike 'Capture * error') {
+        $main=Get-ProgressScriptSource $main $definition.Name $definition.HandleJobError
+        $main+="`r`n"+(Get-Content (Join-Path $root 'scripts/Progress context.cs') -Raw)
+    }
+    $main+="`r`n"+(Get-Content (Join-Path $root 'scripts/Progress logging.cs') -Raw)
+    if(!$definition.SqlProgress -and $definition.Name -notlike 'Capture * error') {
+        $main+="`r`n"+(Get-Content (Join-Path $root 'scripts/Summary logging.cs') -Raw)
+    }
     $access=Get-ScriptVariableAccess $main
     $projectNode.SetAttribute('ReadOnlyVariables',$access.Read)
     $projectNode.SetAttribute('ReadWriteVariables',$access.Write)
@@ -289,12 +313,12 @@ if (!$CompatibilityTest) {
     $projectNs.AddNamespace('SSIS','www.microsoft.com/SqlServer/SSIS')
     foreach($target in $projectXml.SelectNodes('//TargetServerVersion')) { $target.InnerText=$TargetServerVersion }
     foreach($parameterNode in @($projectXml.SelectNodes('//SSIS:PackageMetaData/SSIS:Parameters/SSIS:Parameter',$projectNs))) {
-        if($parameterNode.GetAttribute('Name','www.microsoft.com/SqlServer/SSIS') -notin @('ConnectionString','ArchiveJobsTable','ArchiveJobRelationsTable','ArchiveRoot','MaxRecordsPerCsv')) {
+        if($parameterNode.GetAttribute('Name','www.microsoft.com/SqlServer/SSIS') -notin @('ConnectionString','ArchiveJobsTable','ArchiveJobRelationsTable','ArchiveRoot','LogFolder','MaxRecordsPerCsv')) {
             [void]$parameterNode.ParentNode.RemoveChild($parameterNode)
         }
     }
     $parameterList=$projectXml.SelectSingleNode('//SSIS:PackageMetaData/SSIS:Parameters',$projectNs)
-    foreach($parameterName in @('ConnectionString','ArchiveJobsTable','ArchiveJobRelationsTable','ArchiveRoot','MaxRecordsPerCsv')) {
+    foreach($parameterName in @('ConnectionString','ArchiveJobsTable','ArchiveJobRelationsTable','ArchiveRoot','LogFolder','MaxRecordsPerCsv')) {
         $node=$parameterList.SelectSingleNode('SSIS:Parameter[@SSIS:Name="'+$parameterName+'"]',$projectNs)
         if(!$node) {
             $node=$parameterList.SelectSingleNode('SSIS:Parameter[@SSIS:Name="ConnectionString"]',$projectNs).CloneNode($true)

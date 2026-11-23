@@ -52,7 +52,7 @@ VALUES(1,DB_NAME(),N'',N'dbo.Lines',N'OrderNo',N'OrderId'),
     $logPath=(Join-Path $config.RunDirectory 'seed-other.ldf').Replace("'","''")
     $cmd.CommandText="CREATE DATABASE [$other] ON PRIMARY (NAME=N'OtherData',FILENAME=N'$dataPath') LOG ON (NAME=N'OtherLog',FILENAME=N'$logPath');"
     [void]$cmd.ExecuteNonQuery()
-    $seed=(Get-Content (Join-Path $root 'Integration Services Project2.Console/SeedAll.sql') -Raw).
+    $seed=(Get-Content (Join-Path $root 'tools/ArchiveScenarioFixture.sql') -Raw).
         Replace('nito_superDb',$config.Database).Replace('nito_SomeApps',$other)
     [void]$cmd.Parameters.Add('@DatabaseName',[Data.SqlDbType]::NVarChar,128)
     $firstIds=$null

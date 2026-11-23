@@ -49,6 +49,7 @@ EXEC SSISDB.catalog.set_execution_parameter_value @execution_id=@execution,@obje
 EXEC SSISDB.catalog.set_execution_parameter_value @execution_id=@execution,@object_type=30,@parameter_name=N'ArchiveJobsTable',@parameter_value=N'__DATABASE__.Archive.ArchiveJobs';
 EXEC SSISDB.catalog.set_execution_parameter_value @execution_id=@execution,@object_type=30,@parameter_name=N'ArchiveJobRelationsTable',@parameter_value=N'__DATABASE__.Archive.ArchiveJobRelations';
 EXEC SSISDB.catalog.set_execution_parameter_value @execution_id=@execution,@object_type=30,@parameter_name=N'ArchiveRoot',@parameter_value=N'__ARCHIVE__';
+EXEC SSISDB.catalog.set_execution_parameter_value @execution_id=@execution,@object_type=30,@parameter_name=N'LogFolder',@parameter_value=N'__ARCHIVE__\logs';
 DECLARE @limit int=1000,@logging smallint=1,@synchronous bit=1;
 EXEC SSISDB.catalog.set_execution_parameter_value @execution_id=@execution,@object_type=30,@parameter_name=N'MaxRecordsPerCsv',@parameter_value=@limit;
 EXEC SSISDB.catalog.set_execution_parameter_value @execution_id=@execution,@object_type=50,@parameter_name=N'LOGGING_LEVEL',@parameter_value=@logging;

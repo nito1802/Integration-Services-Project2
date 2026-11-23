@@ -116,7 +116,7 @@ if($MultiDatabase) {
         [void]$cmd.ExecuteNonQuery()
         $cmd.CommandText='DELETE FROM Archive.ArchiveJobs;'
         [void]$cmd.ExecuteNonQuery()
-        $seed=(Get-Content (Join-Path $root 'Integration Services Project2.Console/SeedAll.sql') -Raw).
+        $seed=(Get-Content (Join-Path $root 'tools/ArchiveScenarioFixture.sql') -Raw).
             Replace('nito_superDb',$config.Database).Replace('nito_SomeApps',$otherDatabase)
         $transaction=$db.BeginTransaction()
         $cmd.Transaction=$transaction

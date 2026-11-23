@@ -1,77 +1,67 @@
-# Wspólny seed testów archiwizacji
+# Seed GenericSignature
 
-Uruchom projekt bez argumentów albo przez F5 w Visual Studio:
+Uruchom Console bez argumentów lub przez F5:
 
 ```powershell
 dotnet run --project "Integration Services Project2.Console"
 ```
 
-Program wykonuje jedną metodę `TestDataSeeder.SeedAsync()`. Połączenie pochodzi
-z `ConnectionStrings:ArchiveJobsDatabase`. Konfiguracja zadań i relacji znajduje
-się w `nito_superDb.Archive`, a tabele źródłowe w bazach `nito_superDb`
-i `nito_SomeApps` na tym samym serwerze. Obie bazy muszą istnieć.
+Domyślnie Program.cs uruchamia TestDataSeeder.LittleSeedAsync(). Pełny zestaw
+można odtworzyć przez zmianę wywołania na TestDataSeeder.SeedAsync(). Obie metody
+korzystają ze wspólnego modelu, konfiguracji i generatora relacji. Połączenie pochodzi z
+ConnectionStrings:ArchiveJobsDatabase w appsettings.json projektu Database.
+Źródła powstają w nito_superDb i nito_SomeApps na tym samym serwerze.
+Konfiguracja pozostaje w nito_superDb.Archive.
 
-## Dane tworzone w każdej bazie
+Każda baza otrzymuje schemat GenericSignatureTest: Processes,
+AutentiProcesses, AutentiRecipients, CallProcesses, ProcessData,
+EkdProcesses, EkdProcessHistories oraz słowniki ProcessTypes i EkdStatuses.
+Model EF jest w katalogu GenericSignature w Console. Pola, długości, nullable
+i relacje odtworzono ze zdjęć. Definicji słowników nie było na zdjęciach:
+przyjęto Id i Name. Enumy Autenti mają testowe wartości 0–3. Dla EnvelopeId
+przyjęto ograniczenie klucza EF do 450 znaków. AutentiRecipients ma klucz
+złożony EnvelopeId + Email; RecipientId jest osobnym polem.
 
-| Obiekt | Liczba |
-|---|---:|
-| Zadania dla tabel głównych Root01–Root40 | 40 |
-| Relacje | 25 |
-| Tabele główne i zależne w ArchiveScenarioTest | 64 |
-| Rekordy danych testowych | 189 |
+Pełny SeedAsync obejmuje 2023-01-01 do dnia uruchomienia. Około 95,7% dni zawiera dane:
+zwykle 1–9 procesów, okresowo 35, co 23 dni jeden dzień jest pusty.
+Procesy mają 0–2 rekordy Autenti i Ekd, odbiorców, historie, opcjonalne
+CallProcesses i 1–4 ProcessData. Dane są syntetyczne; adresy używają
+example.invalid. Rozkład dat i liczby są powtarzalne, GUID-y są nowe.
+Indeksy obejmują CreationDate i klucze obce.
 
-Łącznie seed utrzymuje 80 własnych zadań i 50 własnych relacji.
-Wcześniejsze zadania oraz inne schematy zachowują swoje dane.
-Dlatego całkowita liczba wpisów konfiguracji może być większa.
+LittleSeedAsync zastępuje dane w tych samych tabelach małym zestawem:
+3 i 5 stycznia, 7 i 9 marca oraz 12 i 14 czerwca 2023. W kolejnych dniach jest
+3, 4, 5, 6, 3 i 4 procesy (łącznie 25 na bazę), z pełnym drzewem zależności.
+Nie pozostawia danych z pełnego seeda. Wszystkie sześć dni kwalifikuje się do
+archiwizacji; pakiet może pomijać przerwy między miesiącami. Pliki archiwów
+z wcześniejszych uruchomień pozostają zachowane.
 
-## Scenariusze
+W ArchiveJobs powstaje jeden job na bazę: GenericSignatureTest.Processes,
+CreationDate, retencja 30 dni. Sześć relacji na bazę obejmuje drzewo:
 
-- Root01 ma dziecko z relacją jeden-do-wielu.
-- Root02 ma dziecko i wnuki.
-- Root03 tworzy łańcuch czterech tabel.
-- Root04 ma trzy tabele dzieci.
-- Root05 rozgałęzia się na Left i Right, które wskazują wspólne Shared.
-  Rekord Shared pasujący przez obie relacje jest eksportowany raz.
-- Root06 tworzy łańcuch pięciu tabel.
-- Root07 ma dwie gałęzie z kolejnymi dziećmi.
-- Root08 ma trzy tabele dzieci.
-- Root09–Root38 to samodzielne tabele z datą.
-- Root39 zawiera wyłącznie świeże rekordy.
-- Root40 pozostaje pusta.
+- Processes → AutentiProcesses → AutentiRecipients
+- Processes → EkdProcesses → EkdProcessHistories
+- Processes → CallProcesses
+- Processes → ProcessData
 
-Retencja wynosi 30 dni. Zwykły rodzic ma rekordy sprzed 60 i 59 dni oraz
-jeden dzisiejszy. Dzieci mają po dwa rekordy wskazujące starego rodzica
-i jeden wskazujący świeżego. Tabele zależne nie mają dat.
-Wszystkie FK mają ON DELETE NO ACTION, a kolumny FK są indeksowane.
+Słowniki pozostają w źródle. Ponowienie usuwa dane GenericSignatureTest,
+zasila je od nowa, resetuje statusy jego jobów i odtwarza relacje.
+Id jobów pozostają stabilne. Usuwane są też stare tabele i schemat
+ArchiveScenarioTest oraz ich wpisy Jobs/Relations. Inne schematy, zadania
+i pliki archiwów pozostają zachowane. Uruchamiaj przy zatrzymanym pakiecie.
 
-Po poprawnej archiwizacji z każdej bazy powinny zostać wyeksportowane
-124 rekordy, a w źródle pozostać 65 rekordów. Każda baza ma identyczne
-nazwy tabel i klucze, co pozwala sprawdzić rozdzielenie danych po DatabaseName.
+Każda baza wraz ze swoją konfiguracją ma osobną transakcję. Przy błędzie
+drugiej bazy pierwsza może być już zatwierdzona; ponowienie odtwarza obie.
+Seeder uruchamia wyłącznie migrację relacji z CreateArchiveJobRelations.sql,
+pomijając dopisane pod nią ręczne przykłady i zapytania diagnostyczne.
 
-## Konfiguracja i ponowienie
+Stare scenariusze są wyłącznie fixture w tools/ArchiveScenarioFixture.sql
+na potrzeby istniejących testów regresyjnych SSIS. Console ich nie uruchamia.
 
-ArchiveJobRelations przechowuje DatabaseName, ParentTable,
-ChildTable, ParentKeyColumn i ChildKeyColumn. Nazwy tabel mają format
-schema.Tabela. Pakiet pobiera relacje dla DatabaseName zadania i przechodzi od jego TableName po kolejnych ParentTable → ChildTable.
-Relacje są wspólne dla zadań dotyczących tych samych tabel. Migracja uzupełnia stare puste ParentTable i DatabaseName z ArchiveJobs, scala duplikaty oraz usuwa ArchiveJobId i powiązany FK. Usunięcie zadania zachowuje konfigurację relacji.
-Parametr pakietu ArchiveJobRelationsTable wskazuje tabelę relacji niezależnie
-od ArchiveJobsTable. Przyjmuje schema.Tabela albo baza.schema.Tabela.
-Domyślna wartość w projekcie to nito_superDb.Archive.ArchiveJobRelations.
-
-Uruchamiaj seed przy zatrzymanym pakiecie. Ponowienie odtwarza dane
-ArchiveScenarioTest w obu bazach, resetuje statusy jego zadań i odtwarza
-jego relacje. Identyfikatory zadań pozostają stabilne.
-Odtworzenie obu baz i konfiguracji wykonuje się w jednej transakcji.
-Aktualizacja struktury ArchiveJobRelations poprzedza tę transakcję.
-
-## Weryfikacja w izolowanych bazach
+Weryfikacja zasianych danych (tylko odczyt):
 
 ```powershell
-powershell -NoProfile -File tools/Create-TestDatabase.ps1
-powershell -NoProfile -File tools/Build-Package.ps1 -CompatibilityTest
-powershell -NoProfile -File tools/Verify-SqlTasks.ps1 -MultiDatabase
+powershell -NoProfile -File tools/Verify-GenericSignatureSeed.ps1
 ```
 
-Test wykonuje rzeczywiste zadania SQL i kod skryptów pakietu na dwóch LocalDB,
-sprawdza 80 statusów Success, zawartość ZIP-ów, brak powtórzonych kluczy
-oraz liczbę rekordów pozostałych w obu bazach.
+Dla małego zestawu dodaj przełącznik `-Little`.

@@ -1,0 +1,36 @@
+<Window x:Class="ArchiveRelationsGenerator.Wpf.MainWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Generator relacji archiwizacji" Width="1180" Height="790" MinWidth="850" MinHeight="580" WindowStartupLocation="CenterScreen">
+ <Grid Margin="32">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <StackPanel Margin="0,0,0,24">
+   <TextBlock Text="ARCHIVE / NARZĘDZIA" Foreground="#187C79" FontWeight="SemiBold" FontSize="12"/>
+   <TextBlock Text="Z wyników SSMS do INSERT-a" FontSize="29" FontWeight="SemiBold" Margin="0,6,0,8"/>
+   <TextBlock Text="Skopiuj wyniki zapytania o zależności (Copy with Headers) i wklej je poniżej." Foreground="#586B80" FontSize="14"/>
+  </StackPanel>
+  <Grid Grid.Row="1" Margin="0,0,0,20">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+   <StackPanel Margin="0,0,24,0">
+    <Label Content="Baza źródłowa" Target="{Binding ElementName=DatabaseText}" Padding="0,0,0,6" FontWeight="SemiBold"/>
+    <TextBox x:Name="DatabaseText" MaxLength="128" ToolTip="Np. nito_superDb lub 360_genericsignature_dev01. Bez nawiasów i apostrofów."/>
+   </StackPanel>
+   <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
+    <Button Content="Wczytaj przykład" Click="Example_Click" Margin="0,0,10,0"/>
+    <Button Content="Wklej ze schowka" Click="Paste_Click"/>
+   </StackPanel>
+  </Grid>
+  <Grid Grid.Row="2">
+   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+   <Label Content="Wynik zapytania — wiersze relacji" Target="{Binding ElementName=InputText}" Padding="0,0,0,8" FontWeight="SemiBold"/>
+   <TextBox x:Name="InputText" Grid.Row="1" AcceptsReturn="True" AcceptsTab="True" FontFamily="Consolas" FontSize="13"
+    HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" TextWrapping="NoWrap" SpellCheck.IsEnabled="False"/>
+  </Grid>
+  <TextBlock x:Name="ValidationText" Grid.Row="3" Foreground="#AC3434" TextWrapping="Wrap" Margin="0,12,0,0" AutomationProperties.LiveSetting="Polite"/>
+  <Grid Grid.Row="4" Margin="0,18,0,0">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+   <TextBlock Text="Generuje SQL lokalnie. Nie łączy się z bazą i nie wykonuje INSERT-a." TextWrapping="Wrap" Margin="0,0,24,0" Foreground="#586B80" VerticalAlignment="Center"/>
+   <Button x:Name="GenerateButton" Grid.Column="1" Content="Generuj INSERT  →" HorizontalAlignment="Right" Background="#126D6A" Foreground="White" FontWeight="SemiBold" Click="Generate_Click"/>
+  </Grid>
+ </Grid>
+</Window>

@@ -158,3 +158,44 @@ Wyniki aktualnego przepływu z kopią dnia i DELETE po ZIP: `verification/daily-
 Parametr `ArchiveJobsTable` dotyczy pakietu SSIS. Projekty EF/Console zachowują własne mapowanie tabeli; po wybraniu innej tabeli w pakiecie trzeba dodawać zadania do tej właśnie tabeli.
 
 Test parametru tabeli i skryptu bez tworzenia schematu: `.\tools\Verify-JobsTableParameter.ps1`. Obsługiwane formaty to `schemat.tabela` oraz `baza.schemat.tabela`; kropki wewnątrz samych nazw nie są obsługiwane.
+
+## Log postępu każdego uruchomienia
+
+Parametr pakietu `LogFolder` domyślnie wskazuje `C:\ArchiveLogs`.
+Na maszynie wykonującej SSIS powstają dwa pliki ze wspólnym prefiksem:
+`archive_yyyyMMdd_HHmmss_<guid>_details.txt` oraz
+`archive_yyyyMMdd_HHmmss_<guid>_summary.txt` dla każdego uruchomienia, również przy
+uruchamianiu z SQL Server Agent. Folder jest tworzony automatycznie;
+konto wykonujące pakiet musi mieć do niego prawo zapisu.
+
+Log details UTF-8 zawiera timestamp z przesunięciem strefy, START/END skryptów,
+SQL START/SQL END/SQL ERROR, czasy skryptów w ms, job X/Y, tabelę, dzień,
+numer dnia w jobie, indeks tabeli w grupie (od 0), rekordy wyeksportowane/wybrane,
+planowaną liczbę tabel oraz JOB END i RUN SUCCESS/RUN ERROR.
+Licznik dni dotyczy dni już rozpoczętych; nie jest prognozą czasu zakończenia.
+Brak końcowego wpisu RUN może oznaczać przerwanie procesu lub błąd przed
+końcowym sprawdzeniem. SQL END oznacza wyjście z etapu; błędy są osobnymi
+wpisami SQL ERROR. Wynik joba jest we wpisie JOB END.
+
+Każdy zapis otwiera i zamyka plik z FileShare.ReadWrite/Delete. Zapisy
+w ramach runa są synchronizowane niezależnie od blokad zmiennych SSIS.
+Można czytać plik w trakcie wykonania:
+
+```powershell
+Get-Content 'C:\ArchiveLogs\archive_..._summary.txt' -Tail 30 -Wait
+```
+
+Nieudane utworzenie pliku na początku zatrzymuje pakiet przed operacjami SQL.
+Błąd dopisywania później jest ostrzeżeniem SSIS i nie zmienia wyniku
+zatwierdzonej archiwizacji. Logi nie są automatycznie usuwane.
+
+Summary jest dopisywany na bieżąco: RUN START, JOB START, TABLE START,
+TABLE END, JOB END, RUN END. Każdy wpis END zawiera `elapsedMs` oraz czytelny
+`duration` (dni.godziny:minuty:sekundy). TABLE END dotyczy tabeli w jednym dniu:
+obejmuje przygotowanie metadanych i snapshotu, eksport CSV, kompresję i test ZIP.
+Jego status Success oznacza udany eksport/test ZIP; usuwanie źródła jest wspólne
+dla grupy i jego wynik jest uwzględniony w JOB END. JOB END mierzy job od
+inicjalizacji po zapis wyniku, wraz z zależnościami, usuwaniem i sprzątaniem.
+RUN END obejmuje cały pakiet od inicjalizacji logów. Pusta tabela także ma JOB END.
+Czasy pochodzą z monotonicznego Stopwatch; zmiana zegara systemowego ich nie zaburza.
+Awaryjne zakończenie procesu może pozostawić wpis START bez odpowiadającego END.

@@ -10,7 +10,6 @@
     <ProjectReference Include="../Integration Services Project2.Database/Integration Services Project2.Database.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="SeedAll.sql" />
     <EmbeddedResource Include="../CreateArchiveJobRelations.sql" Link="CreateArchiveJobRelations.sql" />
     <None Include="../Integration Services Project2.Database/appsettings.json" Link="appsettings.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
