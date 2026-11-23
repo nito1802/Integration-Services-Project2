@@ -146,3 +146,94 @@ VALUES (
     N'CreationDate',
     30
 );
+
+
+
+DECLARE @StartTable nvarchar(257) = N'dbo.Processes';
+DECLARE @Children bit = 1;
+
+DECLARE @RootId int = OBJECT_ID(@StartTable, N'U');
+
+IF @RootId IS NULL
+    THROW 50001, 'Nie znaleziono tabeli w bieżącej bazie.', 1;
+
+;WITH Edges AS (
+    SELECT
+        fk.object_id AS ForeignKeyId,
+        CASE WHEN @Children = 1
+            THEN fk.referenced_object_id
+            ELSE fk.parent_object_id
+        END AS FromId,
+        CASE WHEN @Children = 1
+            THEN fk.parent_object_id
+            ELSE fk.referenced_object_id
+        END AS ToId
+    FROM sys.foreign_keys fk
+),
+Dependencies AS (
+    SELECT
+        1 AS Depth,
+        e.ForeignKeyId,
+        e.ToId,
+        CAST(
+            '/' + CONVERT(varchar(11), @RootId) +
+            '/' + CONVERT(varchar(11), e.ToId) + '/'
+            AS varchar(max)
+        ) AS ObjectPath,
+        CAST(CASE WHEN e.ToId = @RootId THEN 1 ELSE 0 END AS bit) AS IsCycle
+    FROM Edges e
+    WHERE e.FromId = @RootId
+
+    UNION ALL
+
+    SELECT
+        d.Depth + 1,
+        e.ForeignKeyId,
+        e.ToId,
+        CAST(
+            d.ObjectPath + CONVERT(varchar(11), e.ToId) + '/'
+            AS varchar(max)
+        ),
+        CAST(CASE
+            WHEN CHARINDEX(
+                '/' + CONVERT(varchar(11), e.ToId) + '/',
+                d.ObjectPath
+            ) > 0 THEN 1 ELSE 0
+        END AS bit)
+    FROM Dependencies d
+    JOIN Edges e ON e.FromId = d.ToId
+    WHERE d.IsCycle = 0
+)
+SELECT
+    d.Depth AS Poziom,
+    fk.name AS ForeignKeyName,
+
+    QUOTENAME(OBJECT_SCHEMA_NAME(fk.referenced_object_id)) +
+        '.' + QUOTENAME(OBJECT_NAME(fk.referenced_object_id))
+        AS ParentTable,
+
+    COL_NAME(fc.referenced_object_id, fc.referenced_column_id)
+        AS ParentKeyColumn,
+
+    QUOTENAME(OBJECT_SCHEMA_NAME(fk.parent_object_id)) +
+        '.' + QUOTENAME(OBJECT_NAME(fk.parent_object_id))
+        AS ChildTable,
+
+    COL_NAME(fc.parent_object_id, fc.parent_column_id)
+        AS ChildKeyColumn,
+
+    fc.constraint_column_id AS ColumnPosition,
+    fk.delete_referential_action_desc AS DeleteRule,
+    fk.is_disabled AS IsDisabled,
+    d.IsCycle
+FROM Dependencies d
+JOIN sys.foreign_keys fk ON fk.object_id = d.ForeignKeyId
+JOIN sys.foreign_key_columns fc
+    ON fc.constraint_object_id = fk.object_id
+ORDER BY
+    d.Depth,
+    ParentTable,
+    ChildTable,
+    ForeignKeyName,
+    fc.constraint_column_id
+OPTION (MAXRECURSION 32767);
