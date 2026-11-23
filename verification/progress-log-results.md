@@ -31,3 +31,24 @@ Final ISPAC SHA256:
 Built artifact: artifacts/sql2022/Archive.Sql2022.ispac.
 Tests deployed only to the isolated ArchiveFailureTests project and fixture
 SQL databases. The regular SQL Agent job was not redeployed.
+
+## Update 2026-11-23: independent log switches
+
+- Replaced LogFolder with LogPath; existing configured source path preserved.
+- Parameters end with LogPath, DetailsLog, Summarylog in source package,
+  dtproj metadata and final ISPAC. SSDT output is reordered after its serialization.
+- DetailsLog/Summarylog are Boolean and default False. Boolean metadata uses
+  numeric serialization accepted by SSDT. LogPath default is C:\ArchiveLogs.
+- Both False: no directory validation/creation, no log files; SQL log handlers disabled.
+- SSISDB 70: default False/False, success, no directory or log files created.
+- SSISDB 72: details only, success, only details file created.
+- SSISDB 74: summary only with related chain, success, only summary file created.
+- SSISDB 76: both logs plus SQL delete failure, both logs and error summaries
+  present, rollback/source preservation and following jobs verified.
+- No variable deadlocks in any mode.
+- LittleSeedAsync rerun and verified in nito_superDb and nito_SomeApps:
+  50 processes each, 12 dates in 2023/2024, all related records and 6 archive edges.
+- No actual source-data archiving was run after reseeding; verification uses fixtures.
+
+Current ISPAC SHA256:
+17E1825FF66D300F71B8BA8070C80785DBED12D74BD7E3B2A5BE62CD63A096CD

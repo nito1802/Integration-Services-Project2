@@ -30,9 +30,10 @@ example.invalid. Rozkład dat i liczby są powtarzalne, GUID-y są nowe.
 Indeksy obejmują CreationDate i klucze obce.
 
 LittleSeedAsync zastępuje dane w tych samych tabelach małym zestawem:
-3 i 5 stycznia, 7 i 9 marca oraz 12 i 14 czerwca 2023. W kolejnych dniach jest
-3, 4, 5, 6, 3 i 4 procesy (łącznie 25 na bazę), z pełnym drzewem zależności.
-Nie pozostawia danych z pełnego seeda. Wszystkie sześć dni kwalifikuje się do
+3 i 5 stycznia, 7 i 9 marca oraz 12 i 14 czerwca zarówno 2023, jak i 2024 roku.
+W kolejnych sześciu dniach każdego roku jest 3, 4, 5, 6, 3 i 4 procesy
+(25 na rok, łącznie 50 na bazę), z pełnym drzewem zależności.
+Nie pozostawia danych z pełnego seeda. Wszystkie dwanaście dni kwalifikuje się do
 archiwizacji; pakiet może pomijać przerwy między miesiącami. Pliki archiwów
 z wcześniejszych uruchomień pozostają zachowane.
 

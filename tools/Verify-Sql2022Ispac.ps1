@@ -30,8 +30,14 @@ try {
  foreach($task in $package.SelectNodes('//SQLTask:SqlTaskData',$dn)){if($task.GetAttribute('Connection','www.microsoft.com/sqlserver/dts/tasks/sqltask') -ne $id){throw 'SQL task does not use shared ArchiveDb'}}
  $connection=$package.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="ConnectionString"]/DTS:Property[@DTS:Name="ParameterValue"]',$dn).InnerText
  $relations=$package.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="ArchiveJobRelationsTable"]/DTS:Property[@DTS:Name="ParameterValue"]',$dn)
- $logs=$package.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="LogFolder"]/DTS:Property[@DTS:Name="ParameterValue"]',$dn)
- if(!$logs -or $logs.InnerText -ne 'C:\ArchiveLogs'){throw 'Unexpected LogFolder default'}
+ $logs=$package.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="LogPath"]/DTS:Property[@DTS:Name="ParameterValue"]',$dn)
+ if(!$logs -or $logs.InnerText -ne 'C:\ArchiveLogs'){throw 'Unexpected LogPath default'}
+ foreach($name in @('DetailsLog','Summarylog')) {
+  $flag=$package.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="'+$name+'"]',$dn)
+  if(!$flag -or $flag.GetAttribute('DataType','www.microsoft.com/SqlServer/Dts') -ne '11' -or $flag.SelectSingleNode('DTS:Property[@DTS:Name="ParameterValue"]',$dn).InnerText -notin @('False','false','0')){throw "Expected Boolean $name=False"}
+ }
+ $tail=@($package.SelectNodes('/DTS:Executable/DTS:PackageParameters/DTS:PackageParameter',$dn) | Select-Object -Last 4 | ForEach-Object {$_.GetAttribute('ObjectName','www.microsoft.com/SqlServer/Dts')})
+ if(($tail -join ',') -ne 'LogPath,MaxRecordsPerCsv,DetailsLog,Summarylog'){throw 'Log parameters are not last in requested order'}
  if(!$relations -or $relations.InnerText -ne 'Archive.ArchiveJobRelations'){throw 'Missing or unsafe relations table deployment default'}
  if($connection -ne 'Data Source=.;Integrated Security=True;TrustServerCertificate=True'){throw 'Unexpected deployment connection default'}
  $result=@("PASS: ISPAC TargetServerVersion=160 (SQL Server 2022).","PASS: $($scripts.Count) Script Tasks: VSTA 16 and compiled references ManagedDTS/ScriptTask 16.0.0.0.",'PASS: no SQL Server 2025 references in embedded script projects; safe connection defaults.',('SHA256: '+(Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash))

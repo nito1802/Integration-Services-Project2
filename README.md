@@ -161,8 +161,13 @@ Test parametru tabeli i skryptu bez tworzenia schematu: `.\tools\Verify-JobsTabl
 
 ## Log postępu każdego uruchomienia
 
-Parametr pakietu `LogFolder` domyślnie wskazuje `C:\ArchiveLogs`.
-Na maszynie wykonującej SSIS powstają dwa pliki ze wspólnym prefiksem:
+Parametr pakietu `LogPath` domyślnie wskazuje `C:\ArchiveLogs`.
+Na końcu listy parametrów znajdują się kolejno `LogPath`, `MaxRecordsPerCsv`, `DetailsLog` i `Summarylog`.
+`DetailsLog` i `Summarylog` są typu Boolean i domyślnie mają wartość False.
+Każdy przełącznik niezależnie włącza odpowiedni plik; przy obu False nie jest
+sprawdzana ścieżka ani tworzony katalog lub plik. Poprzednia nazwa `LogFolder`
+została zastąpiona przez `LogPath` (generator zachowuje dotychczasową wartość).
+Po włączeniu obu przełączników na maszynie wykonującej SSIS powstają dwa pliki ze wspólnym prefiksem:
 `archive_yyyyMMdd_HHmmss_<guid>_details.txt` oraz
 `archive_yyyyMMdd_HHmmss_<guid>_summary.txt` dla każdego uruchomienia, również przy
 uruchamianiu z SQL Server Agent. Folder jest tworzony automatycznie;

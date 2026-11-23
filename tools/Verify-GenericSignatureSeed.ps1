@@ -22,9 +22,10 @@ WHILE @Date<=CONVERT(date,GETDATE()) BEGIN
     IF @Count>0 SET @Days+=1;
     SET @Offset+=1; SET @Date=DATEADD(day,1,@Date);
 END;
-IF @Little=1 BEGIN SET @Expected=25; SET @Days=6; END;
+IF @Little=1 BEGIN SET @Expected=50; SET @Days=12; END;
 IF @Little=1 AND EXISTS(SELECT 1 FROM GenericSignatureTest.Processes
-    WHERE CONVERT(date,CreationDate) NOT IN ('20230103','20230105','20230307','20230309','20230612','20230614'))
+    WHERE CONVERT(date,CreationDate) NOT IN ('20230103','20230105','20230307','20230309','20230612','20230614',
+        '20240103','20240105','20240307','20240309','20240612','20240614'))
     THROW 50001,'Unexpected date in the small seed.',1;
 IF (SELECT COUNT(*) FROM GenericSignatureTest.Processes)<>@Expected THROW 50001,'Incorrect process count.',1;
 IF (SELECT COUNT(DISTINCT CONVERT(date,CreationDate)) FROM GenericSignatureTest.Processes)<>@Days THROW 50001,'Incorrect populated day count.',1;

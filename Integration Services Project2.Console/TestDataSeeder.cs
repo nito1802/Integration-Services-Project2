@@ -64,7 +64,7 @@ public sealed class TestDataSeeder
                 DELETE FROM GenericSignatureTest.EkdStatuses;
                 DBCC CHECKIDENT ('GenericSignatureTest.EkdProcessHistories',RESEED,0) WITH NO_INFOMSGS;
                 """, cancellationToken);
-            System.Console.WriteLine($"{database}: generowanie {(little ? "małego zestawu z sześciu dni 2023 roku" : "danych od 2023 roku")}...");
+            System.Console.WriteLine($"{database}: generowanie {(little ? "małego zestawu z lat 2023 i 2024 (po sześć dni)" : "danych od 2023 roku")}...");
             db.AddRange(new NewProcessType { Id="CUSTOMER_ONBOARDING", Name="Test onboarding" },
                 new NewProcessType { Id="ACCOUNT_CREATE", Name="Test account" });
             db.AddRange(new EkdStatus { Id="CREATED", Name="Created" }, new EkdStatus { Id="SIGNED", Name="Signed" });
@@ -73,9 +73,10 @@ public sealed class TestDataSeeder
             var today = DateTime.Today;
             var start = new DateTime(2023,1,1);
             var dates = little
-                ? new[] { new DateTime(2023,1,3), new DateTime(2023,1,5),
-                    new DateTime(2023,3,7), new DateTime(2023,3,9),
-                    new DateTime(2023,6,12), new DateTime(2023,6,14) }
+                ? new[] { 2023, 2024 }.SelectMany(year => new[] {
+                    new DateTime(year,1,3), new DateTime(year,1,5),
+                    new DateTime(year,3,7), new DateTime(year,3,9),
+                    new DateTime(year,6,12), new DateTime(year,6,14) }).ToArray()
                 : Enumerable.Range(0,(today-start).Days+1).Select(offset => start.AddDays(offset)).ToArray();
             var processes = 0;
             var populatedDays = 0;
@@ -85,7 +86,7 @@ public sealed class TestDataSeeder
                 var day=dates[dayIndex];
                 var offset=(day-start).Days;
                 // About 95% of days populated, with small days and occasional larger bursts.
-                var count=little ? 3+dayIndex%4 : offset%23==7 ? 0 : offset%31==0 ? 35 : 1+(offset*17%9);
+                var count=little ? 3+(dayIndex%6)%4 : offset%23==7 ? 0 : offset%31==0 ? 35 : 1+(offset*17%9);
                 if(count>0) populatedDays++;
                 for(var n=0; n<count; n++)
                 {

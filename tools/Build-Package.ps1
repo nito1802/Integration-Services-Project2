@@ -11,9 +11,14 @@ $currentNs=New-Object Xml.XmlNamespaceManager($current.NameTable)
 $currentNs.AddNamespace('DTS','www.microsoft.com/SqlServer/Dts')
 $currentValues=@{}
 $currentParameterIds=@{}
-foreach($name in @('ConnectionString','ArchiveJobsTable','ArchiveJobRelationsTable','ArchiveRoot','LogFolder','MaxRecordsPerCsv')) {
+$parameterOrder=@('ConnectionString','ArchiveJobsTable','ArchiveJobRelationsTable','ArchiveRoot','LogPath','MaxRecordsPerCsv','DetailsLog','Summarylog')
+foreach($name in @($parameterOrder)+@('LogFolder')) {
     $valueNode=$current.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="'+$name+'"]/DTS:Property[@DTS:Name="ParameterValue"]',$currentNs)
     if($valueNode) { $currentValues[$name]=$valueNode.InnerText; $currentParameterIds[$name]=$valueNode.ParentNode.GetAttribute('DTSID','www.microsoft.com/SqlServer/Dts') }
+}
+if(!$currentValues.ContainsKey('LogPath') -and $currentValues.ContainsKey('LogFolder')) {
+    $currentValues['LogPath']=$currentValues['LogFolder']
+    $currentParameterIds['LogPath']=$currentParameterIds['LogFolder']
 }
 $original=[xml](Get-Content -LiteralPath $backup -Raw)
 $originalNs=New-Object Xml.XmlNamespaceManager($original.NameTable)
@@ -51,9 +56,11 @@ foreach($obsolete in @('TableName','DateColumn','OlderThanDays','OutputFile','Se
 $p=$package.Parameters.Add('ArchiveRoot',[TypeCode]::String); $p.Value=$archiveRoot
 if($currentValues.ContainsKey('ConnectionString')) { $package.Parameters['ConnectionString'].Value=$currentValues['ConnectionString'] }
 if($currentValues.ContainsKey('ArchiveRoot')) { $package.Parameters['ArchiveRoot'].Value=$currentValues['ArchiveRoot'] }
-foreach($entry in @(@('ArchiveJobsTable',[TypeCode]::String,'nito_superDb.Archive.ArchiveJobs'),@('ArchiveJobRelationsTable',[TypeCode]::String,'nito_superDb.Archive.ArchiveJobRelations'),@('LogFolder',[TypeCode]::String,'C:\ArchiveLogs'),@('MaxRecordsPerCsv',[TypeCode]::Int32,1000))) {
+foreach($entry in @(@('ArchiveJobsTable',[TypeCode]::String,'nito_superDb.Archive.ArchiveJobs'),@('ArchiveJobRelationsTable',[TypeCode]::String,'nito_superDb.Archive.ArchiveJobRelations'),@('MaxRecordsPerCsv',[TypeCode]::Int32,1000),@('LogPath',[TypeCode]::String,'C:\ArchiveLogs'),@('DetailsLog',[TypeCode]::Boolean,$false),@('Summarylog',[TypeCode]::Boolean,$false))) {
     $p=$package.Parameters.Add($entry[0],$entry[1]); $p.Value=$entry[2]
-    if($currentValues.ContainsKey($entry[0])) { $p.Value=[Convert]::ChangeType($currentValues[$entry[0]],$entry[1]) }
+    if($currentValues.ContainsKey($entry[0])) {
+        $p.Value=if($entry[1] -eq [TypeCode]::Boolean) {$currentValues[$entry[0]] -in @('True','1','-1')} else {[Convert]::ChangeType($currentValues[$entry[0]],$entry[1])}
+    }
 }
 $connection=$package.Connections.Add('ADO.NET:System.Data.SqlClient.SqlConnection, System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089')
 $connection.Name='ArchiveDb'
@@ -83,6 +90,7 @@ function Add-Sql($container,$name,$connectionName,$sql,$result='None',$variableS
     foreach($event in @(@('OnPreExecute','SQL START'),@('OnPostExecute','SQL END'),@('OnError','SQL ERROR'))) {
         $handler=$hostTask.EventHandlers.Add($event[0]); $handler.MaximumErrorCount=0
         $logger=Add-Script $handler ('Log '+$name+' '+$event[0]) '' ''
+        $logger.SetExpression('Disable','!@[$Package::DetailsLog]')
         $definition=$scriptDefinitions[$scriptDefinitions.Count-1]
         $definition.SqlProgress=$event[1]
     }
@@ -249,6 +257,11 @@ foreach($parameterName in $currentParameterIds.Keys) {
     $parameterNode=$xml.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="'+$parameterName+'"]',$ns)
     if($parameterNode -and $currentParameterIds[$parameterName]) { [void]$parameterNode.SetAttribute('DTSID','www.microsoft.com/SqlServer/Dts',$currentParameterIds[$parameterName]) }
 }
+$parameters=$xml.SelectSingleNode('/DTS:Executable/DTS:PackageParameters',$ns)
+foreach($name in $parameterOrder) {
+    $node=$parameters.SelectSingleNode('DTS:PackageParameter[@DTS:ObjectName="'+$name+'"]',$ns)
+    [void]$parameters.AppendChild($node)
+}
 $common=Get-Content -LiteralPath (Join-Path $root 'scripts\Common.cs') -Raw
 $compiler='C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\Roslyn\csc.exe'
 $scriptMajor=if($TargetServerVersion -eq 'SQLServer2022') {16} else {17}
@@ -313,12 +326,12 @@ if (!$CompatibilityTest) {
     $projectNs.AddNamespace('SSIS','www.microsoft.com/SqlServer/SSIS')
     foreach($target in $projectXml.SelectNodes('//TargetServerVersion')) { $target.InnerText=$TargetServerVersion }
     foreach($parameterNode in @($projectXml.SelectNodes('//SSIS:PackageMetaData/SSIS:Parameters/SSIS:Parameter',$projectNs))) {
-        if($parameterNode.GetAttribute('Name','www.microsoft.com/SqlServer/SSIS') -notin @('ConnectionString','ArchiveJobsTable','ArchiveJobRelationsTable','ArchiveRoot','LogFolder','MaxRecordsPerCsv')) {
+        if($parameterNode.GetAttribute('Name','www.microsoft.com/SqlServer/SSIS') -notin $parameterOrder) {
             [void]$parameterNode.ParentNode.RemoveChild($parameterNode)
         }
     }
     $parameterList=$projectXml.SelectSingleNode('//SSIS:PackageMetaData/SSIS:Parameters',$projectNs)
-    foreach($parameterName in @('ConnectionString','ArchiveJobsTable','ArchiveJobRelationsTable','ArchiveRoot','LogFolder','MaxRecordsPerCsv')) {
+    foreach($parameterName in $parameterOrder) {
         $node=$parameterList.SelectSingleNode('SSIS:Parameter[@SSIS:Name="'+$parameterName+'"]',$projectNs)
         if(!$node) {
             $node=$parameterList.SelectSingleNode('SSIS:Parameter[@SSIS:Name="ConnectionString"]',$projectNs).CloneNode($true)
@@ -326,8 +339,9 @@ if (!$CompatibilityTest) {
             [void]$parameterList.AppendChild($node)
         }
         $node.SelectSingleNode('SSIS:Properties/SSIS:Property[@SSIS:Name="ID"]',$projectNs).InnerText=$xml.SelectSingleNode('//DTS:PackageParameter[@DTS:ObjectName="'+$parameterName+'"]',$ns).GetAttribute('DTSID','www.microsoft.com/SqlServer/Dts')
-        $node.SelectSingleNode('SSIS:Properties/SSIS:Property[@SSIS:Name="Value"]',$projectNs).InnerText=[string]$package.Parameters[$parameterName].Value
-        $node.SelectSingleNode('SSIS:Properties/SSIS:Property[@SSIS:Name="DataType"]',$projectNs).InnerText=if($parameterName -eq 'MaxRecordsPerCsv') {'9'} else {'18'}
+        $node.SelectSingleNode('SSIS:Properties/SSIS:Property[@SSIS:Name="Value"]',$projectNs).InnerText=if($parameterName -in @('DetailsLog','Summarylog')) {if($package.Parameters[$parameterName].Value){'1'}else{'0'}}else{[string]$package.Parameters[$parameterName].Value}
+        $node.SelectSingleNode('SSIS:Properties/SSIS:Property[@SSIS:Name="DataType"]',$projectNs).InnerText=if($parameterName -eq 'MaxRecordsPerCsv') {'9'} elseif($parameterName -in @('DetailsLog','Summarylog')) {'3'} else {'18'}
+        [void]$parameterList.AppendChild($node)
     }
     # Synchronize debugger/deployment metadata with the package actually written to disk.
     $packageMetadata=$projectXml.SelectSingleNode('//SSIS:PackageMetaData/SSIS:Properties',$projectNs)

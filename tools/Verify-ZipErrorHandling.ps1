@@ -1,4 +1,4 @@
-param([switch]$Interrupt,[switch]$Success,[switch]$Scenarios,[switch]$SqlFailure,[switch]$Related,[string]$LogFolder)
+param([switch]$Interrupt,[switch]$Success,[switch]$Scenarios,[switch]$SqlFailure,[switch]$Related,[Alias('LogFolder')][string]$LogPath,[ValidateSet('Both','None','Details','Summary')][Alias('Logs')][string]$LogMode='Both')
 $ErrorActionPreference='Stop'
 if($Scenarios -and !$Success) { throw 'Scenarios require the successful execution mode' }
 $root=Split-Path $PSScriptRoot -Parent
@@ -51,11 +51,16 @@ try {
 [void](New-Item -ItemType Directory -Path $archiveRoot -Force)
 & icacls.exe $archiveRoot /grant 'NT SERVICE\MSSQL$SSISARCHIVE22:(OI)(CI)M' | Out-Null
 if($LASTEXITCODE -ne 0) { throw 'Cannot grant test archive access' }
-if(!$LogFolder){$LogFolder=Join-Path $archiveRoot 'logs'}
-[void](New-Item -ItemType Directory -Path $LogFolder -Force)
-& icacls.exe $LogFolder /grant 'NT SERVICE\MSSQL$SSISARCHIVE22:(OI)(CI)M' | Out-Null
-if($LASTEXITCODE -ne 0) { throw 'Cannot grant test log access' }
-$previousLogs=@(Get-ChildItem $LogFolder -Filter 'archive_*.txt' | ForEach-Object {$_.FullName})
+if(!$LogPath){$LogPath=Join-Path $archiveRoot 'logs'}
+$detailsEnabled=$LogMode -in @('Both','Details')
+$summaryEnabled=$LogMode -in @('Both','Summary')
+if($LogMode -ne 'None') {
+ [void](New-Item -ItemType Directory -Path $LogPath -Force)
+ & icacls.exe $LogPath /grant 'NT SERVICE\MSSQL$SSISARCHIVE22:(OI)(CI)M' | Out-Null
+ if($LASTEXITCODE -ne 0) { throw 'Cannot grant test log access' }
+}
+$pathExisted=Test-Path -LiteralPath $LogPath
+$previousLogs=@(if($pathExisted){Get-ChildItem $LogPath -Filter 'archive_*.txt' | ForEach-Object {$_.FullName}})
 $connectionString='Data Source=.\SSISARCHIVE22;Integrated Security=True;TrustServerCertificate=True'
 $connection=New-Object Data.SqlClient.SqlConnection($connectionString)
 try {
@@ -123,7 +128,11 @@ EXEC catalog.set_execution_parameter_value @execution_id=@execution,@object_type
 EXEC catalog.set_execution_parameter_value @execution_id=@execution,@object_type=30,@parameter_name=N'ArchiveJobsTable',@parameter_value=@jobs;
 EXEC catalog.set_execution_parameter_value @execution_id=@execution,@object_type=30,@parameter_name=N'ArchiveJobRelationsTable',@parameter_value=@relations;
 EXEC catalog.set_execution_parameter_value @execution_id=@execution,@object_type=30,@parameter_name=N'ArchiveRoot',@parameter_value=@root;
-EXEC catalog.set_execution_parameter_value @execution_id=@execution,@object_type=30,@parameter_name=N'LogFolder',@parameter_value=@logs;
+EXEC catalog.set_execution_parameter_value @execution_id=@execution,@object_type=30,@parameter_name=N'LogPath',@parameter_value=@logs;
+IF @setFlags=1 BEGIN
+ EXEC catalog.set_execution_parameter_value @execution_id=@execution,@object_type=30,@parameter_name=N'DetailsLog',@parameter_value=@details;
+ EXEC catalog.set_execution_parameter_value @execution_id=@execution,@object_type=30,@parameter_name=N'Summarylog',@parameter_value=@summary;
+END;
 DECLARE @sync bit=1;
 EXEC catalog.set_execution_parameter_value @execution_id=@execution,@object_type=50,@parameter_name=N'SYNCHRONIZED',@parameter_value=@sync;
 EXEC catalog.start_execution @execution_id=@execution;
@@ -134,9 +143,13 @@ SELECT @execution;
         @('@jobs',($database+'.Archive.ArchiveJobs')),
         @('@relations',($database+'.Archive.ArchiveJobRelations')),
         @('@root',$archiveRoot),
-        @('@logs',$LogFolder))) {
+        @('@logs',$LogPath))) {
         [void]$command.Parameters.Add($item[0],[Data.SqlDbType]::NVarChar,4000)
         $command.Parameters[$item[0]].Value=$item[1]
+    }
+    foreach($flag in @(@('@setFlags',($LogMode -ne 'None')),@('@details',$detailsEnabled),@('@summary',$summaryEnabled))) {
+        [void]$command.Parameters.Add($flag[0],[Data.SqlDbType]::Bit)
+        $command.Parameters[$flag[0]].Value=[bool]$flag[1]
     }
     $execution=$command.ExecuteScalar()
     $command.Parameters.Clear()
@@ -144,22 +157,28 @@ SELECT @execution;
     if($command.ExecuteScalar() -ne 0) { throw 'Variable deadlock occurred in full SSISDB execution' }
     $command.CommandText="SELECT status FROM catalog.executions WHERE execution_id=$execution;"
     if($command.ExecuteScalar() -ne $(if($Success){7}else{4})) { throw 'Unexpected package execution status' }
-    $logs=@(Get-ChildItem $LogFolder -Filter 'archive_*.txt' | Where-Object {$_.FullName -notin $previousLogs})
-    if($logs.Count -ne 2){throw 'Expected a details/summary log pair for this package run'}
+    $logs=@(if(Test-Path -LiteralPath $LogPath){Get-ChildItem $LogPath -Filter 'archive_*.txt' | Where-Object {$_.FullName -notin $previousLogs}})
+    if($logs.Count -ne ([int]$detailsEnabled+[int]$summaryEnabled)){throw 'Unexpected number of log files for selected flags'}
+    if($LogMode -eq 'None' -and !$pathExisted -and (Test-Path -LiteralPath $LogPath)){throw 'Disabled logging created a directory'}
     $details=@($logs | Where-Object {$_.Name -like '*_details.txt'})
     $summary=@($logs | Where-Object {$_.Name -like '*_summary.txt'})
-    if($details.Count -ne 1 -or $summary.Count -ne 1 -or $details[0].Name.Replace('_details.txt','_summary.txt') -ne $summary[0].Name){throw 'Log pair does not share the run identity'}
+    if($details.Count -ne [int]$detailsEnabled -or $summary.Count -ne [int]$summaryEnabled){throw 'Wrong log type created'}
+    if($LogMode -eq 'Both' -and $details[0].Name.Replace('_details.txt','_summary.txt') -ne $summary[0].Name){throw 'Log pair does not share the run identity'}
+    $content=''; $summaryContent=''
+    if($detailsEnabled) {
     $content=Get-Content $details[0].FullName -Raw -Encoding UTF8
     foreach($marker in @('RUN START','JOB START','JOB END','SQL START','SQL END','Create daily ZIP','Verify ZIP integrity','rows=','elapsedMs=',$(if($Success){'RUN SUCCESS'}else{'RUN ERROR'}))) {
         if(!$content.Contains($marker)){throw ('Missing progress marker: '+$marker)}
     }
     if(!$Success -and !$content.Contains('-1073741510') -and $Interrupt){throw 'ZIP failure is missing from file log'}
+    }
+    if($summaryEnabled) {
     $summaryContent=Get-Content $summary[0].FullName -Raw -Encoding UTF8
     foreach($marker in @('RUN START','TABLE START','TABLE END','JOB START','JOB END','RUN END','duration=','phase=export+zip',('RUN END | Package | status='+$(if($Success){'Success'}else{'Error'})))) {
         if(!$summaryContent.Contains($marker)){throw ('Missing summary marker: '+$marker)}
     }
     $jobEnds=@([regex]::Matches($summaryContent,'(?m)^.*\| JOB END \|.*elapsedMs=([0-9.]+)'))
-    if($jobEnds.Count -ne 3){throw 'Expected one summary per job, including the empty job'}
+    if($jobEnds.Count -ne $(if($Scenarios){80}else{3})){throw 'Expected one summary per job, including the empty job'}
     $runEnd=[regex]::Match($summaryContent,'(?m)^.*\| RUN END \|.*elapsedMs=([0-9.]+)')
     $jobMs=0.0
     foreach($job in $jobEnds){$jobMs += [double]::Parse($job.Groups[1].Value,[Globalization.CultureInfo]::InvariantCulture)}
@@ -169,7 +188,8 @@ SELECT @execution;
     if($Related -and (!$summaryContent.Contains('TABLE END | Demo.OrderLines') -or !$summaryContent.Contains('TABLE END | Demo.LineDetails'))) {
         throw 'Missing child table timings in summary'
     }
-    Write-Output ('Details and summary verified: '+$details[0].FullName+'; '+$summary[0].FullName)
+    }
+    Write-Output ('Logging mode '+$LogMode+' verified: '+(($logs | ForEach-Object {$_.FullName}) -join '; '))
     $connection.ChangeDatabase($database)
     if($Scenarios) {
         $command.CommandText="SELECT COUNT(*) FROM Archive.ArchiveJobs WHERE LastProcessedStatus=N'Success';"
@@ -188,7 +208,7 @@ SELECT @execution;
     if(!$Success -and !$SqlFailure -and ($data.Rows[0].LastProcessedStatus -ne 'Error' -or $data.Rows[0].ErrorMessage -notlike '*7-Zip stderr:*')) {
         throw 'Process error and diagnostics were not persisted'
     }
-    if($SqlFailure -and ($data.Rows[0].LastProcessedStatus -ne 'Error' -or $data.Rows[0].ErrorMessage -notlike '*Injected SQL delete failure*' -or !$content.Contains('SQL ERROR'))) {
+    if($SqlFailure -and ($data.Rows[0].LastProcessedStatus -ne 'Error' -or $data.Rows[0].ErrorMessage -notlike '*Injected SQL delete failure*' -or ($detailsEnabled -and !$content.Contains('SQL ERROR')))) {
         throw 'SQL failure was not persisted in both job result and progress log'
     }
     if($Interrupt -and $data.Rows[0].ErrorMessage -notlike '*-1073741510*') {

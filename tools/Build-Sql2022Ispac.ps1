@@ -4,7 +4,7 @@ $root=Split-Path $PSScriptRoot -Parent
 $source=Join-Path $root 'Integration Services Project2'
 $destination=Join-Path $root 'artifacts/sql2022/project'
 [void](New-Item -ItemType Directory -Path $destination -Force)
-$defaults=@{ConnectionString='Data Source=.;Integrated Security=True;TrustServerCertificate=True';ArchiveJobsTable='Archive.ArchiveJobs';ArchiveJobRelationsTable='Archive.ArchiveJobRelations';ArchiveRoot='C:\ArchiveTest';LogFolder='C:\ArchiveLogs';MaxRecordsPerCsv='1000'}
+$defaults=@{ConnectionString='Data Source=.;Integrated Security=True;TrustServerCertificate=True';ArchiveJobsTable='Archive.ArchiveJobs';ArchiveJobRelationsTable='Archive.ArchiveJobRelations';ArchiveRoot='C:\ArchiveTest';LogPath='C:\ArchiveLogs';DetailsLog='0';Summarylog='0';MaxRecordsPerCsv='1000'}
 $package=[xml](Get-Content (Join-Path $source 'Package.dtsx') -Raw)
 $ns=New-Object Xml.XmlNamespaceManager($package.NameTable); $ns.AddNamespace('DTS','www.microsoft.com/SqlServer/Dts')
 foreach($script in $package.SelectNodes('//ScriptProject')) { if($script.VSTAMajorVersion -ne '16') { throw 'Rebuild package with Build-Package.ps1 -TargetServerVersion SQLServer2022 first.' } }
@@ -32,5 +32,23 @@ $ispac=Get-ChildItem (Join-Path $destination 'bin') -Filter '*.ispac' -Recurse |
 if(!$ispac) { throw 'SSDT did not produce ISPAC.' }
 $output=Join-Path (Split-Path $destination -Parent) 'Archive.Sql2022.ispac'
 Copy-Item -LiteralPath $ispac.FullName -Destination $output -Force
+# SSDT serializes parameters alphabetically. Restore the requested presentation
+# order in the deliverable, just as in the source package and project metadata.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+Add-Type -AssemblyName System.IO.Compression
+$archive=[IO.Compression.ZipFile]::Open($output,[IO.Compression.ZipArchiveMode]::Update)
+try {
+ $entry=$archive.GetEntry('Package.dtsx')
+ $reader=New-Object IO.StreamReader($entry.Open())
+ try {$ordered=[xml]$reader.ReadToEnd()}finally{$reader.Dispose()}
+ $on=New-Object Xml.XmlNamespaceManager($ordered.NameTable);$on.AddNamespace('D','www.microsoft.com/SqlServer/Dts')
+ $list=$ordered.SelectSingleNode('/D:Executable/D:PackageParameters',$on)
+ foreach($name in @('ConnectionString','ArchiveJobsTable','ArchiveJobRelationsTable','ArchiveRoot','LogPath','MaxRecordsPerCsv','DetailsLog','Summarylog')) {
+  [void]$list.AppendChild($list.SelectSingleNode('D:PackageParameter[@D:ObjectName="'+$name+'"]',$on))
+ }
+ $entry.Delete()
+ $writer=New-Object IO.StreamWriter($archive.CreateEntry('Package.dtsx').Open())
+ try {$writer.Write($ordered.OuterXml)}finally{$writer.Dispose()}
+} finally {$archive.Dispose()}
 Write-Output "ISPAC: $output"
 Write-Output "Build log: $log"
