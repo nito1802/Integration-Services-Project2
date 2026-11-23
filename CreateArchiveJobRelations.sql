@@ -9,6 +9,7 @@ BEGIN TRY
         CREATE TABLE Archive.ArchiveJobRelations (
             Id int IDENTITY NOT NULL CONSTRAINT PK_ArchiveJobRelations PRIMARY KEY,
             ArchiveJobId int NOT NULL,
+            DatabaseName nvarchar(128) NOT NULL,
             ParentTable nvarchar(257) NOT NULL CONSTRAINT DF_ArchiveJobRelations_ParentTable DEFAULT N'',
             ChildTable nvarchar(257) NOT NULL,
             ParentKeyColumn sysname NOT NULL,
