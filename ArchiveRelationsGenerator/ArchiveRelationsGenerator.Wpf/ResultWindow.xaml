@@ -1,7 +1,11 @@
 <Window x:Class="ArchiveRelationsGenerator.Wpf.ResultWindow"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- Title="INSERT do Archive.ArchiveJobRelations" Width="1080" Height="700" MinWidth="760" MinHeight="480" WindowStartupLocation="CenterOwner">
+ Title="INSERT do Archive.ArchiveJobRelations" Width="1080" Height="700" MinWidth="760" MinHeight="480" FontFamily="Segoe UI" Background="#F3F6FA" Foreground="#19283A" WindowStartupLocation="CenterOwner">
+ <Window.Resources>
+<Style TargetType="Button" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><Setter Property="Padding" Value="18,10" /><Setter Property="Background" Value="#E5ECF4" /><Setter Property="BorderThickness" Value="0" /><Setter Property="Cursor" Value="Hand" /><Setter Property="FontSize" Value="14" /></Style>
+<Style TargetType="TextBox" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><Setter Property="Padding" Value="12" /><Setter Property="FontSize" Value="14" /><Setter Property="BorderBrush" Value="#CCD7E5" /><Setter Property="BorderThickness" Value="1" /><Setter Property="Background" Value="White" /></Style>
+</Window.Resources>
  <Grid Margin="28">
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <TextBlock Text="Gotowy INSERT" FontSize="27" FontWeight="SemiBold"/>

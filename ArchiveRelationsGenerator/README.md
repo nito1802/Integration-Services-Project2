@@ -31,8 +31,14 @@ nie obsługuje kilku par kolumn jako jednego warunku AND. Nazwy zawierające kro
 wewnątrz identyfikatora również nie są obsługiwane przez format schema.Tabela.
 Ponowne wykonanie wygenerowanego INSERT-a nie jest automatycznym UPSERT-em.
 
-Sprawdzenie parsera/generatora bez zewnętrznych pakietów testowych:
+Rozwiązanie zawiera tylko jeden projekt WPF. Cały kod aplikacji jest w czterech plikach:
 
-```powershell
-dotnet run --project ArchiveRelationsGenerator/ArchiveRelationsGenerator.Checks
-```
+- `MainWindow.xaml` i `MainWindow.xaml.cs` — formularz, przykład, parser i generowanie SQL.
+- `ResultWindow.xaml` i `ResultWindow.xaml.cs` — wynik, kopiowanie i komunikat.
+
+Nie ma osobnych projektów Core/Checks ani plików App.xaml/App.xaml.cs.
+Style są lokalne w obu oknach. Ten projekt uruchamia się z MainWindow przez
+symbol `GENERATOR_STANDALONE` ustawiony w csproj. Przy kopiowaniu czterech plików
+do zwykłego projektu WPF z własnym App.xaml nie ustawiaj tego symbolu; zachowaj
+własny App.xaml ze StartupUri wskazującym MainWindow.xaml. Dopasuj namespace
+w plikach C# oraz x:Class obu okien do projektu docelowego.

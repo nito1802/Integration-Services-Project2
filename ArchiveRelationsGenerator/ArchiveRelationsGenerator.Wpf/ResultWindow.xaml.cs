@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Threading;
-using ArchiveRelationsGenerator.Core;
+using System;
 
 namespace ArchiveRelationsGenerator.Wpf;
 
