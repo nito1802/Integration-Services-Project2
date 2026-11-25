@@ -15,7 +15,7 @@ Konfiguracja pozostaje w nito_superDb.Archive.
 
 Każda baza otrzymuje schemat GenericSignatureTest: Processes,
 AutentiProcesses, AutentiRecipients, CallProcesses, ProcessData,
-EkdProcesses, EkdProcessHistories oraz słowniki ProcessTypes i EkdStatuses.
+EkdProcesses, EkdProcessHistories, ExportLoadTest oraz słowniki ProcessTypes i EkdStatuses.
 Model EF jest w katalogu GenericSignature w Console. Pola, długości, nullable
 i relacje odtworzono ze zdjęć. Definicji słowników nie było na zdjęciach:
 przyjęto Id i Name. Enumy Autenti mają testowe wartości 0–3. Dla EnvelopeId
@@ -37,7 +37,7 @@ Nie pozostawia danych z pełnego seeda. Wszystkie dwanaście dni kwalifikuje si�
 archiwizacji; pakiet może pomijać przerwy między miesiącami. Pliki archiwów
 z wcześniejszych uruchomień pozostają zachowane.
 
-W ArchiveJobs powstaje jeden job na bazę: GenericSignatureTest.Processes,
+W ArchiveJobs powstają dwa joby na bazę. Pierwszy: GenericSignatureTest.Processes,
 CreationDate, retencja 30 dni. Sześć relacji na bazę obejmuje drzewo:
 
 - Processes → AutentiProcesses → AutentiRecipients
@@ -66,3 +66,11 @@ powershell -NoProfile -File tools/Verify-GenericSignatureSeed.ps1
 ```
 
 Dla małego zestawu dodaj przełącznik `-Little`.
+
+
+ExportLoadTest to niezależna tabela do dłuższego eksportu, bez relacji z Processes.
+Zarówno SeedAsync, jak i LittleSeedAsync wstawiają po 100 000 rekordów w każdej bazie:
+CreatedAt z 14 czerwca 2024, Payload długości 64 znaków. To około 10 MB CSV,
+100 paczek przy MaxRecordsPerCsv=1000. Drugim jobem jest GenericSignatureTest.ExportLoadTest
+z kolumną daty CreatedAt i retencją 30 dni. Ponowienie seeda resetuje również ten job
+oraz odtwarza wszystkie jego rekordy. Krótszy payload ogranicza zajętość bazy hostingowej.

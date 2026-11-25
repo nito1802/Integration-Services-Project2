@@ -9,6 +9,9 @@ public sealed class GenericSignatureDbContext(DbContextOptions<GenericSignatureD
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.HasDefaultSchema(Schema);
+        b.Entity<ExportLoadRecord>().ToTable("ExportLoadTest").HasKey(x => x.Id);
+        b.Entity<ExportLoadRecord>().Property(x => x.Id).ValueGeneratedNever();
+        b.Entity<ExportLoadRecord>().HasIndex(x => x.CreatedAt);
         b.Entity<Process>().ToTable("Processes");
         b.Entity<AutentiProcess>().ToTable("AutentiProcesses").HasKey(x => x.EnvelopeId);
         b.Entity<AutentiRecipient>().ToTable("AutentiRecipients").HasKey(x => new { x.EnvelopeId, x.Email });

@@ -97,7 +97,7 @@ ArchiveRoot/
             2026_10_01_part3.csv   #  500 rekordów + nagłówek
 ```
 
-Baza pochodzi z `DatabaseName` zadania. Rok, miesiąc i dzień wynikają z daty danych; miesiące mają polskie nazwy bez znaków diakrytycznych (`styczen`, `luty`, `marzec`, `kwiecien`, `maj`, `czerwiec`, `lipiec`, `sierpien`, `wrzesien`, `pazdziernik`, `listopad`, `grudzien`). Przed rozpoczęciem eksportu dnia pakiet sprawdza, czy istnieje już jego ZIP albo katalog roboczy. Kolizja kończy zadanie błędem przed odczytem partii i usuwaniem danych; istniejące pliki pozostają bez zmian. Wymagane jest ręczne sprawdzenie wcześniejszych plików przed ponowieniem. Katalogi roku, miesiąca i dnia powstają dopiero przy zapisie pierwszej niepustej partii CSV; puste dni nie tworzą katalogów. W razie błędu eksportu pliki robocze pozostają do sprawdzenia. Robocze CSV znajdują się obok ZIP, w katalogu `2026_10_01`. Nazwy katalogów bazy i tabeli kodują niedozwolone znaki jako `~XXXX`. Istniejące archiwa w poprzednim układzie nie są przenoszone.
+Baza pochodzi z `DatabaseName` zadania. Rok, miesiąc i dzień wynikają z daty danych. Pierwszy eksport ma nazwę `yyyy_MM_dd.zip`, kolejne `yyyy_MM_dd__PART2.zip`, `__PART3.zip` itd. Licznik bierze najwyższą istniejącą część. ZIP-y, także stare `_retry`, nie są nadpisywane ani usuwane. Porzucone foldery robocze danego dnia są sprzątane przed ponownym eksportem; usuwane są tylko rozpoznane CSV i `archive.pending`, bez rekursji i bez podążania za linkami. Folder z ZIP-em lub obcymi plikami zatrzymuje job zamiast usuwać zawartość.
 
 **ZIP jest tworzony przez bloczek Execute Process Task, konfigurowany w Execute Process Task Editor.** Script Task przygotowuje tylko ścieżki i argumenty, nie uruchamia procesu ani kompresji.
 
@@ -122,7 +122,7 @@ Nie ma XML/base64, `BatchKeys`, przesyłania kluczy z C# do SQL ani `IDENTITY_IN
 
 Błąd odczytu, CSV lub ZIP blokuje DELETE całego bieżącego dnia: źródłowe dane dnia pozostają w bazie, a utworzone CSV/ZIP są zachowane do sprawdzenia. Tabela tymczasowa jest sprzątana także po błędzie, a kolejne zadanie nadal jest przetwarzane. Błąd DELETE również zachowuje pliki. Dni zakończone wcześniej poprawnie nie są wycofywane.
 
-Nie ma atomowej transakcji plik–baza. Przerwanie po utworzeniu ZIP, a przed DELETE pozostawia dane w obu miejscach; ponowienie napotka ochronę istniejącego folderu/ZIP. Zakładamy jedno aktywne przetwarzanie tabeli oraz brak zmian już istniejących historycznych rekordów podczas archiwizacji. Kontrola licznika po DELETE wykrywa rozbieżność, lecz nie cofa usunięcia.
+Nie ma atomowej transakcji plik–baza. Przerwanie po publikacji ZIP-a przed DELETE może pozostawić dane w obu miejscach; ponowienie tworzy następną część, a duplikaty są akceptowane. ZIP powstaje jako `archive.pending` w folderze roboczym, przechodzi test 7-Zip i jest publikowany przez File.Move bez nadpisywania. Usuwanie całej grupy nadal jest transakcyjne; rollback zachowuje źródło oraz utworzone archiwa.
 Metadane pochodzą z krótkiego zapytania do `sys.dm_exec_describe_first_result_set` w trybie browse. SQL Server zwraca nazwy kolumn, pełne definicje typów i oznaczenie kolumn klucza unikalnego. Nie ma ręcznego przeglądania indeksów ani odtwarzania długości, precyzji i skali typów. C# przygotowuje nagłówek oraz łączy wynik z typami CLR pustego SELECT. Brak rozpoznanego klucza lub NULL w wartości klucza oznacza błąd. Funkcja wymaga SQL Server 2012 lub nowszego; jej pole `is_hidden` opisuje wynik funkcji i nie jest kolumną `sys.columns.is_hidden`.
 
 Nazwy tabel i kolumn daty pochodzą z zaufanej konfiguracji i są wstawiane do SQL bez cytowania; parametry zadań Single row / None są wiązane. Zadania Full result set otrzymują gotowe zapytania bez zewnętrznych parametrów; literał nazwy tabeli w zapytaniu metadanych ma podwojone apostrofy, a daty i limit powstają wyłącznie z typowanych wartości. Zakładamy kolumnę daty `datetime2`. Partie z #ArchiveDay mają stabilną kolejność po rozpoznanych kolumnach klucza.
@@ -204,3 +204,26 @@ inicjalizacji po zapis wyniku, wraz z zależnościami, usuwaniem i sprzątaniem.
 RUN END obejmuje cały pakiet od inicjalizacji logów. Pusta tabela także ma JOB END.
 Czasy pochodzą z monotonicznego Stopwatch; zmiana zegara systemowego ich nie zaburza.
 Awaryjne zakończenie procesu może pozostawić wpis START bez odpowiadającego END.
+
+
+## Kontrola kompletności FK i ponowienia (2026-11-25)
+
+Przed eksportem joba pakiet czyta definicje FK źródłowej bazy i porównuje wszystkie
+osiągalne zależności z ArchiveJobRelations, także na kolejnych poziomach. Sprawdza
+NO_ACTION, CASCADE, SET_NULL i SET_DEFAULT również dla pustych dzieci. Brak relacji
+zatrzymuje job z nazwą FK, tabelami, kolumnami i DeleteRule; nie dodaje wpisów automatycznie.
+Złożony FK jest blokowany, ponieważ konfiguracja nie obsługuje AND kilku par kolumn.
+Konto źródła wymaga VIEW DEFINITION na bazie — bez niego kontrola nie zakłada kompletności.
+
+Kontrola planu odbywa się przed eksportem członków. Metadane FK są odświeżane i ponownie
+sprawdzane przed DELETE grupy dnia. Nie należy zmieniać schematu ani konfiguracji w trakcie
+archiwizacji; kontrola metadanych nie jest blokadą DDL utrzymywaną przez cały eksport.
+Nie zmieniono algorytmu wyboru rekordów, kolejności zależności ani transakcji DELETE.
+
+Blokada sp_getapplock (Session, w master) wyklucza równoległe przebiegi tego pakietu
+używające tego samego ArchiveRoot na tej samej instancji SQL. Chroni sprzątanie przed
+usunięciem folderu aktywnego eksportu. Zwolnienie jest również obsługiwane po zakończeniu
+pakietu błędem. Nie należy uruchamiać różnych serwerów SQL na wspólnym katalogu archiwów.
+
+Testy rzeczywistego pakietu: tools/Verify-ArchiveSafety.ps1; duży eksport:
+tools/Verify-ArchiveSafety.ps1 -LargeOnly. Dowody: verification/archive-safety-results.md.

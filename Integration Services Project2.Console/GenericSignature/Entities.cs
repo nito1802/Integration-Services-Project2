@@ -2,6 +2,14 @@ using System.ComponentModel.DataAnnotations;
 
 namespace IntegrationServicesProject2.Console.GenericSignature;
 
+// Independent load fixture; not part of the Process relation graph.
+public class ExportLoadRecord
+{
+    public long Id { get; set; }
+    public DateTime CreatedAt { get; set; }
+    [Required, MaxLength(128)] public string Payload { get; set; } = "";
+}
+
 public enum AutentiEnvelopeStatus { Created, Sent, Signed, Rejected }
 public enum AutentiRecipientStatus { Pending, Notified, Signed, Rejected }
 // The photos show these navigations, but not the dictionary definitions.

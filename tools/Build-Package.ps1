@@ -46,6 +46,9 @@ Add-Variable 'RunSummaryFile' ''
 foreach($name in @('RunStartedTicks','JobStartedTicks','MemberStartedTicks')) { Add-Variable $name ([long]0) }
 Add-Variable 'JobNumber' 0
 Add-Variable 'DayNumber' 0
+foreach($name in @('ArchiveLockSql','ArchiveUnlockSql','ForeignKeysSql','ValidationRoot','ZipWorkingFile')) { Add-Variable $name '' }
+Add-Variable 'ArchiveLockHeld' $false
+Add-Variable 'ForeignKeysData' (New-Object object)
 Add-Variable 'CurrentDateFrom' ([datetime]'2000-01-01')
 Add-Variable 'CurrentDateTo' ([datetime]'2000-01-01')
 Add-Variable 'DayHasFiles' $false
@@ -117,7 +120,12 @@ $prepareQueries=Add-Script $package 'Prepare job queries' '$Package::ArchiveJobs
 $initializeLog=Add-Script $package 'Initialize run log' '' ''
 Link $package $initializeLog $prepareQueries
 $getSettings=Add-Sql $package 'Load archive jobs' 'ArchiveDb' 'User::JobsSelectSql' 'Rowset' $true
-Link $package $prepareQueries $getSettings
+$prepareLock=Add-Script $package 'Prepare archive execution lock' '' ''
+$acquireLock=Add-Sql $package 'Acquire archive execution lock' 'ArchiveDb' 'User::ArchiveLockSql' 'SingleRow' $true
+Bind-Result $acquireLock '0' 'User::ArchiveLockHeld'
+Link $package $prepareQueries $prepareLock
+Link $package $prepareLock $acquireLock
+Link $package $acquireLock $getSettings
 Bind-Result $getSettings '0' 'User::Tables'
 $tables=$package.Executables.Add('STOCK:FOREACHLOOP'); $tables.Name='For each archive job'; $tables.DelayValidation=$true; $tables.FailPackageOnFailure=$true
 $tables.ForEachEnumerator=$app.ForEachEnumeratorInfos['Foreach ADO Enumerator'].CreateNew()
@@ -144,7 +152,20 @@ $processMetadata=Add-Script $tables 'Prepare export schema and header' 'User::Sh
 Link $tables $begin $shape
 Link $tables $shape $metadata
 Link $tables $metadata $processMetadata
-Link $tables $processMetadata $cutoff
+$prepareFK=Add-Script $tables 'Prepare FK validation queries' '' ''
+$configuredFK=Add-Sql $tables 'Load configured job relations' 'ArchiveDb' 'User::MembersSelectSql' 'Rowset' $true
+Bind-Input $configuredFK '@DatabaseName' 'User::DatabaseName' String 128
+Bind-Result $configuredFK '0' 'User::RelationsData'
+Job-Sql $configuredFK 'Capture configured relations error'
+$readFK=Add-Sql $tables 'Read foreign key definitions' 'ArchiveDb' 'User::ForeignKeysSql' 'Rowset' $true
+Bind-Result $readFK '0' 'User::ForeignKeysData'
+Job-Sql $readFK 'Capture foreign key metadata error'
+$validateFK=Add-Script $tables 'Validate archive relations' '' ''
+Link $tables $processMetadata $prepareFK
+Link $tables $prepareFK $configuredFK
+Link $tables $configuredFK $readFK
+Link $tables $readFK $validateFK
+Link $tables $validateFK $cutoff
 $firstDay=Add-Sql $tables 'Find first archive day' 'ArchiveDb' 'User::FirstDaySql' 'SingleRow' $true
 Bind-Input $firstDay '@Cutoff' 'User::CutoffDate' DateTime2
 Bind-Result $firstDay '0' 'User::CurrentDateFrom'
@@ -172,7 +193,9 @@ foreach($entry in @(@('MemberSchema',0),@('MemberTable',1),@('MemberParentKey',2
 }
 $planGraph=Add-Script $daysLoop 'Plan archive graph' '' ''
 Link $daysLoop $loadMembers $planGraph
-Link $daysLoop $planGraph $members
+$validatePlan=Add-Script $daysLoop 'Validate archive plan relations' '' ''
+Link $daysLoop $planGraph $validatePlan
+Link $daysLoop $validatePlan $members
 $prepareMember=Add-Script $members 'Prepare archive member' '' ''
 $memberShape=Add-Sql $members 'Read member column definitions' 'ArchiveDb' 'User::ShapeSql' 'Rowset' $true
 Bind-Result $memberShape '0' 'User::ShapeData'
@@ -212,15 +235,23 @@ $collect=Add-Script $members 'Collect archive member deletion' '' ''
 Link $members $batches $verifyDay
 Link $members $verifyDay $zip
 Link $members $zip $testZip
+$publish=Add-Script $members 'Publish verified archive' '' ''
 $processDiagnostics=Add-Script $members 'Collect ZIP process diagnostics' '' ''
-Link $members $testZip $processDiagnostics
+Link $members $testZip $publish
+Link $members $publish $processDiagnostics
 Link $members $processDiagnostics $collect
 $prepareDelete=Add-Script $daysLoop 'Prepare group deletion' '' ''
 Link $daysLoop $members $prepareDelete
 $delete=Add-Sql $daysLoop 'Delete archived day' 'ArchiveDb' 'User::DeleteSql' 'SingleRow' $true
 Bind-Result $delete '0' 'User::DeletedRows'
 Job-Sql $delete 'Capture day delete error'
-Link $daysLoop $prepareDelete $delete
+$refreshFK=Add-Sql $daysLoop 'Refresh foreign keys before deletion' 'ArchiveDb' 'User::ForeignKeysSql' 'Rowset' $true
+Bind-Result $refreshFK '0' 'User::ForeignKeysData'
+Job-Sql $refreshFK 'Capture FK refresh error'
+$validateDelete=Add-Script $daysLoop 'Validate relations before deletion' '' ''
+Link $daysLoop $prepareDelete $refreshFK
+Link $daysLoop $refreshFK $validateDelete
+Link $daysLoop $validateDelete $delete
 $nextDay=Add-Sql $daysLoop 'Find next archive day' 'ArchiveDb' 'User::NextDaySql' 'SingleRow' $true
 Bind-Input $nextDay '@Cutoff' 'User::CutoffDate' DateTime2
 Bind-Result $nextDay '0' 'User::CurrentDateFrom'
@@ -236,15 +267,26 @@ Link $tables $daysLoop $setStatus
 $report=Add-Script $tables 'Log job result' '' ''
 Link $tables $setStatus $report
 $summary=Add-Script $package 'Check overall archive result' '' ''
-Link $package $tables $summary
+$releaseLock=Add-Sql $package 'Release archive execution lock' 'ArchiveDb' 'User::ArchiveUnlockSql' 'SingleRow' $true
+Bind-Result $releaseLock '0' 'User::ArchiveLockHeld'
+Link $package $tables $releaseLock
+Link $package $releaseLock $summary
+# Also release after a fatal error. Propagated child OnPostExecute events must
+# not release a lock belonging to the still-running package.
+$releaseHandler=$package.EventHandlers.Add('OnPostExecute'); $releaseHandler.MaximumErrorCount=0
+$releaseOnFailure=Add-Sql $releaseHandler 'Release interrupted execution lock' 'ArchiveDb' 'User::ArchiveUnlockSql' 'SingleRow' $true
+Bind-Result $releaseOnFailure '0' 'User::ArchiveLockHeld'
+$releaseOnFailure.SetExpression('Disable','!@[User::ArchiveLockHeld] || @[System::SourceID] != @[System::PackageID]')
+$releaseOnFailure.FailPackageOnFailure=$false; $releaseOnFailure.FailParentOnFailure=$false; $releaseOnFailure.MaximumErrorCount=0
 # Script errors are captured inside Main, before SSIS raises OnError. A nested
 # Script Task handler would request locks still owned by its failing parent.
-foreach($task in @($prepareJob,$begin,$processMetadata,$guid,$construct,$export,$verifyDay,$finalize,$group,$prepareMember,$memberSchema,$collect,$planGraph,$zip,$testZip)) {
+foreach($task in @($prepareJob,$begin,$processMetadata,$guid,$construct,$export,$verifyDay,$finalize,$group,$prepareMember,$memberSchema,$collect,$planGraph,$zip,$testZip,$publish,$prepareFK,$validateFK,$validatePlan,$validateDelete)) {
     ($scriptDefinitions | Where-Object { $_.Name -eq $task.Name }).HandleJobError=$true
     if($task -ne $prepareJob) { $task.SetExpression('Disable','@[User::JobFailed]') }
 }
 $zip.SetExpression('Disable','@[User::JobFailed] || !@[User::DayHasFiles]')
 $testZip.SetExpression('Disable','@[User::JobFailed] || !@[User::DayHasFiles]')
+$publish.SetExpression('Disable','@[User::JobFailed] || !@[User::DayHasFiles]')
 # Restore the parent name even after a member failed, so logs identify the job.
 ($scriptDefinitions | Where-Object { $_.Name -eq 'Collect ZIP process diagnostics' }).HandleJobError=$true
 ($scriptDefinitions | Where-Object { $_.Name -eq 'Prepare group deletion' }).HandleJobError=$true
@@ -274,9 +316,12 @@ foreach($definition in $scriptDefinitions) {
     $newName='ST_'+[Guid]::NewGuid().ToString('N')
     $projectNode.SetAttribute('Name',$newName)
     $projectNode.SetAttribute('VSTAMajorVersion',[string]$scriptMajor)
-    $sourceName=if($definition.SqlProgress) { 'Log SQL progress' } elseif($definition.Name -in @('Create daily ZIP','Verify ZIP integrity')) { 'Run ZIP process' } elseif($definition.Name -like 'Capture * error') { 'Capture SQL error' } elseif($definition.Name -eq 'Prepare member export schema') { 'Prepare export schema and header' } else { $definition.Name }
+    $sourceName=if($definition.SqlProgress) { 'Log SQL progress' } elseif($definition.Name -in @('Create daily ZIP','Verify ZIP integrity')) { 'Run ZIP process' } elseif($definition.Name -in @('Validate archive plan relations','Validate relations before deletion')) { 'Validate archive relations' } elseif($definition.Name -like 'Capture * error') { 'Capture SQL error' } elseif($definition.Name -eq 'Prepare member export schema') { 'Prepare export schema and header' } else { $definition.Name }
     $main=Get-Content -LiteralPath (Join-Path $root ('scripts\'+$sourceName+'.cs')) -Raw
     if($definition.HandleJobError) { $main=Get-JobScriptSource $main }
+    if($definition.Name -in @('Initialize daily archive','Finalize successful archives')) {
+        $main+="`r`n"+(Get-Content (Join-Path $root 'scripts/Archive work folders.cs') -Raw)
+    }
     if($definition.SqlProgress) {
         $detail=if($definition.SqlProgress -eq 'SQL ERROR') {'Convert.ToString(Dts.Variables["System::ErrorDescription"].Value)'}else{'""'}
         $main=$main.Replace('__SQL_STATE__',$definition.SqlProgress).Replace('__SQL_DETAIL__',$detail)

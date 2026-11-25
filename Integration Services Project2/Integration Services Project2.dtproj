@@ -41,10 +41,10 @@
                 <SSIS:Property SSIS:Name="Name">ArchiveClosedOrders</SSIS:Property>
                 <SSIS:Property SSIS:Name="VersionMajor">1</SSIS:Property>
                 <SSIS:Property SSIS:Name="VersionMinor">0</SSIS:Property>
-                <SSIS:Property SSIS:Name="VersionBuild">62</SSIS:Property>
+                <SSIS:Property SSIS:Name="VersionBuild">65</SSIS:Property>
                 <SSIS:Property SSIS:Name="VersionComments">
                 </SSIS:Property>
-                <SSIS:Property SSIS:Name="VersionGUID">{3798962A-CB7A-4351-820A-06F49446EC9A}</SSIS:Property>
+                <SSIS:Property SSIS:Name="VersionGUID">{38249EBD-E589-4A25-B974-60F42BE0A881}</SSIS:Property>
                 <SSIS:Property SSIS:Name="PackageFormatVersion">8</SSIS:Property>
                 <SSIS:Property SSIS:Name="Description">Daily CSV parts with configurable row limit; verified ZIP before source deletion; console-free 7-Zip creation and integrity checks.</SSIS:Property>
                 <SSIS:Property SSIS:Name="ProtectionLevel">0</SSIS:Property>
@@ -88,7 +88,7 @@
                     <SSIS:Property SSIS:Name="IncludeInDebugDump">0</SSIS:Property>
                     <SSIS:Property SSIS:Name="Required">0</SSIS:Property>
                     <SSIS:Property SSIS:Name="Sensitive">0</SSIS:Property>
-                    <SSIS:Property SSIS:Name="Value">C:\Archivess</SSIS:Property>
+                    <SSIS:Property SSIS:Name="Value">C:\ArchivessXX</SSIS:Property>
                     <SSIS:Property SSIS:Name="DataType">18</SSIS:Property>
                   </SSIS:Properties>
                 </SSIS:Parameter>

@@ -13,8 +13,19 @@ foreach($database in @('nito_superDb','nito_SomeApps')) {
 SET NOCOUNT ON;
 IF EXISTS(SELECT 1 FROM sys.tables WHERE schema_id=SCHEMA_ID(N'ArchiveScenarioTest'))
     THROW 50001,'Old scenario tables remain.',1;
-IF (SELECT COUNT(*) FROM sys.tables WHERE schema_id=SCHEMA_ID(N'GenericSignatureTest'))<>9
-    THROW 50001,'Expected nine model tables.',1;
+IF (SELECT COUNT(*) FROM sys.tables WHERE schema_id=SCHEMA_ID(N'GenericSignatureTest'))<>10
+    THROW 50001,'Expected ten model tables.',1;
+IF (SELECT COUNT(*) FROM GenericSignatureTest.ExportLoadTest)<>100000
+    THROW 50001,'Expected 100000 load-test rows.',1;
+IF (SELECT max_length FROM sys.columns WHERE object_id=OBJECT_ID(N'GenericSignatureTest.ExportLoadTest') AND name=N'Payload')<>256
+    THROW 50001,'Load-test payload must be nvarchar(128).',1;
+IF ISNULL(HAS_PERMS_BY_NAME(DB_NAME(),N'DATABASE',N'VIEW DEFINITION'),0)<>1
+    THROW 50001,'Archive FK validation needs VIEW DEFINITION on this source database.',1;
+IF EXISTS(SELECT 1 FROM GenericSignatureTest.ExportLoadTest WHERE CreatedAt<'20240614' OR CreatedAt>='20240615')
+    THROW 50001,'Unexpected load-test date.',1;
+IF (SELECT COUNT(*) FROM nito_superDb.Archive.ArchiveJobs WHERE DatabaseName=DB_NAME()
+    AND TableName=N'GenericSignatureTest.ExportLoadTest' AND DateColumn=N'CreatedAt' AND LastProcessedStatus IS NULL)<>1
+    THROW 50001,'Missing or incorrectly reset load-test archive job.',1;
 DECLARE @Expected int=0,@Days int=0,@Offset int=0,@Date date='20230101';
 WHILE @Date<=CONVERT(date,GETDATE()) BEGIN
     DECLARE @Count int=CASE WHEN @Offset%23=7 THEN 0 WHEN @Offset%31=0 THEN 35 ELSE 1+@Offset*17%9 END;

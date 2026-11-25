@@ -148,9 +148,9 @@ if($FullPackage) {
     $stubPath=Join-Path $build 'Stub.cs'; [IO.File]::WriteAllText($stubPath,$stub)
     $files=@($stubPath)
     $common=Get-Content -LiteralPath (Join-Path $root 'scripts/Common.cs') -Raw
-    $names=@('Prepare job queries','Initialize job variables','Prepare metadata and date queries','Initialize daily archive','Prepare batch select query','Write batch to CSV','Verify exported day','Verify deleted row count','Log job result','Capture SQL error','Prepare export schema and header','Delete temporary CSV files','Prepare related archive group','Prepare archive member','Prepare member export schema','Collect archive member deletion','Prepare group deletion','Finalize successful archives','Plan archive graph','Collect ZIP process diagnostics','Create daily ZIP','Verify ZIP integrity')
+    $names=@('Prepare job queries','Initialize job variables','Prepare metadata and date queries','Initialize daily archive','Prepare batch select query','Write batch to CSV','Verify exported day','Verify deleted row count','Log job result','Capture SQL error','Prepare export schema and header','Delete temporary CSV files','Prepare related archive group','Prepare archive member','Prepare member export schema','Collect archive member deletion','Prepare group deletion','Finalize successful archives','Plan archive graph','Collect ZIP process diagnostics','Create daily ZIP','Verify ZIP integrity','Publish verified archive')
     for($i=0;$i -lt $names.Count;$i++) {
-                $sourceName=if($names[$i] -in @('Create daily ZIP','Verify ZIP integrity')) {'Run ZIP process'} elseif($names[$i] -eq 'Prepare member export schema') {'Prepare export schema and header'} else {$names[$i]}
+                $sourceName=if($names[$i] -in @('Create daily ZIP','Verify ZIP integrity','Publish verified archive')) {'Run ZIP process'} elseif($names[$i] -eq 'Prepare member export schema') {'Prepare export schema and header'} else {$names[$i]}
         $main=Get-Content -LiteralPath (Join-Path $root ('scripts/'+$sourceName+'.cs')) -Raw
         if($RelatedFailure -eq 'ChildWrite' -and $names[$i] -eq 'Write batch to CSV') {
             $main=$main.Replace('writer.WriteLine();','writer.WriteLine(); if (Convert.ToString(Dts.Variables["User::TableName"].Value) == "dbo.OrderLines") throw new IOException("Injected child CSV failure.");')
@@ -158,6 +158,7 @@ if($FullPackage) {
         if($FailureMode -eq 'Write' -and $names[$i] -eq 'Write batch to CSV') {
             $main=$main.Replace('writer.WriteLine();','writer.WriteLine(); if (Convert.ToString(Dts.Variables["User::TableName"].Value) == "dbo.Orders") throw new IOException("Injected write failure.");')
         }
+        if($names[$i] -in @('Initialize daily archive','Finalize successful archives')) { $main+="`r`n"+(Get-Content (Join-Path $root 'scripts/Archive work folders.cs') -Raw) }
         if($names[$i] -notin @('Prepare job queries','Log job result','Capture SQL error')) { $main=Get-JobScriptSource $main }
         $file=Join-Path $build ('Step'+$i+'.cs')
         [IO.File]::WriteAllText($file,$common.Replace('__NAMESPACE__',('NativeProbe'+$i)).Replace('// __MAIN__',$main)); $files+=$file
@@ -170,7 +171,7 @@ if($FullPackage) {
     function Step($container,$name) {
         $task=$container.Executables[$name]
         if($task.GetExpression('Disable') -and $package.Variables['User::JobFailed'].Value) { return }
-        if($name -in @('Create daily ZIP','Verify ZIP integrity') -and ($package.Variables['User::JobFailed'].Value -or !$package.Variables['User::DayHasFiles'].Value)) { return }
+        if($name -in @('Create daily ZIP','Verify ZIP integrity','Publish verified archive') -and ($package.Variables['User::JobFailed'].Value -or !$package.Variables['User::DayHasFiles'].Value)) { return }
         $index=[Array]::IndexOf($names,$name)
         if($index -ge 0) {
             $probe.Variables.Clear()
@@ -227,7 +228,7 @@ if($FullPackage) {
         $result=$task.Execute($package.Connections,$task.Variables,$null,$null,$null)
         $errors=@($package.Errors | Select-Object -Skip $before | ForEach-Object Description)
         if($result -ne 'Success' -or $errors.Count -gt 0) {
-            if($name -in @('Calculate retention cutoff','Read archive batch','Read column definitions','Read SQL types and keys','Find first archive day','Find next archive day','Stage archive day','Drop staged day','Stage parent day','Load archive members','Read member column definitions','Read member SQL types and keys','Delete archived day','Create daily ZIP','Verify ZIP integrity')) {
+            if($name -in @('Calculate retention cutoff','Read archive batch','Read column definitions','Read SQL types and keys','Find first archive day','Find next archive day','Stage archive day','Drop staged day','Stage parent day','Load archive members','Read member column definitions','Read member SQL types and keys','Delete archived day','Create daily ZIP','Verify ZIP integrity','Publish verified archive')) {
                 # TaskHost.Execute does not dispatch the package scheduler's event handlers.
                 $package.Variables['User::JobFailed'].Value=$true
                 $package.Variables['User::JobError'].Value=$errors -join [Environment]::NewLine
@@ -286,7 +287,7 @@ if($FullPackage) {
                 while(!$package.Variables['User::JobFailed'].Value -and $package.Variables['User::BatchHasRows'].Value) {
                     foreach($name in @('Prepare batch select query','Read archive batch','Write batch to CSV')) { Step $batches $name }
                 }
-                foreach($name in @('Verify exported day','Create daily ZIP','Verify ZIP integrity','Collect ZIP process diagnostics','Collect archive member deletion')) { Step $members $name }
+                foreach($name in @('Verify exported day','Create daily ZIP','Verify ZIP integrity','Publish verified archive','Collect ZIP process diagnostics','Collect archive member deletion')) { Step $members $name }
             }
             foreach($name in @('Prepare group deletion','Delete archived day','Finalize successful archives','Find next archive day')) { Step $daily $name }
 
@@ -425,7 +426,7 @@ try {
         $archive=[IO.Compression.ZipFile]::OpenRead($zip.FullName)
         try {
             foreach($entry in $archive.Entries) {
-                if($zip.BaseName -notmatch '^\d{4}_\d{2}_\d{2}(_retry_[a-f0-9]{32})?$' -or $entry.Name -notmatch ('^'+[regex]::Escape($zip.BaseName.Substring(0,10))+'_part[1-9][0-9]*\.csv$')) { throw 'Unexpected ZIP/CSV naming' }
+                if($zip.BaseName -notmatch '^\d{4}_\d{2}_\d{2}(__PART(?:[2-9]|[1-9][0-9]+))?$' -or $entry.Name -notmatch ('^'+[regex]::Escape($zip.BaseName.Substring(0,10))+'_part[1-9][0-9]*\.csv$')) { throw 'Unexpected ZIP/CSV naming' }
                 if($entry.Name -notlike '*.csv' -or $entry.FullName -ne $entry.Name) { throw 'ZIP must contain flat CSV entries only' }
                 $reader=New-Object IO.StreamReader($entry.Open())
                 try { $content=$reader.ReadToEnd() } finally { $reader.Dispose() }

@@ -26,11 +26,14 @@ function Place($id,$x,$y,$width=210,$height=46,$container=$false) {
     }
 }
 # Coordinates are relative to the containing panel.
-Place 'Package\Prepare job queries' 32 24
-Place 'Package\Initialize run log' 310 24
-Place 'Package\Load archive jobs' 32 120
-Place 'Package\For each archive job' 32 216 1100 2300 $true
-Place 'Package\Check overall archive result' 32 2566
+Place 'Package\Initialize run log' 32 24
+Place 'Package\Prepare job queries' 310 24
+Place 'Package\Prepare archive execution lock' 590 24
+Place 'Package\Acquire archive execution lock' 32 120
+Place 'Package\Load archive jobs' 310 120
+Place 'Package\For each archive job' 32 216 1100 2600 $true
+Place 'Package\Release archive execution lock' 32 2900
+Place 'Package\Check overall archive result' 310 2900
 $jobs='Package\For each archive job'
 Place "$jobs\Mark job as started" 28 24
 Place "$jobs\Initialize job variables" 294 24
@@ -38,15 +41,20 @@ Place "$jobs\Prepare metadata and date queries" 560 24
 Place "$jobs\Read column definitions" 826 24
 Place "$jobs\Read SQL types and keys" 826 140
 Place "$jobs\Prepare export schema and header" 560 140
-Place "$jobs\Calculate retention cutoff" 294 140
-Place "$jobs\Find first archive day" 294 260
-Place "$jobs\For each archive day" 28 410 1030 1640 $true
+Place "$jobs\Prepare FK validation queries" 28 240
+Place "$jobs\Load configured job relations" 294 240
+Place "$jobs\Read foreign key definitions" 560 240
+Place "$jobs\Validate archive relations" 826 240
+Place "$jobs\Calculate retention cutoff" 294 350
+Place "$jobs\Find first archive day" 560 350
+Place "$jobs\For each archive day" 28 460 1030 1900 $true
 $daily="$jobs\For each archive day"
 Place "$daily\Prepare related archive group" 24 24
 Place "$daily\Stage parent day" 340 24
 Place "$daily\Load archive members" 656 24
 Place "$daily\Plan archive graph" 656 85
-Place "$daily\For each archive member" 24 140 970 1100 $true
+Place "$daily\Validate archive plan relations" 340 85
+Place "$daily\For each archive member" 24 180 970 1100 $true
 $member="$daily\For each archive member"
 Place "$member\Prepare archive member" 24 24
 Place "$member\Read member column definitions" 340 24
@@ -59,14 +67,17 @@ Place "$member\Process daily batches" 24 300 920 150 $true
 Place "$member\Verify exported day" 24 530
 Place "$member\Create daily ZIP" 340 530
 Place "$member\Verify ZIP integrity" 656 530
+Place "$member\Publish verified archive" 24 700
 Place "$member\Collect archive member deletion" 656 700
 Place "$member\Collect ZIP process diagnostics" 340 700
 Place "$daily\Prepare group deletion" 24 1320
-Place "$daily\Delete archived day" 340 1320
-Place "$daily\Finalize successful archives" 656 1320
-Place "$daily\Find next archive day" 656 1450
-Place "$jobs\Save job result" 294 2130
-Place "$jobs\Log job result" 560 2130
+Place "$daily\Refresh foreign keys before deletion" 340 1320
+Place "$daily\Validate relations before deletion" 656 1320
+Place "$daily\Delete archived day" 24 1470
+Place "$daily\Finalize successful archives" 340 1470
+Place "$daily\Find next archive day" 656 1470
+Place "$jobs\Save job result" 294 2440
+Place "$jobs\Log job result" 560 2440
 $batch="$member\Process daily batches"
 Place "$batch\Prepare batch select query" 24 24 240
 Place "$batch\Read archive batch" 330 24 240

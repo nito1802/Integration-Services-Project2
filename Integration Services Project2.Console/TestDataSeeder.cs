@@ -53,6 +53,14 @@ public sealed class TestDataSeeder
                         if (!string.IsNullOrWhiteSpace(batch)) await db.Database.ExecuteSqlRawAsync(batch, cancellationToken);
             }
             await db.Database.ExecuteSqlRawAsync("""
+                IF OBJECT_ID(N'GenericSignatureTest.ExportLoadTest',N'U') IS NULL
+                BEGIN
+                    CREATE TABLE GenericSignatureTest.ExportLoadTest
+                        (Id bigint NOT NULL PRIMARY KEY,CreatedAt datetime2(7) NOT NULL,Payload nvarchar(128) NOT NULL);
+                    CREATE INDEX IX_ExportLoadTest_CreatedAt ON GenericSignatureTest.ExportLoadTest(CreatedAt);
+                END;
+                DELETE FROM GenericSignatureTest.ExportLoadTest;
+                ALTER TABLE GenericSignatureTest.ExportLoadTest ALTER COLUMN Payload nvarchar(128) NOT NULL;
                 DELETE FROM GenericSignatureTest.AutentiRecipients;
                 DELETE FROM GenericSignatureTest.EkdProcessHistories;
                 DELETE FROM GenericSignatureTest.AutentiProcesses;
@@ -131,6 +139,15 @@ public sealed class TestDataSeeder
                     System.Console.WriteLine($"{database}: zapisano do {day:yyyy-MM-dd}, {processes} procesów...");
                 }
             }
+            System.Console.WriteLine($"{database}: seed ExportLoadTest — 100 000 rekordów, około 10 MB CSV...");
+            await db.Database.ExecuteSqlRawAsync("""
+                ;WITH n AS (SELECT TOP (100000) CONVERT(bigint,ROW_NUMBER() OVER(ORDER BY (SELECT NULL))) AS Id
+                    FROM sys.all_objects a CROSS JOIN sys.all_objects b)
+                INSERT GenericSignatureTest.ExportLoadTest(Id,CreatedAt,Payload)
+                SELECT Id,DATEADD(second,CONVERT(int,Id%86400),CONVERT(datetime2(7),'20240614')),
+                    REPLICATE(CONVERT(nvarchar(max),N'0123456789ABCDEF'),4) FROM n;
+                IF @@ROWCOUNT<>100000 THROW 50014,'Load fixture must contain 100000 records.',1;
+                """, cancellationToken);
             await ExecuteAsync(db, """
                 DELETE FROM Archive.ArchiveJobRelations WHERE DatabaseName=@DatabaseName
                   AND (LEFT(ParentTable,20)=N'ArchiveScenarioTest.' OR LEFT(ChildTable,20)=N'ArchiveScenarioTest.'
@@ -142,6 +159,12 @@ public sealed class TestDataSeeder
                 UPDATE Archive.ArchiveJobs SET DateColumn=N'CreationDate',ArchiveOlderThanDays=30,
                     LastSuccesProcessedAt=NULL,LastProcessedAt=NULL,LastProcessedStatus=NULL,ErrorMessage=NULL
                 WHERE DatabaseName=@DatabaseName AND TableName=N'GenericSignatureTest.Processes';
+                IF NOT EXISTS(SELECT 1 FROM Archive.ArchiveJobs WHERE DatabaseName=@DatabaseName AND TableName=N'GenericSignatureTest.ExportLoadTest')
+                    INSERT Archive.ArchiveJobs(DatabaseName,TableName,DateColumn,ArchiveOlderThanDays)
+                    VALUES(@DatabaseName,N'GenericSignatureTest.ExportLoadTest',N'CreatedAt',30);
+                UPDATE Archive.ArchiveJobs SET DateColumn=N'CreatedAt',ArchiveOlderThanDays=30,
+                    LastSuccesProcessedAt=NULL,LastProcessedAt=NULL,LastProcessedStatus=NULL,ErrorMessage=NULL
+                WHERE DatabaseName=@DatabaseName AND TableName=N'GenericSignatureTest.ExportLoadTest';
                 INSERT Archive.ArchiveJobRelations(DatabaseName,ParentTable,ChildTable,ParentKeyColumn,ChildKeyColumn)
                 SELECT @DatabaseName,N'GenericSignatureTest.'+p,N'GenericSignatureTest.'+c,pk,ck FROM (VALUES
                     (N'Processes',N'AutentiProcesses',N'Id',N'ProcessId'),
@@ -153,7 +176,7 @@ public sealed class TestDataSeeder
                 ) e(p,c,pk,ck);
                 """, "nito_superDb", cancellationToken, database);
             await transaction.CommitAsync(cancellationToken);
-            System.Console.WriteLine($"{database}: {processes} procesów; {populatedDays} dni z danymi ({dates[0]:yyyy-MM-dd}–{dates[^1]:yyyy-MM-dd}); 1 job, 6 relacji.");
+            System.Console.WriteLine($"{database}: {processes} procesów; {populatedDays} dni z danymi ({dates[0]:yyyy-MM-dd}–{dates[^1]:yyyy-MM-dd}); ExportLoadTest: 100 000 rekordów; 2 joby, 6 relacji.");
         }
     }
 

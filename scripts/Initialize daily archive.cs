@@ -18,14 +18,29 @@
             string database = ArchivePathName(Convert.ToString(Dts.Variables["User::DatabaseName"].Value, CultureInfo.InvariantCulture));
             string folder = Path.Combine(Path.GetFullPath(Convert.ToString(Dts.Variables["User::ArchiwumPath"].Value, CultureInfo.InvariantCulture)), database,
                 safeName, date.ToString("yyyy", CultureInfo.InvariantCulture), months[date.Month - 1], day);
-            string zip = folder + ".zip";
-            if (Directory.Exists(folder) || File.Exists(folder) || File.Exists(zip) || Directory.Exists(zip))
+            string directory = Path.GetDirectoryName(folder);
+            // A session application lock excludes another exporter using this root.
+            // Old work files may be rebuilt; all existing ZIPs remain immutable.
+            if (Directory.Exists(directory))
             {
-                folder += "_retry_" + Convert.ToString(Dts.Variables["User::ArchiveAttempt"].Value);
-                zip = folder + ".zip";
-                if (Directory.Exists(folder) || File.Exists(folder) || File.Exists(zip) || Directory.Exists(zip))
-                    throw new IOException("Archive attempt destination already exists: " + folder);
+                foreach (string previous in Directory.GetDirectories(directory, day + "*"))
+                    if (WorkFolderName(Path.GetFileName(previous), day)) CleanWorkFolder(previous);
             }
+            int lastPart = File.Exists(folder + ".zip") ? 1 : 0;
+            if (Directory.Exists(folder + ".zip")) throw new IOException("ZIP destination is a directory: " + folder);
+            if (Directory.Exists(directory))
+                foreach (string previous in Directory.GetFiles(directory, day + "__PART*.zip"))
+                {
+                    string name = Path.GetFileNameWithoutExtension(previous);
+                    int part;
+                    if (int.TryParse(name.Substring(day.Length + 6), out part) && part >= 2)
+                        lastPart = Math.Max(lastPart, part);
+                }
+            if (lastPart == int.MaxValue) throw new IOException("Archive part counter exhausted.");
+            string zip = folder + (lastPart == 0 ? "" : "__PART" + (lastPart + 1).ToString(CultureInfo.InvariantCulture)) + ".zip";
+            if (File.Exists(folder) || File.Exists(zip) || Directory.Exists(zip))
+                throw new IOException("Archive destination already exists: " + zip);
+            string workingZip = Path.Combine(folder, "archive.pending");
             string output = Path.Combine(folder, safeName + "_" + day + ".csv");
             Dts.Variables["User::FolderFullPath"].Value = folder;
             Dts.Variables["User::OutputFile"].Value = output;
@@ -34,8 +49,9 @@
             Dts.Variables["User::BatchHasRows"].Value = true;
             Dts.Variables["User::DayHasFiles"].Value = false;
             Dts.Variables["User::ZipFile"].Value = zip;
-            Dts.Variables["User::ZipArguments"].Value = "a -tzip -y \"" + zip + "\" \"" + Path.Combine(folder, "*.csv") + "\"";
-            Dts.Variables["User::ZipTestArguments"].Value = "t -tzip \"" + zip + "\"";
+            Dts.Variables["User::ZipWorkingFile"].Value = workingZip;
+            Dts.Variables["User::ZipArguments"].Value = "a -tzip -y \"" + workingZip + "\" \"" + Path.Combine(folder, "*.csv") + "\"";
+            Dts.Variables["User::ZipTestArguments"].Value = "t -tzip \"" + workingZip + "\"";
             Dts.Variables["User::DayRows"].Value = 0L;
             Dts.Variables["User::DayExportedRows"].Value = 0L;
             string table = Convert.ToString(Dts.Variables["User::QualifiedTableName"].Value);
