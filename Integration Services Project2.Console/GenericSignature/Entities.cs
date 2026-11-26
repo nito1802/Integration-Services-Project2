@@ -15,9 +15,16 @@ public enum AutentiRecipientStatus { Pending, Notified, Signed, Rejected }
 // The photos show these navigations, but not the dictionary definitions.
 public class NewProcessType { [MaxLength(30)] public string Id { get; set; } = ""; [MaxLength(128)] public string Name { get; set; } = ""; }
 public class EkdStatus { [MaxLength(64)] public string Id { get; set; } = ""; [MaxLength(128)] public string Name { get; set; } = ""; }
+public class Document
+{
+    public Guid Id { get; set; }
+    [Required, MaxLength(256)] public string FileName { get; set; } = "";
+}
 public class Process
 {
     public Guid Id { get; set; }
+    public Guid? DocumentId { get; set; }
+    public Document? Document { get; set; }
     [Required, MaxLength(30)] public string ProcessTypeId { get; set; } = "";
     public NewProcessType ProcessType { get; set; } = null!;
     [MaxLength(50)] public string? SignatureTypeId { get; set; }

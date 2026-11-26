@@ -52,7 +52,20 @@ public sealed class TestDataSeeder
                     foreach (var batch in System.Text.RegularExpressions.Regex.Split(db.Database.GenerateCreateScript(), @"^GO\s*$", System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.IgnoreCase))
                         if (!string.IsNullOrWhiteSpace(batch)) await db.Database.ExecuteSqlRawAsync(batch, cancellationToken);
             }
+            // Upgrade an already existing test model as well as supporting fresh databases.
             await db.Database.ExecuteSqlRawAsync("""
+                IF OBJECT_ID(N'GenericSignatureTest.Documents',N'U') IS NULL
+                    CREATE TABLE GenericSignatureTest.Documents
+                        (Id uniqueidentifier NOT NULL CONSTRAINT PK_Documents PRIMARY KEY, FileName nvarchar(256) NOT NULL);
+                IF COL_LENGTH(N'GenericSignatureTest.Processes',N'DocumentId') IS NULL
+                    ALTER TABLE GenericSignatureTest.Processes ADD DocumentId uniqueidentifier NULL;
+                """, cancellationToken);
+            await db.Database.ExecuteSqlRawAsync("""
+                IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'GenericSignatureTest.Processes') AND name=N'IX_Processes_DocumentId')
+                    CREATE INDEX IX_Processes_DocumentId ON GenericSignatureTest.Processes(DocumentId);
+                IF NOT EXISTS(SELECT 1 FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'GenericSignatureTest.Processes') AND name=N'FK_Processes_Documents_DocumentId')
+                    ALTER TABLE GenericSignatureTest.Processes WITH CHECK ADD CONSTRAINT FK_Processes_Documents_DocumentId
+                        FOREIGN KEY(DocumentId) REFERENCES GenericSignatureTest.Documents(Id) ON DELETE NO ACTION;
                 IF OBJECT_ID(N'GenericSignatureTest.ExportLoadTest',N'U') IS NULL
                 BEGIN
                     CREATE TABLE GenericSignatureTest.ExportLoadTest
@@ -68,6 +81,7 @@ public sealed class TestDataSeeder
                 DELETE FROM GenericSignatureTest.CallProcesses;
                 DELETE FROM GenericSignatureTest.ProcessData;
                 DELETE FROM GenericSignatureTest.Processes;
+                DELETE FROM GenericSignatureTest.Documents;
                 DELETE FROM GenericSignatureTest.ProcessTypes;
                 DELETE FROM GenericSignatureTest.EkdStatuses;
                 DBCC CHECKIDENT ('GenericSignatureTest.EkdProcessHistories',RESEED,0) WITH NO_INFOMSGS;
@@ -139,6 +153,19 @@ public sealed class TestDataSeeder
                     System.Console.WriteLine($"{database}: zapisano do {day:yyyy-MM-dd}, {processes} procesów...");
                 }
             }
+            var sharedDocument = new Document { Id=Guid.Parse("00000000-0000-0000-0000-000000000d01"), FileName="shared-contract.pdf" };
+            db.Add(sharedDocument);
+            foreach (var old in new[] { true, false })
+                db.Processes.Add(new Process {
+                    Id=Guid.Parse(old ? "00000000-0000-0000-0000-000000000a01" : "00000000-0000-0000-0000-000000000a02"),
+                    Document=sharedDocument, ProcessTypeId="CUSTOMER_ONBOARDING", Status="Success",
+                    CreationDate=old ? new DateTime(2023,3,7,15,0,0) : today.AddHours(12),
+                    ExternalId=old ? "SHARED-DOC-OLD" : "SHARED-DOC-NEW",
+                    EqNumber=old ? "SHARED-DOC-OLD" : "SHARED-DOC-NEW", UserLogin="seed.shared", ClientWorkingMode="TEST"
+                });
+            await db.SaveChangesAsync(cancellationToken);
+            processes+=2;
+            System.Console.WriteLine($"{database}: wspólny shared-contract.pdf: SHARED-DOC-OLD (2023-03-07) i SHARED-DOC-NEW ({today:yyyy-MM-dd}); razem {processes} procesów.");
             System.Console.WriteLine($"{database}: seed ExportLoadTest — 100 000 rekordów, około 10 MB CSV...");
             await db.Database.ExecuteSqlRawAsync("""
                 ;WITH n AS (SELECT TOP (100000) CONVERT(bigint,ROW_NUMBER() OVER(ORDER BY (SELECT NULL))) AS Id
@@ -176,7 +203,7 @@ public sealed class TestDataSeeder
                 ) e(p,c,pk,ck);
                 """, "nito_superDb", cancellationToken, database);
             await transaction.CommitAsync(cancellationToken);
-            System.Console.WriteLine($"{database}: {processes} procesów; {populatedDays} dni z danymi ({dates[0]:yyyy-MM-dd}–{dates[^1]:yyyy-MM-dd}); ExportLoadTest: 100 000 rekordów; 2 joby, 6 relacji.");
+            System.Console.WriteLine($"{database}: {processes} procesów (w tym 2 współdzielące dokument); standardowy zestaw: {populatedDays} dni ({dates[0]:yyyy-MM-dd}–{dates[^1]:yyyy-MM-dd}); ExportLoadTest: 100 000 rekordów; 2 joby, 6 relacji.");
         }
     }
 

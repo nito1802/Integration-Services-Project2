@@ -1,5 +1,17 @@
 -- Run in the database containing the Archive configuration schema.
 -- Migrates existing job-bound relations to shared database/table relations.
+
+
+Skrypt archiwizuje dane starsze niż ustawiona retencja. Dla każdego dnia eksportuje tabelę główną oraz jej powiązane dzieci do CSV, tworzy osobne ZIP-y dla tabel i sprawdza ich integralność. Dopiero po poprawnej weryfikacji całej grupy usuwa dane z bazy — najpierw dzieci, potem rodzica. Istniejące ZIP-y pozostają bez zmian, a kolejne eksporty tego samego dnia otrzymują końcówki __PART2, __PART3 itd.
+
+Aby dodać własne dane do archiwizacji:
+1. W Archive.ArchiveJobs dodaj wpis z nazwą bazy (DatabaseName), tabelą w formacie schema.Tabela (TableName), kolumną daty (DateColumn) i retencją w dniach (ArchiveOlderThanDays).
+2. W Archive.ArchiveJobRelations zdefiniuj zależności: DatabaseName, ParentTable, ChildTable, ParentKeyColumn oraz ChildKeyColumn. Dodaj również kolejne poziomy dzieci; kolejność wpisów nie ma znaczenia. Dzieci nie potrzebują własnej kolumny daty — są wybierane przez powiązanie z archiwizowanymi rekordami.
+3. Ustaw parametry pakietu: połączenie z serwerem, lokalizację tabel konfiguracji i folder archiwów. Opcjonalnie włącz logi szczegółowe i podsumowanie.
+Przed eksportem skrypt sprawdza, czy konfiguracja obejmuje zależności FK wymagane do bezpiecznego usuwania. Tabele słownikowe lub inne rekordy wskazywane przez tabelę główną nie są automatycznie archiwizowane ani usuwane.
+
+
+
 SET XACT_ABORT ON;
 BEGIN TRANSACTION;
 BEGIN TRY
